@@ -16,12 +16,16 @@ subsystem, ask its owner or open a pull request for them to review.
 ## 1. Members and subsystems
 
 | # | Subsystem (what it does) | Student ID | GitHub username | Code | Tests |
-|---|---|---|---|---|---|
-| 1 | *example:* LED heartbeat on GP19 | | | `app_program/subsystem1/` | `testing/subsystem1/` |
-| 2 | *example:* Producer: makes a sample every 300 ms | | | `app_program/subsystem2/` | `testing/subsystem2/` |
-| 3 | *example:* Consumer: collects samples into statistics | | | `app_program/subsystem3/` | `testing/subsystem3/` |
-| 4 | *example:* Monitor: prints reports, pauses the LED | | | `app_program/subsystem4/` | `testing/subsystem4/` |
-| 5 | | | | `app_program/subsystem5/` | `testing/subsystem5/` |
+
+| 1 | Wilson Teng Hao Feng — WiFi communication, permitted command handling and telemetry; integrate through the built-in network service | 2503002 | (UPDATE) | `app_program/subsystem1/` | `testing/subsystem1/` |
+
+| 2 | Zayar Hpoun Myint — motor control, encoders, speed/distance estimation and turning | 2502688 | (UPDATE) | `app_program/subsystem2/` | `testing/subsystem2/` |
+
+| 3 | Troy Ang Songze — digital IR sensing, line/junction detection and barcode decoding; report navigation results to controller | 2503451 | Troge21 | `app_program/subsystem3/` | `testing/subsystem3/` |
+
+| 4 | Thaw Zin Htun — GY-511 sensing, tilt/hump detection, height estimation and run maximum | 2502712 | (UPDATE) | `app_program/subsystem4/` | `testing/subsystem4/` |
+
+| 5 | Siyona — servo/ultrasonic scanning, obstacle profile and clearance measurements | 2502714 | (UPDATE) | `app_program/subsystem5/` | `testing/subsystem5/` |
 
 Shared files (`app_program/app_main.c`, `app_program/app.h`, this file)
 are changed only by agreement of the team. The exception is claiming an empty
@@ -48,32 +52,32 @@ fixed.
 | Pin | Owner | Used for |
 |---|---|---|
 | GP23, GP24, GP25, GP29 | *reserved* | Pico W radio |
-| GP0 | | (taken whenever the team builds with `CRASH_REPORT=1`) |
-| GP1 | | (taken whenever the team builds with `CRASH_REPORT=1`) |
-| GP2 | | |
-| GP3 | | |
-| GP4 | | |
-| GP5 | | |
-| GP6 | | |
-| GP7 | | |
-| GP8 | | |
-| GP9 | | |
-| GP10 | | |
-| GP11 | | |
-| GP12 | | |
+| GP0 | S2 - Zayar | (taken whenever the team builds with `CRASH_REPORT=1`) | Right wheel encoder A
+| GP1 | S2 - Zayar | (taken whenever the team builds with `CRASH_REPORT=1`) | Right wheel encoder B
+| GP2 | S4 - Thaw Zin | GY-511 SDA — I2C1 |
+| GP3 | S4 - Thaw Zin | GY-511 SCL — I2C1 |
+| GP4 | S5 - Siyona | Ultrasonic TRIG — GPIO output |
+| GP5 | S5 - Siyona | Ultrasonic ECHO — GPIO input |
+| GP6 | S3 - Troy | Centre IR sensor DO — GPIO input |
+| GP7 | S2 - Zayar | Left wheel encoder A |
+| GP8 | S2 - Zayar | Left motor M1A — PWM/GPIO output |
+| GP9 | S2 - Zayar | Left motor M1B — PWM/GPIO output |
+| GP10 | S2 - Zayar | Right motor M2A — PWM/GPIO output |
+| GP11 | S2 - Zayar | Right motor M2B — PWM/GPIO output |
+| GP12 | S5 - Siyona | Servo control signal — PWM output |
 | GP13 | | |
 | GP14 | | |
 | GP15 | | |
-| GP16 | | |
+| GP16 | S3 - Troy | Right IR sensor DO — GPIO input |
 | GP17 | | |
 | GP18 | | |
 | GP19 | *example:* S1 | external LED (LED + 330 Ω to GND) |
 | GP20 | | |
 | GP21 | | |
 | GP22 | | |
-| GP26 | | (ADC0 capable) |
-| GP27 | | (ADC1 capable) |
-| GP28 | | (ADC2 capable) |
+| GP26 | S3 - Troy | Left IR sensor DO — GPIO input |
+| GP27 | | |
+| GP28 | S2 - Zayar | Left wheel encoder B |
 
 ## 3. Peripherals
 
@@ -105,13 +109,14 @@ the drivers have no locking to stop it.
 
 | Peripheral | Owner subsystem | Owning task | Pins |
 |---|---|---|---|
-| UART1 | | | |
-| I2C0 | | | |
-| I2C1 | | | |
-| SPI0 | | | |
-| SPI1 | | | |
-| ADC | | | GP26–GP28 |
-| PWM slices (list) | | | |
+| UART1 | Not used | | |
+| I2C0 | Not used | | |
+| I2C1 | S4 - Thaw Zin| IMU / Hump Task | GP2 SDA / GP3 SCL |
+| SPI0 | Not used | | |
+| SPI1 | Not used | | |
+| ADC | Not used | | |
+| Motor PWM slices — numbers TBD | S2 - Zayar | Motor Control Task | GP8 / GP9 / GP10 / GP11 |
+| Servo PWM slice — number TBD | S5 - Siyona | Servo / Ultrasonic Task | GP12 |
 | WiFi radio, TCP/IP, MQTT | *kernel* | `cyw43_utk_task` (built in) | GP23–25, GP29 |
 
 ### WiFi and MQTT are special
@@ -146,13 +151,18 @@ change it only by team agreement. Write down every task you create.
 
 | Subsystem | Priority band | Tasks (name – priority – core) |
 |---|---|---|
-| 1 | 12–13 | *example:* led_task – 12 – any |
-| 2 | 14–15 | *example:* producer_task – 14 – core 1 |
-| 3 | 16–17 | *example:* consumer_task – 16 – core 0 |
-| 4 | 18–19 | *example:* monitor_task – 18 – any |
-| 5 | 20–21 | |
+| 1 — Wilson | 12–13(TBD) | Telemetry / Command Task – TBD (Low intended) – TBD |
+| 2 — Zayar | 14–15(TBD) | Motor Control Task – TBD (High intended) – TBD  |
+| 3 — Troy | 16–17(TBD) | IR / Barcode Task – TBD (High intended) – TBD |
+| 4 — Thaw Zin | 18–19(TBD) | IMU / Hump Task – TBD (Medium intended) – TBD |
+| 5 — Siyona | 20–21(TBD) | Servo / Ultrasonic Task – TBD (Medium intended) – TBD |
 
 Core: `TP_PRC1` = core 0, `TP_PRC2` = core 1, or "any".
+
+Term	Meaning	Example
+Priority band :	A range of priority numbers allocated to a subsystem.	S3 gets 16–17, so its tasks can use 16 or 17.
+Priority :	The specific number assigned to one task. Smaller number = higher priority.	Your IR task uses 16.
+Core :	Which processor core may run the task. The Pico’s RP2040 has two cores.	core 0, core 1, or any.
 
 ## 5. Interfaces between subsystems
 
@@ -162,12 +172,18 @@ sends to it or waits on it. Agree on the data format before coding.
 
 | ID | From → To | Mechanism | Object ID name | Data / meaning | Agreed by |
 |---|---|---|---|---|---|
-| IF-01 | S2 → S3 | mailbox (owned by S3) | `mbx_samples` | `SAMPLE_MSG` in `subsystem2.h` | *example* |
-| IF-02 | S3 → S2 | semaphore + fixed memory pool (owned by S2) | `sem_slots`, `mpf_samples` | receiver returns the block, then 1 slot | *example* |
-| IF-03 | S3 → S4 | message buffer + event flag (owned by S4) | `mbf_summary`, `flg_events` | text line ≤ `S4_SUMMARY_MAX` bytes, then `FLG_BATCH` | *example* |
-| IF-04 | S4 → S3 | shared data under a mutex (owned by S3) | `app_stats`, `mtx_stats` | `APP_STATS`, read only while locked | *example* |
-| IF-05 | S4 → S1 | task control | `tid_led` | `tk_sus_tsk` / `tk_rsm_tsk` / `tk_chg_pri` | *example* |
-| IF-06 | | | | | |
+| IF-01 | S3 → Controller | Result queue; concrete kernel type TBD; controller owns | TBD (suggested `mbf_line_barcode`) | IR/line status, barcode result validity and supported action; reject invalid/incomplete captures; report each valid barcode once | TBD: Troy + controller owner |
+| IF-02 | S4 → Controller | Result queue; type TBD; controller owns | TBD (suggested `mbf_hump_result`) | Tilt/hump state, height, run maximum, validity and sensor faults | TBD: Thaw Zin + controller owner |
+| IF-03 | S5 → Controller | Result queue; type TBD; controller owns | TBD (suggested `mbf_scan_result`) | Distance, scan profile/clearance, validity and failure; missing echo is not clear space | TBD: Siyona + controller owner |
+| IF-04 | Controller → S2 | Latest motor-command channel; type TBD; S2 owns | TBD (suggested `mbf_motor_cmd`) | Requested left/right movement, bounds and freshness; exact units/ranges TBD | TBD: Zayar + controller owner |
+| IF-05 | S2 → Controller | Feedback queue; type TBD; controller owns | TBD (suggested `mbf_motion_feedback`) | Encoder counts, wheel speed, distance, motion/fault status and validity | TBD: Zayar + controller owner |
+| IF-06 | Controller → S2 | Separate stop event flag, owned by S2 | TBD (suggested `flg_motor_stop`) | Stop overrides movement queue; wake path, latch/clear rules and stale-command invalidation TBD | TBD: Zayar + controller owner |
+| IF-07 | Controller → S5 | Scan-request queue; type TBD; S5 owns | TBD (suggested `mbf_scan_request`) | Coarse/fine scan request and angle parameters; units, bounds and timing TBD | TBD: Siyona + controller owner |
+| IF-08 | Controller → S4 | Run-reset queue; type TBD; S4 owns | TBD (suggested `mbf_run_reset`) | Confirmed new-run reset; temporary stops do not clear maximum hump height | TBD: Thaw Zin + controller owner |
+| IF-09 | Controller → S1 | Telemetry queue; type TBD; S1 owns | TBD (suggested `mbf_telemetry`) | Operating state and available motion/line/barcode/hump/obstacle measurements with validity | TBD: Wilson + controller owner |
+| IF-10 | S1 → Controller | Request/status queue; type TBD; controller owns | TBD (suggested `mbf_supervisory`) | Validated permitted commands and connection state; command list/topics TBD; reject stale replay | TBD: Wilson + controller owner |
+| IF-11 | S1 → kernel network service | Proposed outbound message buffer owned by S1; service polls with `TMO_POL` | TBD (suggested `mbf_network_tx`) | Encoded telemetry/heartbeat for publication inside network task; no blocking network-service wait | TBD: Wilson + team + instructor |
+| IF-12 | Kernel network service → S1 | Proposed bounded nonblocking inbound channel owned by S1; type TBD | TBD (suggested `mbf_network_rx`) | Received command payload/connection events for application handling; overflow policy TBD | TBD: Wilson + team + instructor |
 
 Each interface is tested by at least one integration test
 (`testing/integration/TEST_LOG.md`).
