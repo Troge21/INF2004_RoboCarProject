@@ -11,6 +11,14 @@
 
 #include "../app.h"
 
+/* Stationary IR test: digital DO pins already claimed in TEAM.md. */
+#define S3_PRI_IR               17
+#define S3_IR_LEFT_PIN          26
+#define S3_IR_CENTRE_PIN        6
+#define S3_IR_RIGHT_PIN         16
+#define S3_IR_PERIOD_MS         100
+#define S3_IR_BLACK_LEVEL       1       /* confirmed by stationary testing */
+
 #define S3_PRI_CONSUMER		16	/* priority band 16-17 (TEAM.md) */
 #define S3_BATCH_SIZE		5	/* report to subsystem 4 every N samples */
 
