@@ -1,0 +1,21 @@
+User-reported serial excerpts from this session; not a full raw capture.
+Powered bench firmware (earlier revision):
+[TEST] S1-U08 PASS  motor sequence completed
+[TEST] S1-U09 PASS  at least 4 encoder counts per direction
+[TEST] S1-U10 PASS  encoder direction reversed
+[TEST] S1-U11 PASS  no encoder pulses while stopped for 1 second
+[TEST] RIGHT SUMMARY 4 passed, 0 failed
+[ENC] LEFT: forward=-2867 reverse=2879 stopped=0 error=0
+[ENC] RIGHT: forward=2532 reverse=-3027 stopped=0 error=0
+
+Other reported powered-test repeats:
+[ENC] LEFT: forward=-2838 reverse=2854 stopped=0 error=0
+[ENC] RIGHT: forward=2526 reverse=-2991 stopped=0 error=0
+[ENC] LEFT: forward=-2633 reverse=2655 stopped=0 error=0
+[ENC] RIGHT: forward=2512 reverse=-2983 stopped=0 error=0
+
+Manual calibration firmware:
+[CAL] LIVE motors OFF | LEFT=-6341 RIGHT=2 (x1 counts)
+[CAL] LIVE motors OFF | LEFT=-6341 RIGHT=5354 (x1 counts)
+[CAL] LIVE motors OFF | LEFT=-12662 RIGHT=10731 (x1 counts)
+[CAL] LIVE motors OFF | LEFT=-19005 RIGHT=16079 (x1 counts)

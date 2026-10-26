@@ -71,7 +71,7 @@ fixed.
 | GP16 | S3 - Troy | Right IR sensor DO — GPIO input |
 | GP17 | | |
 | GP18 | | |
-| GP19 | *example:* S1 | external LED (LED + 330 Ω to GND) |
+| GP19 | | |
 | GP20 | | |
 | GP21 | | |
 | GP22 | | |
