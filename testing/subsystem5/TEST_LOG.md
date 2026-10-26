@@ -38,8 +38,9 @@ accuracy is not claimed for this firmware.
 From `build_make`, run `make -j8` for normal operation, or `make TEST=1 -j8`
 to include software conversion checks. Flash the matching UF2:
 `mtk3pico_smp1_usb_cdc_wifi.uf2` or `mtk3pico_smp1_usb_cdc_wifi_test.uf2`.
-Leave `S1_ENCODER_CALIBRATION=0`: calibration and this bench driver both own
-GPIO IRQ13, so simultaneous use is rejected during compilation. The task runs
+Leave `S2_ENCODER_CALIBRATION=0` for ultrasonic testing. Calibration and this
+bench driver both own GPIO IRQ13; when enabled, calibration takes precedence
+and ultrasonic startup is skipped. The task runs
 at priority 20 on core 0 (TP_PRC1), matching its GPIO interrupt routing.
 
 Open USB Serial Monitor at 115200. IR monitoring remains enabled; filter the

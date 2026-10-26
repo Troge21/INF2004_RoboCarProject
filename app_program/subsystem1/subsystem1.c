@@ -1,6 +1,6 @@
 /* Subsystem 1 lifecycle hooks. The LED example has been retired.
  * WiFi command/telemetry implementation remains to be added (TEAM.md).
- * Motor/encoder calibration is an optional test, not a runtime task here.
+ * Motor/encoder tests belong to subsystem2.
  */
 #include "subsystem1.h"
 

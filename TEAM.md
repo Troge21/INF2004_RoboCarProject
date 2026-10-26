@@ -117,7 +117,7 @@ the drivers have no locking to stop it.
 | ADC | Not used | | |
 | Motor PWM slices — numbers TBD | S2 - Zayar | Motor Control Task | GP8 / GP9 / GP10 / GP11 |
 | Servo PWM slice — number TBD | S5 - Siyona | Servo / Ultrasonic Task | GP12 |
-| IO_BANK0 IRQ13, GP5 echo edges | S5 - Siyona (current bench build) | `ultrasonic_task`, core 0 | GP5 via 5 V to 3.3 V divider; incompatible with optional S1 encoder calibration |
+| IO_BANK0 IRQ13, GP5 echo edges | S5 - Siyona (current bench build) | `ultrasonic_task`, core 0 | GP5 via 5 V to 3.3 V divider; incompatible with optional S2 encoder calibration |
 | WiFi radio, TCP/IP, MQTT | *kernel* | `cyw43_utk_task` (built in) | GP23–25, GP29 |
 
 ### WiFi and MQTT are special
@@ -193,7 +193,7 @@ Each interface is tested by at least one integration test
 
 Limits are set in `config/config.h`. If the team needs more, raise the
 limit there. The numbers below describe the current build; demo sample objects are retired.
-Optional S1 calibration adds one task when enabled in a test build.
+Optional S2 calibration adds one task when enabled in a test build.
 
 | Object | Limit | S1 | S2 | S3 | S4 | S5 |
 |---|---|---|---|---|---|---|

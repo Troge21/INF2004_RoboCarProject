@@ -3,13 +3,10 @@
  * Only this core-0 task owns the sensor. No servo or controller commands yet.
  */
 #include "subsystem5.h"
-#include "../subsystem1/subsystem1.h"
+#include "../subsystem2/subsystem2.h"
 #include <sys/sysdef.h>
 #include <tk/syslib.h>
 
-#if APP_TEST && S1_ENCODER_CALIBRATION
-#error "Disable S1_ENCODER_CALIBRATION: ultrasonic bench test owns GPIO IRQ13"
-#endif
 
 #define ECHO_IRQ 13
 #define ECHO_FALL (4U << (4 * S5_ECHO_PIN))
@@ -123,6 +120,9 @@ static void ultrasonic_task(INT stacd, void *exinf)
 
 EXPORT ER subsystem5_init(void)
 {
+#if APP_TEST && S2_ENCODER_CALIBRATION
+    return E_OK;
+#else
     T_CSEM csem = {0};
     ER er;
     gpio_set_val(S5_TRIG_PIN, 0);
@@ -136,13 +136,19 @@ EXPORT ER subsystem5_init(void)
     csem.maxsem = 1;
     echo_done = tk_cre_sem(&csem);
     return echo_done < E_OK ? echo_done : E_OK;
+#endif
 }
 
 EXPORT ER subsystem5_start(void)
 {
+#if APP_TEST && S2_ENCODER_CALIBRATION
+    tm_printf((UB *)"[ULTRA] SKIP: subsystem2 encoder calibration owns GPIO IRQ13.\n");
+    return E_OK;
+#else
     ID tid;
     if (echo_done <= 0) return E_OBJ;
     tid = app_start_task((FP)ultrasonic_task, S5_PRI_MAIN, TP_PRC1,
                          "ultrasonic_task");
     return tid < E_OK ? tid : E_OK;
+#endif
 }

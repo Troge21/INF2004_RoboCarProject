@@ -1,6 +1,6 @@
 /* Application lifecycle: create all subsystem objects, then start tasks.
- * S1: WiFi placeholder; optional manual encoder calibration in TEST=1.
- * S2: motor-controller placeholder.
+ * S1: WiFi placeholder.
+ * S2: motor-controller placeholder; optional encoder calibration in TEST=1.
  * S3: digital IR sensing.
  * S4: IMU/hump-sensing placeholder.
  * S5: fixed-position HC-SR04 measurements.
