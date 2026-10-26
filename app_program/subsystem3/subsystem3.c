@@ -1,15 +1,6 @@
-/*
- *	subsystem3.c
- *	Subsystem 3 -- Consumer example and stationary IR sensor test.
- *
- *	APIs shown: tk_cre_mbx, tk_cre_mtx
- */
+/* Subsystem 3: stationary digital IR sensing; line/barcode processing pending. */
 
 #include "subsystem3.h"
-
-EXPORT ID		mbx_samples;	/* IF-01 */
-EXPORT ID		mtx_stats;	/* IF-04 */
-EXPORT APP_STATS	app_stats;
 
 /* Describe which sensors see black. These patterns alone do not identify
  * a junction or a barcode, and do not request motor actions. */
@@ -42,6 +33,8 @@ LOCAL void ir_task(INT stacd, void *exinf)
 		S3_IR_LEFT_PIN, S3_IR_CENTRE_PIN, S3_IR_RIGHT_PIN
 	};
 	UINT i;
+	const UW report_period_ms = 5000;
+	UW report_elapsed_ms = report_period_ms; /* print the first sample */
 	BOOL left_on_black, centre_on_black, right_on_black;
 	ER er;
 
@@ -57,9 +50,11 @@ LOCAL void ir_task(INT stacd, void *exinf)
 		}
 	}
 
-	tm_printf((UB*)"IR: left=GP%u centre=GP%u right=GP%u, period=%u ms, 1=black\n",
+	if (S3_IR_LOG_ENABLED) {
+		tm_printf((UB*)"IR: left=GP%u centre=GP%u right=GP%u, sample=%u ms, report=%u ms, 1=black\n",
 		  S3_IR_LEFT_PIN, S3_IR_CENTRE_PIN, S3_IR_RIGHT_PIN,
-		  S3_IR_PERIOD_MS);
+		  S3_IR_PERIOD_MS, report_period_ms);
+	}
 
 	while (1) {
 		/* Convert electrical levels into explicit black-line detections. */
@@ -67,46 +62,24 @@ LOCAL void ir_task(INT stacd, void *exinf)
 		centre_on_black = (gpio_get_val(S3_IR_CENTRE_PIN) == S3_IR_BLACK_LEVEL);
 		right_on_black = (gpio_get_val(S3_IR_RIGHT_PIN) == S3_IR_BLACK_LEVEL);
 
-		tm_printf((UB*)"IR black: L=%d C=%d R=%d | pattern=%s\n",
-			  left_on_black, centre_on_black, right_on_black,
-			  ir_pattern_name(left_on_black, centre_on_black, right_on_black));
+		if (S3_IR_LOG_ENABLED && report_elapsed_ms >= report_period_ms) {
+			tm_printf((UB*)"IR black: L=%d C=%d R=%d | pattern=%s\n",
+				  left_on_black, centre_on_black, right_on_black,
+				  ir_pattern_name(left_on_black, centre_on_black, right_on_black));
+			report_elapsed_ms = 0;
+		}
 		tk_dly_tsk(S3_IR_PERIOD_MS);
+		if (S3_IR_LOG_ENABLED) report_elapsed_ms += S3_IR_PERIOD_MS;
 	}
 }
 
 EXPORT ER subsystem3_init(void)
 {
-	T_CMBX	cmbx = {0};
-	T_CMTX	cmtx = {0};
-
-	/* Mailbox: passes a POINTER to a message (zero copy).  The message
-	   memory must stay valid until the receiver is done with it, which
-	   is why subsystem 2 takes it from its memory pool. */
-	cmbx.mbxatr = TA_TFIFO | TA_MFIFO;	/* FIFO waiters, FIFO messages */
-	mbx_samples = tk_cre_mbx(&cmbx);
-	if (mbx_samples < E_OK) {
-		return mbx_samples;
-	}
-
-	/* Mutex: only one task at a time may touch app_stats.  TA_INHERIT
-	   (priority inheritance) avoids priority inversion: a low-priority
-	   holder is temporarily raised to the waiter's priority. */
-	cmtx.mtxatr = TA_INHERIT;
-	mtx_stats = tk_cre_mtx(&cmtx);
-	return (mtx_stats < E_OK) ? mtx_stats : E_OK;
+    return E_OK;
 }
 
 EXPORT ER subsystem3_start(void)
 {
-	/* Pinned to core 0 (TP_PRC1): opposite core to the producer */
-	ID tid = app_start_task(consumer_task, S3_PRI_CONSUMER, TP_PRC1,
-				"consumer_task");
-	if (tid < E_OK) {
-		return tid;
-	}
-
-	/* Keep consuming S2 samples while the separate task tests our IR pins. */
-	tid = app_start_task(ir_task, S3_PRI_IR, TP_PRC1,
-			     "ir_task");
-	return (tid < E_OK) ? tid : E_OK;
+    ID tid = app_start_task(ir_task, S3_PRI_IR, TP_PRC1, "ir_task");
+    return tid < E_OK ? tid : E_OK;
 }

@@ -1,17 +1,15 @@
-/*
- *	subsystem5.h
- *	Subsystem 5 -- <name>.  Student ID: <student ID>.
- *
- *	EMPTY TEMPLATE.  Subsystems 1-4 show a complete example; copy their
- *	pattern.  Put here only what OTHER subsystems may use (object IDs,
- *	message formats, priorities); keep everything else LOCAL in the .c.
- */
-
+/* Subsystem 5: fixed-position HC-SR04 bench measurement (servo not started). */
 #ifndef SUBSYSTEM5_H
 #define SUBSYSTEM5_H
 
 #include "../app.h"
 
-#define S5_PRI_MAIN	20		/* priority band 20-21 (TEAM.md) */
+#define S5_PRI_MAIN 20
+#define S5_TRIG_PIN 4
+#define S5_ECHO_PIN 5
+
+/* Internal conversion shared with subsystem5_test.c. Valid range 20–4000 mm.
+ * Returns E_PAR for invalid widths and clears *mm on failure. */
+IMPORT ER s5_echo_to_mm(UW pulse_us, UW *mm);
 
 #endif /* SUBSYSTEM5_H */

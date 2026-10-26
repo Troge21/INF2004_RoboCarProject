@@ -117,6 +117,7 @@ the drivers have no locking to stop it.
 | ADC | Not used | | |
 | Motor PWM slices — numbers TBD | S2 - Zayar | Motor Control Task | GP8 / GP9 / GP10 / GP11 |
 | Servo PWM slice — number TBD | S5 - Siyona | Servo / Ultrasonic Task | GP12 |
+| IO_BANK0 IRQ13, GP5 echo edges | S5 - Siyona (current bench build) | `ultrasonic_task`, core 0 | GP5 via 5 V to 3.3 V divider; incompatible with optional S1 encoder calibration |
 | WiFi radio, TCP/IP, MQTT | *kernel* | `cyw43_utk_task` (built in) | GP23–25, GP29 |
 
 ### WiFi and MQTT are special
@@ -155,7 +156,7 @@ change it only by team agreement. Write down every task you create.
 | 2 — Zayar | 14–15(TBD) | Motor Control Task – TBD (High intended) – TBD  |
 | 3 — Troy | 16–17(TBD) | IR / Barcode Task – TBD (High intended) – TBD |
 | 4 — Thaw Zin | 18–19(TBD) | IMU / Hump Task – TBD (Medium intended) – TBD |
-| 5 — Siyona | 20–21(TBD) | Servo / Ultrasonic Task – TBD (Medium intended) – TBD |
+| 5 — Siyona | 20–21 | `ultrasonic_task` – 20 – core 0 (`TP_PRC1`); servo not started |
 
 Core: `TP_PRC1` = core 0, `TP_PRC2` = core 1, or "any".
 
@@ -191,19 +192,20 @@ Each interface is tested by at least one integration test
 ## 6. Kernel object budget
 
 Limits are set in `config/config.h`. If the team needs more, raise the
-limit there. The numbers below are the example's usage.
+limit there. The numbers below describe the current build; demo sample objects are retired.
+Optional S1 calibration adds one task when enabled in a test build.
 
 | Object | Limit | S1 | S2 | S3 | S4 | S5 |
 |---|---|---|---|---|---|---|
-| Task | 32 | 1 | 1 | 1 | 1 | |
-| Semaphore | 16 | | 1 | | | |
-| Event flag | 16 | | | | 1 | |
-| Mailbox | 12 | | | 1 | | |
-| Mutex | 12 | | | 1 | | |
-| Message buffer | 12 | | | | 1 | |
-| Fixed memory pool | 12 | | 1 | | | |
+| Task | 32 | | | 1 | | 1 |
+| Semaphore | 16 | | | | | 1 |
+| Event flag | 16 | | | | | |
+| Mailbox | 12 | | | | | |
+| Mutex | 12 | | | | | |
+| Message buffer | 12 | | | | | |
+| Fixed memory pool | 12 | | | | | |
 | Variable memory pool | 12 | | | | | |
-| Cyclic handler | 12 | 1 | | | | |
-| Alarm handler | 12 | | | | 1 | |
+| Cyclic handler | 12 | | | | | |
+| Alarm handler | 12 | | | | | |
 
 (The kernel's USB and WiFi service tasks also use a few of these.)
