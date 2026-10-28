@@ -23,7 +23,7 @@ subsystem, ask its owner or open a pull request for them to review.
 
 | 3 | Troy Ang Songze — digital IR sensing, line/junction detection and barcode decoding; report navigation results to controller | 2503451 | Troge21 | `app_program/subsystem3/` | `testing/subsystem3/` |
 
-| 4 | Thaw Zin Htun — GY-511 sensing, tilt/hump detection, height estimation and run maximum | 2502712 | (UPDATE) | `app_program/subsystem4/` | `testing/subsystem4/` |
+| 4 | Thaw Zin Htun — GY-511 sensing, tilt/hump detection, height estimation and run maximum | 2502712 | thawzin07 | `app_program/subsystem4/` | `testing/subsystem4/` |
 
 | 5 | Siyona — servo/ultrasonic scanning, obstacle profile and clearance measurements | 2502714 | (UPDATE) | `app_program/subsystem5/` | `testing/subsystem5/` |
 
@@ -155,7 +155,7 @@ change it only by team agreement. Write down every task you create.
 | 1 — Wilson | 12–13(TBD) | Telemetry / Command Task – TBD (Low intended) – TBD |
 | 2 — Zayar | 14–15(TBD) | Motor Control Task – TBD (High intended) – TBD  |
 | 3 — Troy | 16–17(TBD) | IR / Barcode Task – TBD (High intended) – TBD |
-| 4 — Thaw Zin | 18–19(TBD) | IMU / Hump Task – TBD (Medium intended) – TBD |
+| 4 — Thaw Zin | 18–19 | `imu_hump_task` – 18 – core 0 (`TP_PRC1`) |
 | 5 — Siyona | 20–21 | `ultrasonic_task` – 20 – core 0 (`TP_PRC1`); servo not started |
 
 Core: `TP_PRC1` = core 0, `TP_PRC2` = core 1, or "any".

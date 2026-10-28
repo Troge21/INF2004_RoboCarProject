@@ -1,0 +1,19 @@
+=== micro T-Kernel on Raspberry Pi Pico W (spec 0x0300, product 0x0001) ===
+dual-core (SMP) build, usermain on core 0
+[S4] IMU Hump Task started (priority=18, period=20 ms, I2C1 GP2/GP3)
+[S4] Calibration complete. Baseline pitch: 0.1 deg
+all subsystems started
+
+[TEST] === test run start ===
+[TEST] subsystem1: no tests enabled
+[TEST] subsystem2: calibration disabled by default
+[TEST] subsystem3 SKIP: IR hardware checks are manual; enable S3_IR_LOG_ENABLED.
+[TEST] S4-U02a PASS  flat acceleration vector computes 0.0 +/- 0.2 deg
+[TEST] S4-U02b PASS  +15 deg incline vector computes +15.0 +/- 0.5 deg
+[TEST] S4-U02c PASS  -15 deg decline vector computes -15.0 +/- 0.5 deg
+[TEST] S4-U02d PASS  +30 deg steep vector computes +30.0 +/- 1.0 deg
+[TEST] S4-U05a PASS  subsystem4_get_telemetry returns E_OK and valid snapshot
+[TEST] S4-U06a PASS  subsystem4_reset_run clears run maximum to 0 mm
+[TEST] subsystem4 SUMMARY 6 passed, 0 failed
+[TEST] subsystem5 SUMMARY 3 passed, 0 failed
+[TEST] === test run end ===
