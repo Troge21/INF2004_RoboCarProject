@@ -1,0 +1,29 @@
+User-provided COM3 serial excerpt, recorded from this chat on 2026-11-02.
+Exact flashed firmware commit and test capture timestamp were not supplied.
+
+---- Opened the serial port COM3 ----
+[WIFI] init_done=1 init_result=0 ready=1 link=1 polls=224
+[WIFI] init_done=1 init_result=0 ready=1 link=1 polls=324
+[WIFI] init_done=1 init_result=0 ready=1 link=1 polls=424
+wifi: link status -> joined AP, no IP yet (2)
+[WIFI] init_done=1 init_result=0 ready=1 link=2 polls=524
+wifi: link up, ip=192.168.0.6
+mqtt: connected to 192.168.0.9
+mqtt: subscribed to mtk3smp-pico/heartbeat
+[WIFI] init_done=1 init_result=0 ready=1 link=3 polls=625
+[WIFI] last reported IP=192.168.0.6
+[WIFI] init_done=1 init_result=0 ready=1 link=3 polls=725
+[WIFI] last reported IP=192.168.0.6
+mqtt: TX [mtk3smp-pico/heartbeat] "hb 0"
+mqtt: RX [mtk3smp-pico/heartbeat] "hb 0"
+[WIFI] init_done=1 init_result=0 ready=1 link=3 polls=826
+[WIFI] last reported IP=192.168.0.6
+[WIFI] init_done=1 init_result=0 ready=1 link=3 polls=926
+[WIFI] last reported IP=192.168.0.6
+[WIFI] init_done=1 init_result=0 ready=1 link=3 polls=1026
+[WIFI] last reported IP=192.168.0.6
+mqtt: TX [mtk3smp-pico/heartbeat] "hb 1"
+mqtt: RX [mtk3smp-pico/heartbeat] "hb 1"
+[WIFI] init_done=1 init_result=0 ready=1 link=3 polls=1127
+[WIFI] last reported IP=192.168.0.6
+---- Closed the serial port COM3 ----
