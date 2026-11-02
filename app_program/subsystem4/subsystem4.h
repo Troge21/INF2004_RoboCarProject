@@ -104,6 +104,10 @@ EXPORT ER subsystem4_reset_run(void);
  */
 EXPORT void subsystem4_set_speed_mm_s(uint16_t speed_mm_s);
 
+/* Current mounting: front-up makes sensor Y more negative.
+ * Returns vehicle pitch in tenths of a degree; front-up is positive. */
+EXPORT int16_t subsystem4_calc_vehicle_pitch_x10(const GY511_ACCEL_DATA_T *accel);
+
 #if APP_TEST
 /* Standalone on-target unit test suite (make TEST=1) */
 EXPORT void subsystem4_test(void);

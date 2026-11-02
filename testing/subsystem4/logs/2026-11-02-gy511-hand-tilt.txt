@@ -1,0 +1,22 @@
+User-provided COM3 serial excerpts recorded from chat on 2026-11-02.
+Selected lines below are copied from two separate captures, not one continuous run.
+Exact capture timestamps, operator name and flashed commit were not supplied.
+Manual hand tilting; no measured ramp traversal or controlled speed.
+
+Attempt A: corrected mounting axis, ascent and timeout.
+[S4 Status] State=2 | Pitch=4.9 deg | Baseline=4.9 deg | Accel=-25,-81,935 mg | CurrentHump=0 mm | RunMax=0 mm | Flags=0x01
+[S4] HUMP DETECTED! Ascent pitch: 3.5 deg (start=3355803946 ms)
+[S4 Status] State=3 | Pitch=8.7 deg | Baseline=4.9 deg | Accel=-26,-144,936 mg | CurrentHump=0 mm | RunMax=0 mm | Flags=0x03
+[S4 Status] State=3 | Pitch=7.1 deg | Baseline=4.9 deg | Accel=-27,-118,933 mg | CurrentHump=0 mm | RunMax=0 mm | Flags=0x03
+[S4] WARNING: Hump traversal timeout (>3000 ms). Resetting to MONITOR.
+
+Attempt B: ascent, descent and rejection of an undersized estimate.
+[S4 Status] State=2 | Pitch=7.9 deg | Baseline=4.9 deg | Accel=-25,-132,938 mg | CurrentHump=0 mm | RunMax=0 mm | Flags=0x01
+[S4] HUMP DETECTED! Ascent pitch: 3.7 deg (start=3356272516 ms)
+[S4 Status] State=4 | Pitch=0.7 deg | Baseline=4.9 deg | Accel=-44,-13,949 mg | CurrentHump=0 mm | RunMax=0 mm | Flags=0x03
+[WIFI] init_done=1 init_result=0 ready=1 link=0 polls=25159
+[S4] REJECTED HUMP: noise/invalid (height=2 mm, duration=2880 ms)
+[S4 Status] State=2 | Pitch=5.2 deg | Baseline=4.9 deg | Accel=-21,-88,956 mg | CurrentHump=0 mm | RunMax=0 mm | Flags=0x01
+[WIFI] init_done=1 init_result=0 ready=1 link=0 polls=25259
+[S4 Status] State=2 | Pitch=5.0 deg | Baseline=4.9 deg | Accel=-24,-83,936 mg | CurrentHump=0 mm | RunMax=0 mm | Flags=0x01
+---- Closed the serial port COM3 ----

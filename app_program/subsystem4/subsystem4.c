@@ -15,8 +15,8 @@
 #include <tk/syslib.h>
 #include <tm/tmonitor.h>
 
-/* Console logging throttle: print periodic status every 5 seconds */
-#define S4_LOG_PERIOD_MS            (5000U)
+/* Bench diagnostics: print latest readings once a second. */
+#define S4_LOG_PERIOD_MS            (1000U)
 
 #define s4_abs(x)                   (((x) < 0) ? -(x) : (x))
 
@@ -49,10 +49,25 @@ static uint32_t get_time_ms(void)
 /* -------------------------------------------------------------------------
  * RTOS Task: imu_hump_task
  * ------------------------------------------------------------------------- */
+EXPORT int16_t subsystem4_calc_vehicle_pitch_x10(const GY511_ACCEL_DATA_T *accel)
+{
+    GY511_ACCEL_DATA_T mapped;
+
+    if (accel == NULL) {
+        return 0;
+    }
+    /* Use Y as the longitudinal axis, X/Z for the denominator.
+     * Negate the resulting angle so front-up is positive. */
+    mapped.x_mg = accel->y_mg;
+    mapped.y_mg = accel->x_mg;
+    mapped.z_mg = accel->z_mg;
+    return (int16_t)-drv_gy511_calc_pitch_x10(&mapped);
+}
+
 static void imu_hump_task(INT stacd, void *exinf)
 {
-    GY511_ACCEL_DATA_T accel_data;
-    int16_t pitch_x10;
+    GY511_ACCEL_DATA_T accel_data = {0};
+    int16_t pitch_x10 = 0;
     int16_t delta_pitch_x10;
     uint32_t current_time_ms;
     uint32_t log_elapsed_ms = S4_LOG_PERIOD_MS;
@@ -98,7 +113,7 @@ static void imu_hump_task(INT stacd, void *exinf)
         case S4_STATE_CALIBRATING:
             er = drv_gy511_read_accel(&accel_data);
             if (er == E_OK) {
-                pitch_x10 = drv_gy511_calc_pitch_x10(&accel_data);
+                pitch_x10 = subsystem4_calc_vehicle_pitch_x10(&accel_data);
                 calib_sum_x10 += (int32_t)pitch_x10;
                 calib_sample_counter++;
 
@@ -124,7 +139,7 @@ static void imu_hump_task(INT stacd, void *exinf)
                 break;
             }
 
-            pitch_x10 = drv_gy511_calc_pitch_x10(&accel_data);
+            pitch_x10 = subsystem4_calc_vehicle_pitch_x10(&accel_data);
             delta_pitch_x10 = (int16_t)(pitch_x10 - s_baseline_pitch_x10);
 
             /* Check for upward slope / hump ascent */
@@ -151,7 +166,7 @@ static void imu_hump_task(INT stacd, void *exinf)
                 break;
             }
 
-            pitch_x10 = drv_gy511_calc_pitch_x10(&accel_data);
+            pitch_x10 = subsystem4_calc_vehicle_pitch_x10(&accel_data);
             delta_pitch_x10 = (int16_t)(pitch_x10 - s_baseline_pitch_x10);
 
             /*
@@ -189,7 +204,7 @@ static void imu_hump_task(INT stacd, void *exinf)
                 break;
             }
 
-            pitch_x10 = drv_gy511_calc_pitch_x10(&accel_data);
+            pitch_x10 = subsystem4_calc_vehicle_pitch_x10(&accel_data);
             delta_pitch_x10 = (int16_t)(pitch_x10 - s_baseline_pitch_x10);
 
             /* When chassis settles back to level, transition to validate */
@@ -273,10 +288,19 @@ static void imu_hump_task(INT stacd, void *exinf)
 
         /* Periodic diagnostic heartbeat */
         if (log_elapsed_ms >= S4_LOG_PERIOD_MS) {
-            tm_printf((UB*)"[S4 Status] State=%d | Pitch=%d.%d deg | CurrentHump=%u mm | RunMax=%u mm | Flags=0x%02X\n",
+            /* Last successful sample; retained if a later read fails.
+             * Previously Pitch displayed the fixed calibration baseline. */
+            tm_printf((UB*)"[S4 Status] State=%d | Pitch=%s%d.%d deg | Baseline=%s%d.%d deg | Accel=%d,%d,%d mg | CurrentHump=%u mm | RunMax=%u mm | Flags=0x%02X\n",
                       s_state,
-                      s_baseline_pitch_x10 / 10,
+                      pitch_x10 < 0 ? "-" : "",
+                      (int)s4_abs(pitch_x10) / 10,
+                      (int)s4_abs(pitch_x10 % 10),
+                      s_baseline_pitch_x10 < 0 ? "-" : "",
+                      (int)s4_abs(s_baseline_pitch_x10) / 10,
                       (int)s4_abs(s_baseline_pitch_x10 % 10),
+                      (int)accel_data.x_mg,
+                      (int)accel_data.y_mg,
+                      (int)accel_data.z_mg,
                       s_current_hump_mm,
                       s_max_hump_mm,
                       s_flags);
