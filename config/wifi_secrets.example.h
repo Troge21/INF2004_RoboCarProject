@@ -20,5 +20,7 @@
 #define MQTT_BROKER_PORT 1883
 #define MQTT_CLIENT_ID   "mtk3smp-pico"
 #define MQTT_TOPIC       "mtk3smp-pico/heartbeat"
+/* Optional override; existing wifi_secrets.h files use this default too. */
+#define MQTT_TELEMETRY_TOPIC MQTT_CLIENT_ID "/telemetry"
 
 #endif /* WIFI_SECRETS_H */

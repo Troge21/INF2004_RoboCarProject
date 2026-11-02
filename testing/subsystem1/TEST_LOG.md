@@ -1,13 +1,9 @@
-git add app_program/subsystem1/subsystem1.c \
-        app_program/subsystem1/subsystem1.h \
-        app_program/subsystem1/subsystem1_test.c \
-        testing/subsystem1/TEST_LOG.md \
-        testing/subsystem1/logs/2026-11-02-mqtt-heartbeat.txt# Subsystem 1 — test log
+# Subsystem 1 — test log
 
 Subsystem1 owns WiFi command handling and telemetry (TEAM.md). It currently
 monitors radio status and has a locally tested proposed STOP/STATUS parser.
-MQTT/controller queues, telemetry, freshness checks and command execution
-remain pending. The LED example and its
+Temporary S5 -> S1 -> MQTT telemetry is now implemented for bench testing.
+Controller routing and command execution remain pending. The LED example and its
 S1-U01 through S1-U03 tests are retired; no LED test runs now.
 
 Motor and encoder bench tests were temporarily hosted here. Their results,
@@ -32,6 +28,12 @@ There is no motor or encoder test in subsystem1.
 | S1-U19 | Parse STOP NOW and STOP with newline | Invalid |
 | S1-U20 | Parse embedded or trailing NUL | Invalid |
 | S1-U21 | Parse oversized length | Invalid, no payload access |
+| S1-U22 | Format valid 451 mm sample | Exact JSON with numeric distance and true validity |
+| S1-U23 | Format invalid measurement | Distance=null, validity=false |
+| S1-U24 | Format into too-small buffer | E_PAR, empty output, guard byte preserved |
+| S1-U25 | Null/out-of-range sample | E_PAR from formatter/submission; no queue access |
+| S1-U26 | Maximum sequence and valid distance | Exact JSON within fixed buffer |
+| S1-U27 | Invalid validity flag/output arguments | E_PAR |
 | S1-M01 | Build NET=lwip, boot near configured AP, observe USB status | init_done=1, init_result=0, ready=1; link=3 and an IP after connection |
 | S1-M02 | Boot with wrong AP password; then restore credentials and rebuild | No connection with wrong credentials; normal connection after restore |
 | S1-M03 | Build NET=lwip MQTT=1 against configured broker | mqtt connected/subscribed, recurring heartbeat TX and matching RX |
@@ -64,7 +66,7 @@ Flash `build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2` using BOOTSEL.
 Open the USB serial console at 115200 baud. Expected local-test summary:
 
 ```text
-[TEST] subsystem1 SUMMARY 8 passed, 0 failed
+[TEST] subsystem1 SUMMARY 14 passed, 0 failed
 ```
 
 These parser tests do not require an AP or broker. To test them without
@@ -83,3 +85,53 @@ only reaches the demo logger, not this parser or the motors.
 Save serial output under `testing/subsystem1/logs/` and append actual results
 with the tested commit ID, operator and evidence as described in
 `testing/README.md`. No hardware result is recorded until run on a board.
+
+## S5 distance telemetry bench setup
+
+No additional source files were added. S5 now submits each valid or failed
+measurement to S1 using `s1_submit_telemetry()`. S1's task formats JSON and
+queues it; `mqtt_utk_poll()` publishes only from the existing network task.
+This is a temporary IF-13 bench route; replace it with controller routing
+through IF-03/09 during final integration. Commands and motors are unchanged.
+
+The telemetry topic defaults to `MQTT_CLIENT_ID "/telemetry"`, normally
+`mtk3smp-pico/telemetry`. Existing secrets files need no new setting; an
+optional `MQTT_TELEMETRY_TOPIC` overrides it. Heartbeats keep their old topic.
+
+1. Keep Mosquitto running on the computer named by `MQTT_BROKER_IP`.
+2. In Ubuntu, from `~/pico/robocar/build_make`, build:
+   `make PICO_SDK_PATH="$HOME/pico/pico-sdk" NET=lwip MQTT=1 TEST=1 -j8`.
+3. Flash `mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2` and open serial at 115200.
+4. On the Windows broker computer, open another PowerShell window and run:
+
+   ```powershell
+   & "C:\Program Files\mosquitto\mosquitto_sub.exe" -h 127.0.0.1 -p 1883 -t "+/telemetry" -v
+   ```
+
+5. Move a target closer/farther from the ultrasonic sensor. Expect around two
+   updates per second (sample timing includes echo wait), for example:
+
+   ```text
+   mtk3smp-pico/telemetry {"sequence":12,"obstacle_mm":451,"obstacle_valid":true}
+   ```
+
+6. A failed measurement must publish `obstacle_mm:null, obstacle_valid:false`
+   as JSON, rather than a numeric clear-space distance. Lack of a nearby target
+   does not guarantee failure because a farther surface can still return an echo.
+
+S1 owns one task and two four-message buffers. Input/output sends and network
+receives never block. Full queues drop the new sample. The network drains up
+to four payloads per poll, sends only the newest fresh one, and discards queued
+telemetry while offline. Samples older than 2 seconds are rejected. MQTT uses
+QoS 0 without retain; immediate publish errors drop that sample and are logged.
+This is best-effort live telemetry, not guaranteed delivery or command handling.
+The existing heartbeat RX is independent: telemetry TX appears in serial, and
+the external subscriber above verifies delivery (telemetry is not self-subscribed).
+
+Development verification: all 14 local checks passed on the host with the
+actual S1 source and kernel/console stubs under address/undefined-behavior
+sanitizers (leak checking disabled because the execution environment uses ptrace).
+A deterministic host queue simulation also checked input overflow, newest-sample
+selection, invalid/null forwarding, and expiry at input/output. These are not
+on-board or MQTT integration passes. See integration tests INT-03 through INT-05;
+hardware outcomes remain pending.

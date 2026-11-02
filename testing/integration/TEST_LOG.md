@@ -12,6 +12,9 @@ Define a test here before running it. Test IDs never change.
 |---|---|---|---|---|---|
 | INT-01 | samples flow from S2 to S3 (≥ 5 in 2 s) | IF-01, IF-02 | auto | `subsystem3_test.c` | `[TEST] INT-01 PASS` |
 | INT-02 | summary lines flow from S3 to S4 (≥ 2 in 3.5 s) | IF-03 | auto | `subsystem4_test.c` | `[TEST] INT-02 PASS` |
+| INT-03 | Live S5 distance reaches external MQTT subscriber | IF-13, IF-11 (temporary bench route) | manual | Build NET=lwip MQTT=1 TEST=1; run broker/subscriber per S1 guide; move target between measured distances | Received telemetry changes with target distance, sequence advances; no fake readings |
+| INT-04 | Failed echo is published as invalid | IF-13, IF-11 | manual | Cause a no-echo/invalid-width measurement without changing powered wiring; compare ULTRA fault output and MQTT subscriber | JSON has obstacle_mm=null and obstacle_valid=false; no clear-space interpretation |
+| INT-05 | Broker outage/recovery does not block sensing | IF-13, IF-11 | manual | Stop broker, move target, wait >2 s, restart broker and observe S5/serial/subscriber | Measurements continue; MQTT reconnects; fresh readings resume; queued samples older than 2 s are discarded; no retained telemetry |
 
 *Method:* **auto** = `TEST_CHECK` in code, result printed on the console;
 **manual** = a person observes the result (LED, scope, meter, phone app…).

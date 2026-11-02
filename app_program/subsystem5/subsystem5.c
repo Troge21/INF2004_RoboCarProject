@@ -4,6 +4,7 @@
  */
 #include "subsystem5.h"
 #include "../subsystem2/subsystem2.h"
+#include "../subsystem1/subsystem1.h"
 #include <sys/sysdef.h>
 #include <tk/syslib.h>
 
@@ -105,9 +106,18 @@ static void ultrasonic_task(INT stacd, void *exinf)
     }
     tm_printf((UB *)"[ULTRA] HC-SR04 GP4=TRIG GP5=ECHO (divider required); servo OFF\n");
     tk_dly_tsk(100); /* let sensor power settle */
+    UW sequence = 0;
     for (;;) {
         UW mm, pulse;
         const char *error = measure(&mm, &pulse);
+        S1_TELEMETRY sample = {0};
+        sample.sequence = sequence++;
+        sample.obstacle_mm = mm;
+        sample.obstacle_valid = (error == NULL);
+        /* Temporary bench route; final measurements go via the controller.
+         * Never delay sensing for WiFi, a disconnected broker or full queue. */
+        er = s1_submit_telemetry(&sample);
+        if (er != E_OK && er != E_TMOUT) CHECK(er, "S5 -> S1 telemetry");
         if (error == NULL) {
             tm_printf((UB *)"[ULTRA] distance=%u mm echo=%u us\n", mm, pulse);
         } else {

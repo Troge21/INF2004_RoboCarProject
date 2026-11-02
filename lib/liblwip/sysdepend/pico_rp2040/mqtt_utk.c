@@ -25,6 +25,9 @@
 #define MQTT_UTK_HEARTBEAT_MS   5000
 #define MQTT_UTK_KEEPALIVE_S    60
 #define MQTT_UTK_RETRY_MS       3000
+#ifndef MQTT_TELEMETRY_TOPIC
+#define MQTT_TELEMETRY_TOPIC MQTT_CLIENT_ID "/telemetry"
+#endif
 
 /* Inbound message staging. A publish arrives as one topic callback followed by
  * one or more data callbacks, so the topic has to be kept until the fragment
@@ -44,6 +47,26 @@ static u16_t		rx_len;
 static u8_t		rx_truncated;
 
 static void heartbeat_timeout(void *arg);
+static void publish_done_cb(void *arg, err_t result);
+
+void mqtt_utk_poll(void)
+{
+    char payload[128];
+    int len = s1_network_poll(payload, sizeof(payload));
+    err_t err;
+
+    /* Drain while disconnected too: this is live telemetry, not a backlog.
+     * S1 also discards samples older than two seconds. QoS 0, no retain;
+     * publish failures drop this sample and the next measurement replaces it. */
+    if(len <= 0 || client == NULL || !mqtt_client_is_connected(client)) return;
+    err = mqtt_publish(client, MQTT_TELEMETRY_TOPIC, payload, (u16_t)len,
+                       0, 0, publish_done_cb, NULL);
+    if(err == ERR_OK) {
+        tm_printf((UB*)"mqtt: TX [" MQTT_TELEMETRY_TOPIC "] %s\n", payload);
+    } else {
+        tm_printf((UB*)"mqtt: telemetry dropped, err=%d\n", (int)err);
+    }
+}
 
 /* mqtt.c NUL-terminates the topic before handing it over, but it is only
  * valid for the duration of this call -- copy it out. */

@@ -15,4 +15,10 @@
  */
 void mqtt_utk_start(void);
 
+/* Called every service iteration, even offline to discard pending telemetry. */
+void mqtt_utk_poll(void);
+
+/* S1 queue bridge ABI; deliberately no kernel or SDK headers in this file. */
+int s1_network_poll(char *out, unsigned int capacity);
+
 #endif /* MQTT_UTK_H */

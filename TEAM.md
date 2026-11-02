@@ -152,7 +152,7 @@ change it only by team agreement. Write down every task you create.
 
 | Subsystem | Priority band | Tasks (name – priority – core) |
 |---|---|---|
-| 1 — Wilson | 12–13(TBD) | Telemetry / Command Task – TBD (Low intended) – TBD |
+| 1 — Wilson | 12–13 | `wifi_status_task` – 12 – any core; telemetry formatting and status monitoring; command routing pending |
 | 2 — Zayar | 14–15(TBD) | Motor Control Task – TBD (High intended) – TBD  |
 | 3 — Troy | 16–17(TBD) | IR / Barcode Task – TBD (High intended) – TBD |
 | 4 — Thaw Zin | 18–19 | `imu_hump_task` – 18 – core 0 (`TP_PRC1`) |
@@ -183,8 +183,9 @@ sends to it or waits on it. Agree on the data format before coding.
 | IF-08 | Controller → S4 | Run-reset queue; type TBD; S4 owns | TBD (suggested `mbf_run_reset`) | Confirmed new-run reset; temporary stops do not clear maximum hump height | TBD: Thaw Zin + controller owner |
 | IF-09 | Controller → S1 | Telemetry queue; type TBD; S1 owns | TBD (suggested `mbf_telemetry`) | Operating state and available motion/line/barcode/hump/obstacle measurements with validity | TBD: Wilson + controller owner |
 | IF-10 | S1 → Controller | Request/status queue; type TBD; controller owns | TBD (suggested `mbf_supervisory`) | Validated permitted commands and connection state; command list/topics TBD; reject stale replay | TBD: Wilson + controller owner |
-| IF-11 | S1 → kernel network service | Proposed outbound message buffer owned by S1; service polls with `TMO_POL` | TBD (suggested `mbf_network_tx`) | Encoded telemetry/heartbeat for publication inside network task; no blocking network-service wait | TBD: Wilson + team + instructor |
+| IF-11 | S1 → kernel network service | Bounded message buffer owned by S1; `s1_network_poll()` uses `TMO_POL` | private `network_tx_mbf`; access through S1 API | Bench telemetry JSON, max 127 bytes; latest fresh queued sample, 2 s expiry; QoS 0, no retain; offline and failed publishes dropped | Bench implementation requested in session; formal Wilson + team + instructor sign-off pending |
 | IF-12 | Kernel network service → S1 | Proposed bounded nonblocking inbound channel owned by S1; type TBD | TBD (suggested `mbf_network_rx`) | Received command payload/connection events for application handling; overflow policy TBD | TBD: Wilson + team + instructor |
+| IF-13 | S5 → S1 (temporary bench route) | Bounded message buffer owned by S1; `s1_submit_telemetry()` uses `TMO_POL` | private `telemetry_mbf`; `S1_TELEMETRY` in `subsystem1.h` | Sequence, distance in mm, validity; valid range 20–4000 mm; failures encode null; full queue drops new sample; final route remains via controller IF-03/09 | Bench setup requested in session; team sign-off pending |
 
 Each interface is tested by at least one integration test
 (`testing/integration/TEST_LOG.md`).
@@ -197,12 +198,12 @@ Optional S2 calibration adds one task when enabled in a test build.
 
 | Object | Limit | S1 | S2 | S3 | S4 | S5 |
 |---|---|---|---|---|---|---|
-| Task | 32 | | | 1 | | 1 |
+| Task | 32 | 1 | | 1 | | 1 |
 | Semaphore | 16 | | | | | 1 |
 | Event flag | 16 | | | | | |
 | Mailbox | 12 | | | | | |
 | Mutex | 12 | | | | | |
-| Message buffer | 12 | | | | | |
+| Message buffer | 12 | 2 | | | | |
 | Fixed memory pool | 12 | | | | | |
 | Variable memory pool | 12 | | | | | |
 | Cyclic handler | 12 | | | | | |

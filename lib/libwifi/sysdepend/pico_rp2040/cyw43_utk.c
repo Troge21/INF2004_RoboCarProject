@@ -341,6 +341,7 @@ void cyw43_utk_task(int32_t stacd, void *exinf)
         if(radio_status.link_status == CYW43_LINK_UP) {
             mqtt_utk_start();
         }
+        mqtt_utk_poll();
 #endif
 #endif
         (void)tk_dly_tsk(CYW43_POLL_MS);
