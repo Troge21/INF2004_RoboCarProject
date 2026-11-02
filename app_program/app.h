@@ -27,6 +27,21 @@
  * --------------------------------------------------------------------- */
 #define TASK_STACK_SIZE		2048	/* bytes; tm_printf needs ~1 KB */
 
+/* IR-to-motor controller settings; normal builds only. */
+#define APP_LINE_FOLLOW_ENABLED  1
+#define APP_CONTROL_PERIOD_MS    20
+#define APP_IR_MAX_AGE_MS        100U
+#define APP_START_DELAY_MS       3000
+#define APP_FORWARD_DUTY         25
+#define APP_INNER_DUTY           15
+/* On all-white, pivot forward toward the last known side, then stop.
+ * No side history means stop immediately. Centre-only preserves history. */
+#define APP_RECOVERY_DUTY        20
+#define APP_RECOVERY_TIMEOUT_MS  600U
+
+
+#define APP_PRI_CONTROLLER       15
+
 /* Create and start a task.  prc = TP_PRC1 (core 0), TP_PRC2 (core 1), or
    0 for "any core".  Defined in app_main.c. */
 IMPORT ID app_start_task(FP entry, PRI pri, UW prc, const char *name);

@@ -115,7 +115,7 @@ the drivers have no locking to stop it.
 | SPI0 | Not used | | |
 | SPI1 | Not used | | |
 | ADC | Not used | | |
-| Motor PWM slices — numbers TBD | S2 - Zayar | Motor Control Task | GP8 / GP9 / GP10 / GP11 |
+| Motor PWM slices 4 and 5 | S2 - Zayar | `motor_task` | GP8 / GP9 / GP10 / GP11 |
 | Servo PWM slice — number TBD | S5 - Siyona | Servo / Ultrasonic Task | GP12 |
 | IO_BANK0 IRQ13, GP5 echo edges | S5 - Siyona (current bench build) | `ultrasonic_task`, core 0 | GP5 via 5 V to 3.3 V divider; incompatible with optional S2 encoder calibration |
 | WiFi radio, TCP/IP, MQTT | *kernel* | `cyw43_utk_task` (built in) | GP23–25, GP29 |
@@ -210,3 +210,17 @@ Optional S2 calibration adds one task when enabled in a test build.
 | Alarm handler | 12 | | | | | |
 
 (The kernel's USB and WiFi service tasks also use a few of these.)
+
+### S3 to app_main controller to S2 integration
+
+S3 publishes `S3_LINE_DATA` through `subsystem3_get_line()` using its own
+semaphore. `vehicle_controller_task` in app_main.c (priority 15, core 0) polls
+S3 every 20 ms and owns line steering/recovery. Controller tuning is in app.h.
+It publishes forward-only 0..100% wheel commands through
+`subsystem2_set_duty()`. S2's motor_task (priority 14, core 0) alone writes PWM
+and stops on missing or older-than-100-ms commands. S2 owns the command semaphore
+and PWM slices 4/5; servo slice 6 is untouched. S3's ir_task uses priority 17.
+Normal builds start following after 3 seconds; APP_TEST builds disable the
+controller and motor task, preserving manual encoder calibration. This initial
+command API does not implement the proposed remote stop-event arbitration.
+See `testing/subsystem2/LINE_FOLLOW.md` for behavior, settings and bench checks.

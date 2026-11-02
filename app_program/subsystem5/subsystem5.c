@@ -104,7 +104,8 @@ static void ultrasonic_task(INT stacd, void *exinf)
         tk_exd_tsk();
         return;
     }
-    tm_printf((UB *)"[ULTRA] HC-SR04 GP4=TRIG GP5=ECHO (divider required); servo OFF\n");
+    if (S5_ULTRA_LOG_ENABLED)
+        tm_printf((UB *)"[ULTRA] HC-SR04 GP4=TRIG GP5=ECHO (divider required); servo OFF\n");
     tk_dly_tsk(100); /* let sensor power settle */
     UW sequence = 0;
     for (;;) {
@@ -118,11 +119,13 @@ static void ultrasonic_task(INT stacd, void *exinf)
          * Never delay sensing for WiFi, a disconnected broker or full queue. */
         er = s1_submit_telemetry(&sample);
         if (er != E_OK && er != E_TMOUT) CHECK(er, "S5 -> S1 telemetry");
-        if (error == NULL) {
-            tm_printf((UB *)"[ULTRA] distance=%u mm echo=%u us\n", mm, pulse);
-        } else {
-            tm_printf((UB *)"[ULTRA] INVALID %s echo=%u us (not clear space)\n",
-                      error, pulse);
+        if (S5_ULTRA_LOG_ENABLED) {
+            if (error == NULL) {
+                tm_printf((UB *)"[ULTRA] distance=%u mm echo=%u us\n", mm, pulse);
+            } else {
+                tm_printf((UB *)"[ULTRA] INVALID %s echo=%u us (not clear space)\n",
+                          error, pulse);
+            }
         }
         tk_dly_tsk(SAMPLE_PAUSE_MS);
     }
@@ -152,7 +155,8 @@ EXPORT ER subsystem5_init(void)
 EXPORT ER subsystem5_start(void)
 {
 #if APP_TEST && S2_ENCODER_CALIBRATION
-    tm_printf((UB *)"[ULTRA] SKIP: subsystem2 encoder calibration owns GPIO IRQ13.\n");
+    if (S5_ULTRA_LOG_ENABLED)
+        tm_printf((UB *)"[ULTRA] SKIP: subsystem2 encoder calibration owns GPIO IRQ13.\n");
     return E_OK;
 #else
     ID tid;

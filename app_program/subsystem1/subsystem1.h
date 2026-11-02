@@ -5,6 +5,7 @@
 #include "../app.h"
 
 #define S1_TASK_PRIORITY 12
+#define S1_WIFI_LOG_ENABLED 0 /* set to 1 to restore WiFi status output */
 
 /* Temporary S5 -> S1 bench interface; later supplied by the controller.
  * Nonblocking sends: E_TMOUT means full (new sample dropped).

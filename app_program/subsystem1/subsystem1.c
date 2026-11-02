@@ -138,7 +138,7 @@ static void wifi_status_task(INT stacd, void *exinf)
         }
         if ((UW)(uptime_ms() - last_status_ms) < 2000U) continue;
         last_status_ms = uptime_ms();
-#if TM_WIFI_CYW43
+#if TM_WIFI_CYW43 && S1_WIFI_LOG_ENABLED
         T_CYW43_UTK_STATUS st = {0};
 
         cyw43_utk_get_status(&st);
