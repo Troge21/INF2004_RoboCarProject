@@ -1,9 +1,9 @@
 /* Application lifecycle: create all subsystem objects, then start tasks.
  * S1: WiFi status and telemetry forwarding.
  * S2: motor PWM command consumer; optional encoder calibration in TEST=1.
- * S3: optional single line sensing and LEFT-sensor barcode decoding.
+ * S3: centre/right line sensing and LEFT-sensor barcode decoding.
  * S4: IMU/hump sensing.
- * Legacy IR steering/recovery is disabled in this barcode bench build.
+ * IR steering/recovery runs alongside barcode diagnostics.
  * S5: fixed-position HC-SR04 measurements.
  * Former producer/consumer/monitor sample tasks and interfaces are retired.
  * Returning from usermain shuts down the kernel; leave it sleeping instead.
@@ -14,7 +14,7 @@
 #include "subsystem3/subsystem3.h"
 
 #if !APP_TEST
-/* Barcode diagnostics remain available with automatic driving disabled.
+/* Barcode diagnostics run independently of line following.
  * Deliberately no letter-to-turn mapping: A-D in the brief were examples. */
 static void barcode_report_task(INT stacd, void *exinf)
 {
@@ -36,7 +36,7 @@ static void barcode_report_task(INT stacd, void *exinf)
 #if APP_LINE_FOLLOW_ENABLED && !APP_TEST
 /* Controller owns IR interpretation; S2 owns motor hardware. */
 typedef struct {
-    INT last_side; /* -1 left, +1 right, 0 unknown */
+    INT last_side; /* -1 centre/left side, +1 right, 0 unknown */
     BOOL searching;
     UW search_start_ms;
 } APP_LINE_TRACKER;
@@ -47,33 +47,30 @@ static void app_line_speeds(UINT pattern, INT *left, INT *right)
     *left = 0;
     *right = 0;
     switch (pattern) {
-    case 7: /* All three black */
-    case 2: *left = APP_FORWARD_DUTY; *right = APP_FORWARD_DUTY; break;
-    case 6: *left = APP_INNER_DUTY; *right = APP_FORWARD_DUTY; break;
-    case 4: *right = APP_FORWARD_DUTY; break;
-    case 3: *left = APP_FORWARD_DUTY; *right = APP_INNER_DUTY; break;
-    case 1: *left = APP_FORWARD_DUTY; break;
-    default: break; /* All-white or unsupported pattern: no direct command. */
+    /* Centre is the left member of the centre/right tracking pair. */
+    case 3: *left = APP_FORWARD_DUTY; *right = APP_FORWARD_DUTY; break;
+    case 2: *left = APP_INNER_DUTY; *right = APP_FORWARD_DUTY; break;
+    case 1: *left = APP_FORWARD_DUTY; *right = APP_INNER_DUTY; break;
+    default: break; /* No black or unsupported pattern: stop both motors. */
     }
 }
 
-/* Caller owns a zero-initialized tracker. A timed-out search stays stopped
- * until a recognized line pattern returns; repeated white cannot restart it. */
+/* Recover once per line loss; timeout stays stopped until reacquisition. */
 static void app_track_line(APP_LINE_TRACKER *tracker, UINT pattern,
                            BOOL fresh, UW now_ms, INT *left, INT *right)
 {
     if (tracker == NULL || left == NULL || right == NULL) return;
     *left = 0;
     *right = 0;
-    if (!fresh || pattern > 7U || pattern == 5U) {
+    if (!fresh || pattern > 3U) {
         tracker->last_side = 0;
         tracker->searching = FALSE;
         return;
     }
     if (pattern != 0U) {
         tracker->searching = FALSE;
-        if (pattern == 4U || pattern == 6U) tracker->last_side = -1;
-        if (pattern == 1U || pattern == 3U) tracker->last_side = 1;
+        if (pattern == 2U) tracker->last_side = -1;
+        if (pattern == 1U) tracker->last_side = 1;
         app_line_speeds(pattern, left, right);
         return;
     }

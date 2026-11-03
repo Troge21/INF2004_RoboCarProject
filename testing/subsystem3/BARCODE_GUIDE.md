@@ -1,19 +1,17 @@
 # Left IR barcode bench build
 
-This update repurposes the left digital IR input (GP26) for barcode reading.
-There are now TWO IR sensors total: one barcode sensor and one line sensor.
-The remaining line sensor's GPIO is unconfirmed. `S3_LINE_PIN` defaults to -1
-in `app_program/subsystem3/subsystem3.h`: no GP6/GP16 input is configured or
-read for line sensing, and line snapshots stay invalid (not a white reading).
-After verifying the wiring, set this single setting to 6 or 16. This enables
-only the line reading, not automatic driving. Pattern 1 means black and 0
-means white when the snapshot is valid; it is not a steering direction.
+Current firmware uses left GP26 for barcode capture, centre GP6 and right GP16
+for line tracking. Centre/right bits are 2/1; barcode input never contributes.
+Normal builds drive after a 3-second startup delay. Both-black drives forward,
+centre-only steers left, and right-only steers right. Both-white searches toward
+the last detected side for up to 200 ms, then stops until reacquisition. With
+no side history it stops immediately. Stale/invalid data stops and clears history.
+Mount the tracking pair so both detect black when aligned on the line.
 
-Automatic line following remains OFF. The old three-sensor controller is
-retained for reference and compile-time blocked from consuming this new
-single-sensor format. A new tracking strategy must be implemented and tested
-before automatic driving can be enabled. Barcode characters do not generate
-motor commands.
+Barcode scanning remains available even without a label; characters do not
+issue motor commands. For stationary barcode trials, use TEST=1 for synthetic
+tests or set APP_LINE_FOLLOW_ENABLED=0 for normal firmware with barcode reporting.
+In TEST=1 the barcode report task is disabled, although capture still runs.
 
 The input assumption is the existing digital reflectance module: 1 means
 black, 0 means white. If a different module is installed, confirm its output
@@ -29,7 +27,7 @@ scanner needs a different acquisition interface.
   white quiet zones. A label is reported once, after trailing white.
 - Timeouts and resynchronisation after missed samples or edge queue overflow.
 - Nonblocking, one-byte decoded-result channel to a diagnostic consumer.
-- The optional single-line snapshot never includes the barcode sensor. Unknown wiring is reported as invalid.
+- The centre/right line snapshot never includes the barcode sensor.
 
 Multi-character labels, optional check digits and Full ASCII expansion are
 not supported. An arbitrary long barcode must not be treated as a navigation
@@ -80,11 +78,11 @@ inventory and before/after RAM/timing evidence remain separate work.
 ## Try it on the board
 
 1. Confirm GP26 is still the sensor's digital output, with common ground and
-   Pico-compatible signal voltage. Keep the car stationary and motors stopped.
+   Pico-compatible signal voltage. Use a normal build with APP_LINE_FOLLOW_ENABLED=0 to keep motors stopped
+   while retaining barcode reporting.
 2. Build the normal firmware using the team's existing SDK/toolchain setup
    (`cd build_make`, then `make -j8`). Network options are unchanged. New C
-   files are picked up by the existing wildcard source rule. No UF2 is supplied
-   with this update; the full linked firmware still needs building on that setup.
+   files are picked up by the existing wildcard source rule. Rebuild after changing settings so the UF2 matches the intended mode.
 3. Open the USB serial monitor. Expect an IR setup line containing
    `barcode=GP26` and `barcode sample=500 us`. A setup error is not a valid scan.
 4. Move the A label steadily across the left sensor, including white space
@@ -109,14 +107,14 @@ Alternatively pass `--compiler /path/to/zig` or `--compiler /path/to/gcc`.
 Only the Python standard library is needed to run the saved fixtures. The tests
 compile and call the actual C decoder and exercise the actual capture driver
 against a register/IRQ model. Additional tests run the actual S3 task with
-mock GPIO/kernel calls for disabled/GP6/GP16 line configurations and verify
-configuration guards. Fixture provenance is recorded in the JSON file.
+mock GPIO/kernel calls for all four line patterns at both barcode input
+levels, with line following enabled and disabled. Fixture provenance is recorded in the JSON file.
 Host tests cannot establish real interrupt latency or physical recognition.
 
-Before driving, confirm the single line sensor's wiring and placement, implement
-and validate a suitable single-sensor tracking strategy, agree the barcode-to-command mapping, and connect decoded
-commands to the controller's navigation state machine. The A-D mapping in the
-project brief is an example and has deliberately not been assumed here.
+Before driving, verify centre/right polarity, placement and steering with wheels
+raised, then test the 200 ms recovery on the track. Barcode-to-command mapping
+and navigation integration remain unimplemented. The A-D mapping in the project
+brief has deliberately not been assumed here.
 
 References: [Code 39 structure](https://barcodeguide.seagullscientific.com/content/Symbologies/Code_39_Regular.htm),
 [RP2040 timer registers](https://github.com/raspberrypi/pico-sdk/blob/master/src/rp2040/hardware_regs/include/hardware/regs/timer.h).

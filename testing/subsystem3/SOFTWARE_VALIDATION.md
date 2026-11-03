@@ -1,5 +1,20 @@
 # Barcode software validation - 3 November 2026
 
+## Current integration checks
+
+The working tree now uses left GP26 for barcode and centre GP6/right GP16 for
+tracking with 200 ms recovery. Host barcode tests, controller policy tests and
+motor-command tests pass. The task harness checks all four line patterns at
+both barcode levels, with line following enabled and disabled. Full normal and
+TEST firmware builds pass using the local Pico SDK and Arm GNU compiler.
+These checks do not establish physical line tracking or barcode recognition.
+
+## Imported barcode-only validation (historical)
+
+The remaining sections describe the imported single-line bench revision,
+including its former pin selection and validation environment.
+
+
 Source: supplied INF2004_RoboCarProject.zip (local copy; no remote repository changes).
 Compiler: Zig 0.16.0 C compiler, Windows x64 host.
 

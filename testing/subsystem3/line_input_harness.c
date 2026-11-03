@@ -33,13 +33,14 @@ typedef struct { unsigned sematr; unsigned isemcnt; unsigned maxsem; } T_CSEM;
 typedef struct { unsigned mbfatr; unsigned bufsz; unsigned maxmsz; } T_CMBF;
 static jmp_buf exit_task;
 static UW configured, reads;
-static UINT line_level;
+static UINT line_level, barcode_level;
 static ER gpio_set_pin(UINT pin, UINT mode) {
     assert(mode == GPIO_MODE_IN);
     configured |= 1U << pin;
     return E_OK;
 }
-UINT gpio_get_val(UINT pin) { reads |= 1U << pin; return line_level; }
+UINT gpio_get_val(UINT pin) { reads |= 1U << pin; return pin == 6 ? ((line_level >> 1) & 1U) :
+    (pin == 16 ? (line_level & 1U) : barcode_level); }
 static ER tk_wai_sem(ID id, unsigned count, int timeout) {
     assert(id == 1 && count == 1 && timeout == TMO_POL); return E_OK;
 }
@@ -60,8 +61,8 @@ static void tm_printf(UB *format, ...) { (void)format; }
 static ID app_start_task(FP entry, PRI priority, UW core, const char *name) {
     (void)entry; (void)name; assert(priority == 17 && core == TP_PRC1); return 3;
 }
-ER s3_capture_start(UW *time, BOOL *black) { *time=0; *black=0; return E_OK; }
-ER s3_capture_read(UW *time, BOOL *black) { *time=1000; *black=0; return E_TMOUT; }
+ER s3_capture_start(UW *time, BOOL *black) { *time=0; *black=barcode_level; return E_OK; }
+ER s3_capture_read(UW *time, BOOL *black) { *time=1000; *black=barcode_level; return E_TMOUT; }
 
 /* SUBSYSTEM_SOURCE */
 
@@ -74,19 +75,14 @@ int main(void) {
     assert(subsystem3_init() == E_OK);
     assert(subsystem3_start() == E_OK);
     assert(subsystem3_get_line(NULL) == E_PAR);
-    for (line_level = 0; line_level <= 1; ++line_level) {
-        run_one_iteration();
-#if S3_LINE_PIN >= 0
-        assert(configured == ((1U << 26) | (1U << S3_LINE_PIN)));
-        assert(reads == (1U << S3_LINE_PIN));
-        assert(subsystem3_get_line(&line) == E_OK);
-        assert(line.valid && line.pattern == line_level && line.timestamp_ms == 20);
-#else
-        assert(configured == (1U << 26));
-        assert(reads == 0);
-        assert(subsystem3_get_line(&line) == E_TMOUT);
-        assert(!line.valid && line.pattern == 0);
-#endif
+    for (barcode_level = 0; barcode_level <= 1; ++barcode_level) {
+        for (line_level = 0; line_level <= 3; ++line_level) {
+            run_one_iteration();
+            assert(configured == ((1U << 26) | (1U << 6) | (1U << 16)));
+            assert(reads == ((1U << 6) | (1U << 16)));
+            assert(subsystem3_get_line(&line) == E_OK);
+            assert(line.valid && line.pattern == line_level && line.timestamp_ms == 20);
+        }
     }
     return 0;
 }

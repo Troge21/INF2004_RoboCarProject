@@ -216,28 +216,18 @@ class BarcodeTests(unittest.TestCase):
         executable = directory/(f'line-{pin}.exe' if os.name == 'nt' else f'line-{pin}')
         command = [COMPILER] + (['cc'] if Path(COMPILER).stem == 'zig' else [])
         command += ['-std=c99', '-Wall', '-Wextra', '-Werror',
-                    f'-DS3_LINE_PIN={pin}', '-I', str(ROOT/'app_program/subsystem3'),
+                    f'-DAPP_LINE_FOLLOW_ENABLED={pin}', '-DAPP_TEST=0', '-DAPP_RECOVERY_TIMEOUT_MS=200U', '-I', str(ROOT/'app_program/subsystem3'),
                     str(source), str(ROOT/'app_program/subsystem3/barcode_decoder.c'),
                     '-o', str(executable)]
         command += extra or []
         return command, executable
 
-    def test_optional_single_line_input_actual_task(self):
-        for pin in (-1, 6, 16):
-            with self.subTest(pin=pin):
-                command, executable = self.compile_line_harness(pin)
+    def test_centre_right_inputs_independent_of_barcode_actual_task(self):
+        for enabled in (0, 1):
+            with self.subTest(line_follow=enabled):
+                command, executable = self.compile_line_harness(enabled)
                 subprocess.run(command, check=True)
                 subprocess.run([str(executable)], check=True)
-
-    def test_single_line_configuration_guards(self):
-        command, _ = self.compile_line_harness(7)
-        result = subprocess.run(command, capture_output=True, text=True)
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn('S3_LINE_PIN must be', result.stderr)
-        command, _ = self.compile_line_harness(6, ['-DAPP_LINE_FOLLOW_ENABLED=1'])
-        result = subprocess.run(command, capture_output=True, text=True)
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn('Legacy three-sensor steering', result.stderr)
 
 
 if __name__ == '__main__':

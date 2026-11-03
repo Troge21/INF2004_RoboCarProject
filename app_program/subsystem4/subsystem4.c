@@ -15,7 +15,8 @@
 #include <tk/syslib.h>
 #include <tm/tmonitor.h>
 
-/* Bench diagnostics: print latest readings once a second. */
+/* Bench diagnostics: set to 1 to print latest readings once a second. */
+#define S4_STATUS_LOG_ENABLED       0
 #define S4_LOG_PERIOD_MS            (1000U)
 
 #define s4_abs(x)                   (((x) < 0) ? -(x) : (x))
@@ -287,7 +288,7 @@ static void imu_hump_task(INT stacd, void *exinf)
         }
 
         /* Periodic diagnostic heartbeat */
-        if (log_elapsed_ms >= S4_LOG_PERIOD_MS) {
+        if (S4_STATUS_LOG_ENABLED && log_elapsed_ms >= S4_LOG_PERIOD_MS) {
             /* Last successful sample; retained if a later read fails.
              * Previously Pitch displayed the fixed calibration baseline. */
             tm_printf((UB*)"[S4 Status] State=%d | Pitch=%s%d.%d deg | Baseline=%s%d.%d deg | Accel=%d,%d,%d mg | CurrentHump=%u mm | RunMax=%u mm | Flags=0x%02X\n",
@@ -308,7 +309,7 @@ static void imu_hump_task(INT stacd, void *exinf)
         }
 
         tk_dly_tsk(S4_SAMPLE_PERIOD_MS);
-        log_elapsed_ms += S4_SAMPLE_PERIOD_MS;
+        if (S4_STATUS_LOG_ENABLED) log_elapsed_ms += S4_SAMPLE_PERIOD_MS;
     }
 }
 

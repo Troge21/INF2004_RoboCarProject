@@ -1,4 +1,4 @@
-/* S3: ONE optional line input and LEFT-sensor Code 39 acquisition. */
+/* S3: centre/right line inputs and LEFT-sensor Code 39 acquisition. */
 #include "subsystem3.h"
 #include "barcode_capture.h"
 
@@ -42,9 +42,7 @@ static void ir_task(INT stacd, void *exinf)
 {
     const UINT pins[] = {
         S3_BARCODE_PIN,
-#if S3_LINE_PIN >= 0
-        S3_LINE_PIN,
-#endif
+        S3_IR_CENTRE_PIN, S3_IR_RIGHT_PIN,
     };
     S3_BARCODE_DECODER decoder;
     UW stamp, rejected = 0, dropped = 0, lost = 0;
@@ -63,12 +61,9 @@ static void ir_task(INT stacd, void *exinf)
     if (S3_IR_LOG_ENABLED) {
         tm_printf((UB *)"[IR] barcode=GP%u; barcode sample=%u us; black level=%u\n",
                   S3_BARCODE_PIN, S3_BC_SAMPLE_US, S3_BARCODE_BLACK_LEVEL);
-#if S3_LINE_PIN >= 0
-        tm_printf((UB *)"[IR] single line sensor=GP%u; 1=black; automatic driving OFF\n",
-                  S3_LINE_PIN);
-#else
-        tm_printf((UB *)"[IR] line sensor DISABLED: wiring pin unconfirmed\n");
-#endif
+        tm_printf((UB *)"[IR] line centre=GP%u right=GP%u; 1=black; follow=%u; recovery=%u ms\n",
+                  S3_IR_CENTRE_PIN, S3_IR_RIGHT_PIN,
+                  (UINT)(APP_LINE_FOLLOW_ENABLED && !APP_TEST), APP_RECOVERY_TIMEOUT_MS);
     }
     for (;;) {
         UB code;
@@ -92,19 +87,18 @@ static void ir_task(INT stacd, void *exinf)
             status = s3_barcode_edge(&decoder, black, stamp, &code);
             barcode_result(status, code, &rejected, &dropped);
         }
-#if S3_LINE_PIN >= 0
-        pattern = gpio_get_val(S3_LINE_PIN) == S3_IR_BLACK_LEVEL ? 1U : 0U;
-#endif
+        pattern = (gpio_get_val(S3_IR_CENTRE_PIN) == S3_IR_BLACK_LEVEL ? 2U : 0U)
+                | (gpio_get_val(S3_IR_RIGHT_PIN) == S3_IR_BLACK_LEVEL ? 1U : 0U);
         (void)tk_get_tim(&now);
         if (tk_wai_sem(s_line_sem, 1, TMO_POL) == E_OK) {
             s_line.pattern = pattern; /* LEFT/BARCODE NEVER participates. */
             s_line.timestamp_ms = (UW)now.lo;
-            s_line.valid = (S3_LINE_PIN >= 0);
+            s_line.valid = TRUE;
             (void)tk_sig_sem(s_line_sem, 1);
         }
         if (S3_IR_LOG_ENABLED && (UW)((UW)now.lo - last_report_ms) >= 5000U) {
-            tm_printf((UB *)"[IR] line_valid=%u line_black=%u; barcode rejected=%u lost=%u dropped=%u\n",
-                      (UINT)(S3_LINE_PIN >= 0), pattern, rejected, lost, dropped);
+            tm_printf((UB *)"[IR] line C=%u R=%u pattern=%u; barcode rejected=%u lost=%u dropped=%u\n",
+                      (pattern >> 1) & 1U, pattern & 1U, pattern, rejected, lost, dropped);
             last_report_ms = (UW)now.lo;
         }
         (void)tk_dly_tsk(S3_IR_PERIOD_MS);

@@ -1,12 +1,22 @@
 # Subsystem 3 — test log
 
-## Current two-sensor setup - 3 November 2026
+## Current centre/right tracking setup - 3 November 2026
 
-There are TWO sensors total: GP26 barcode and ONE line sensor whose GPIO
-remains unconfirmed. `S3_LINE_PIN=-1` disables line GPIO configuration/reads
-and marks line snapshots invalid. After confirmed wiring, choose 6 or 16.
-Automatic steering remains disabled and the old controller is blocked from
-using the new single-sensor format. Earlier centre/right notes are history.
+Left GP26 is barcode only. Centre GP6 and right GP16 contribute bits 2/1 to
+the line pattern, sampled every 20 ms. Barcode capture samples every 500 us.
+Normal builds enable line following after 3 seconds with 200 ms recovery;
+TEST builds disable automatic driving. Historical three-line-sensor patterns
+below do not describe this current interface.
+
+Manual integration checks (not yet run):
+
+| ID | Method | Expected result |
+|---|---|---|
+| S3-U11 | With driving disabled, present C/R=00,01,10,11; repeat at both left-sensor levels. | Pattern=0,1,2,3 respectively; left coverage never changes line pattern. |
+| S3-U12 | With wheels raised, present centre-only/right-only, then both-white; repeat with both-black in between. | Turn toward last known side for up to 200 ms, then stop until reacquisition. No side history means immediate stop. |
+
+Physical trials and formal results remain pending. Record the tested revision
+and actual evidence in the Results table after completing each test.
 
 ## Earlier barcode software update - 3 November 2026
 

@@ -28,16 +28,16 @@
 #define TASK_STACK_SIZE		2048	/* bytes; tm_printf needs ~1 KB */
 
 /* IR-to-motor controller settings; normal builds only. */
-#define APP_LINE_FOLLOW_ENABLED  0 /* barcode bench; only one line sensor, wiring unconfirmed */
+#define APP_LINE_FOLLOW_ENABLED  1 /* centre/right line tracking; left is barcode only */
 #define APP_CONTROL_PERIOD_MS    20
 #define APP_IR_MAX_AGE_MS        100U
 #define APP_START_DELAY_MS       3000
 #define APP_FORWARD_DUTY         25
-#define APP_INNER_DUTY           15
+#define APP_INNER_DUTY           20
 /* On all-white, pivot forward toward the last known side, then stop.
- * No side history means stop immediately. Centre-only preserves history. */
+ * No side history means stop immediately. Both-black preserves history. */
 #define APP_RECOVERY_DUTY        20
-#define APP_RECOVERY_TIMEOUT_MS  600U
+#define APP_RECOVERY_TIMEOUT_MS  200U
 
 
 #define APP_PRI_CONTROLLER       15

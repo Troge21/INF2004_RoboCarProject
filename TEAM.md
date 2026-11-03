@@ -1,17 +1,17 @@
 # Team and subsystems
 
-## Current two-sensor hardware update - 3 November 2026
+## Current centre/right tracking and left barcode setup - 3 November 2026
 
-The user confirmed that one IR sensor was removed: TWO remain in total.
-The left sensor is barcode input GP26. Only ONE sensor remains for the line;
-its GPIO is not yet known (formerly centre GP6 or right GP16).
-`S3_LINE_PIN=-1` deliberately configures/reads neither possible line pin and
-publishes unavailable line data. After wiring is verified, set it to 6 or 16.
-Do not release/reassign either claimed pin before the actual wiring is known.
-Automatic driving remains disabled; the legacy three-sensor controller is
-compile-time blocked for this new format. A single black/white reading is
-not a left/right steering estimate. Barcode decoding and timer ownership are
-unchanged. The earlier sections below are retained as design history.
+Three IR inputs are used: left GP26 for barcode capture, centre GP6 and right
+GP16 for tracking. Line patterns use centre/right bits 2/1; the left sensor
+never contributes. Normal builds enable driving after 3 seconds. Both-black
+moves forward, centre-only steers left, and right-only steers right. Both-white
+searches toward the last detected side for up to 200 ms at 20% duty, then stays
+stopped until the line returns. No side history means stop immediately.
+Stale/invalid line data stops and clears history. TEST builds disable driving.
+Barcode timer alarm 2 / IRQ2 and decoding remain active; decoded characters
+print without issuing motor commands. Physical trials remain pending.
+The barcode bench descriptions below are historical, not current settings.
 
 ## Earlier barcode bench update - 3 November 2026
 
