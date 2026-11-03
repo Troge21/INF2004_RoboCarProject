@@ -207,6 +207,39 @@ class BarcodeTests(unittest.TestCase):
         subprocess.run([str(executable)], check=True)
 
 
+    def compile_line_harness(self, pin, extra=None):
+        directory = Path(self.temp.name)
+        source = directory/f'line-{pin}.c'
+        actual = (ROOT/'app_program/subsystem3/subsystem3.c').read_text()
+        harness = Path(__file__).with_name('line_input_harness.c').read_text()
+        source.write_text(harness.replace('/* SUBSYSTEM_SOURCE */', actual))
+        executable = directory/(f'line-{pin}.exe' if os.name == 'nt' else f'line-{pin}')
+        command = [COMPILER] + (['cc'] if Path(COMPILER).stem == 'zig' else [])
+        command += ['-std=c99', '-Wall', '-Wextra', '-Werror',
+                    f'-DS3_LINE_PIN={pin}', '-I', str(ROOT/'app_program/subsystem3'),
+                    str(source), str(ROOT/'app_program/subsystem3/barcode_decoder.c'),
+                    '-o', str(executable)]
+        command += extra or []
+        return command, executable
+
+    def test_optional_single_line_input_actual_task(self):
+        for pin in (-1, 6, 16):
+            with self.subTest(pin=pin):
+                command, executable = self.compile_line_harness(pin)
+                subprocess.run(command, check=True)
+                subprocess.run([str(executable)], check=True)
+
+    def test_single_line_configuration_guards(self):
+        command, _ = self.compile_line_harness(7)
+        result = subprocess.run(command, capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('S3_LINE_PIN must be', result.stderr)
+        command, _ = self.compile_line_harness(6, ['-DAPP_LINE_FOLLOW_ENABLED=1'])
+        result = subprocess.run(command, capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Legacy three-sensor steering', result.stderr)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--compiler', default=shutil.which('gcc') or shutil.which('cc'))

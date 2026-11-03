@@ -1,6 +1,19 @@
 # Team and subsystems
 
-## Barcode bench update - 3 November 2026
+## Current two-sensor hardware update - 3 November 2026
+
+The user confirmed that one IR sensor was removed: TWO remain in total.
+The left sensor is barcode input GP26. Only ONE sensor remains for the line;
+its GPIO is not yet known (formerly centre GP6 or right GP16).
+`S3_LINE_PIN=-1` deliberately configures/reads neither possible line pin and
+publishes unavailable line data. After wiring is verified, set it to 6 or 16.
+Do not release/reassign either claimed pin before the actual wiring is known.
+Automatic driving remains disabled; the legacy three-sensor controller is
+compile-time blocked for this new format. A single black/white reading is
+not a left/right steering estimate. Barcode decoding and timer ownership are
+unchanged. The earlier sections below are retained as design history.
+
+## Earlier barcode bench update - 3 November 2026
 
 Zayar is now developing barcode software; a teammate is handling hardware.
 The user confirmed that the LEFT sensor will be repurposed. Current code uses

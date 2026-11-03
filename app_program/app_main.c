@@ -1,7 +1,7 @@
 /* Application lifecycle: create all subsystem objects, then start tasks.
  * S1: WiFi status and telemetry forwarding.
  * S2: motor PWM command consumer; optional encoder calibration in TEST=1.
- * S3: centre/right line sensing and LEFT-sensor barcode decoding.
+ * S3: optional single line sensing and LEFT-sensor barcode decoding.
  * S4: IMU/hump sensing.
  * Legacy IR steering/recovery is disabled in this barcode bench build.
  * S5: fixed-position HC-SR04 measurements.

@@ -1,6 +1,14 @@
 # Subsystem 3 — test log
 
-## Barcode software update - 3 November 2026
+## Current two-sensor setup - 3 November 2026
+
+There are TWO sensors total: GP26 barcode and ONE line sensor whose GPIO
+remains unconfirmed. `S3_LINE_PIN=-1` disables line GPIO configuration/reads
+and marks line snapshots invalid. After confirmed wiring, choose 6 or 16.
+Automatic steering remains disabled and the old controller is blocked from
+using the new single-sensor format. Earlier centre/right notes are history.
+
+## Earlier barcode software update - 3 November 2026
 
 The sections below retain the original three-line-sensor setup and past test
 IDs as history. GP26 is now the barcode input; only GP6/GP16 contribute to line

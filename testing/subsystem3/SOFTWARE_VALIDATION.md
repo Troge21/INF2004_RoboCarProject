@@ -5,7 +5,7 @@ Compiler: Zig 0.16.0 C compiler, Windows x64 host.
 
 ## Completed checks
 
-- 11 host test groups PASS, compiling and calling the actual C decoder.
+- 13 host test groups PASS, compiling and calling the actual C decoder.
 - All 43 standard Code 39 characters, both directions, five narrow-element
   intervals and three wide/narrow ratios: 1,290 valid decoding cases.
 - 860 deterministic jittered scans PASS (43 characters, both directions,
@@ -22,6 +22,16 @@ Compiler: Zig 0.16.0 C compiler, Windows x64 host.
   the project's REAL micro T-Kernel/BSP headers, warnings treated as errors.
   Profiles checked: SMP=1/APP_TEST=0, SMP=1/APP_TEST=1, SMP=0/APP_TEST=0.
 
+## Two-sensor configuration checks
+
+The actual S3 task and snapshot API were tested with host kernel/GPIO stubs
+for S3_LINE_PIN=-1, 6 and 16. With -1, only GP26 is configured and no line GPIO
+is read; snapshots return E_TMOUT with valid=FALSE. With 6/16, only the selected
+line pin is configured/read, and both black/white levels produce the expected
+single-bit status. Unsupported pins and enabling the legacy steering flag
+are rejected during compilation. Both configured pins also compile against
+the real Pico headers for Cortex-M0+ (SMP normal build).
+
 ## Not yet established
 
 No board was connected. No physical barcode trial or real interrupt-latency,
@@ -30,7 +40,7 @@ firmware was not linked against the Pico SDK and no UF2 was produced. The
 on-target synthetic test functions compiled but were not executed on a board.
 The team's existing SDK/Arm GNU build must still be run before flashing.
 
-Default automatic driving is OFF. The remaining line-sensor geometry and
-letter-to-command mapping are undecided. This is a barcode bench prototype,
+Default automatic driving is OFF. Only ONE line sensor remains, and its GPIO/placement and
+letter-to-command mapping are unconfirmed. S3_LINE_PIN defaults to -1. This is a barcode bench prototype,
 not a completed integrated navigation demonstration or a claim of project-wide
 minimum-bit compliance. See testing/subsystem3/BARCODE_GUIDE.md.
