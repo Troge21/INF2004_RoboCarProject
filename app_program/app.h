@@ -28,7 +28,7 @@
 #define TASK_STACK_SIZE		2048	/* bytes; tm_printf needs ~1 KB */
 
 /* IR-to-motor controller settings; normal builds only. */
-#define APP_LINE_FOLLOW_ENABLED  1
+#define APP_LINE_FOLLOW_ENABLED  0 /* barcode bench; two-sensor layout unconfirmed */
 #define APP_CONTROL_PERIOD_MS    20
 #define APP_IR_MAX_AGE_MS        100U
 #define APP_START_DELAY_MS       3000

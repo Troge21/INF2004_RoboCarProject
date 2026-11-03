@@ -1,5 +1,28 @@
 # Team and subsystems
 
+## Barcode bench update - 3 November 2026
+
+Zayar is now developing barcode software; a teammate is handling hardware.
+The user confirmed that the LEFT sensor will be repurposed. Current code uses
+GP26 exclusively as the digital barcode input. Centre GP6/right GP16 remain
+line inputs; their physical layout is undecided. The historical three-sensor
+ownership/design entries below describe the previous arrangement.
+
+S3 now reserves **timer alarm 2 / IRQ2 on core 0** for 500 us input sampling.
+No other task, SDK alarm pool or subsystem may claim this alarm. GPIO IRQ13
+remains with the existing ultrasonic/encoder bench code. S3's `ir_task` still
+runs at priority 17/core 0 and owns the sensors, decoder, capture ring, line
+snapshot semaphore and a 64-byte result message buffer (one-byte payload).
+The shared `barcode_report` task is priority 16/core 0, consumes results using
+`subsystem3_get_barcode()` and only prints characters. There is no agreed
+letter-to-navigation-command mapping in this update.
+
+`APP_LINE_FOLLOW_ENABLED=0` is the default for barcode bench testing; the old
+controller is not validated for the new geometry. See
+`testing/subsystem3/BARCODE_GUIDE.md` for input assumptions, sampling limits,
+result format and the remaining hardware/integration checks. These changes
+are a local review copy, not evidence of team approval or physical testing.
+
 The tables are pre-filled with the **example** in `app_program/` (marked
 *example*). Replace those rows with your own as you replace the example code.
 
@@ -75,7 +98,7 @@ fixed.
 | GP20 | | |
 | GP21 | | |
 | GP22 | | |
-| GP26 | S3 - Troy | Left IR sensor DO — GPIO input |
+| GP26 | S3 - barcode software now Zayar | Left digital IR DO repurposed as barcode input |
 | GP27 | | |
 | GP28 | S2 - Zayar | Left wheel encoder B |
 
@@ -118,6 +141,7 @@ the drivers have no locking to stop it.
 | Motor PWM slices 4 and 5 | S2 - Zayar | `motor_task` | GP8 / GP9 / GP10 / GP11 |
 | Servo PWM slice — number TBD | S5 - Siyona | Servo / Ultrasonic Task | GP12 |
 | IO_BANK0 IRQ13, GP5 echo edges | S5 - Siyona (current bench build) | `ultrasonic_task`, core 0 | GP5 via 5 V to 3.3 V divider; incompatible with optional S2 encoder calibration |
+| Timer alarm 2 / IRQ2 | S3 - barcode software | sampler ISR and `ir_task`, core 0 | GP26 sampled every 500 us; exclusive alarm reservation |
 | WiFi radio, TCP/IP, MQTT | *kernel* | `cyw43_utk_task` (built in) | GP23–25, GP29 |
 
 ### WiFi and MQTT are special

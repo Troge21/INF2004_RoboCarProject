@@ -1,9 +1,9 @@
 /* Application lifecycle: create all subsystem objects, then start tasks.
  * S1: WiFi status and telemetry forwarding.
  * S2: motor PWM command consumer; optional encoder calibration in TEST=1.
- * S3: digital IR sensing.
+ * S3: centre/right line sensing and LEFT-sensor barcode decoding.
  * S4: IMU/hump sensing.
- * IR steering/recovery integration runs in vehicle_controller_task below.
+ * Legacy IR steering/recovery is disabled in this barcode bench build.
  * S5: fixed-position HC-SR04 measurements.
  * Former producer/consumer/monitor sample tasks and interfaces are retired.
  * Returning from usermain shuts down the kernel; leave it sleeping instead.
@@ -12,6 +12,26 @@
 #include "app.h"
 #include "subsystem2/subsystem2.h"
 #include "subsystem3/subsystem3.h"
+
+#if !APP_TEST
+/* Barcode diagnostics remain available with automatic driving disabled.
+ * Deliberately no letter-to-turn mapping: A-D in the brief were examples. */
+static void barcode_report_task(INT stacd, void *exinf)
+{
+    (void)stacd; (void)exinf;
+    for (;;) {
+        UINT i;
+        for (i = 0; i < 8U; ++i) {
+            UB code;
+            if (subsystem3_get_barcode(&code) != E_OK) break;
+            tm_printf((UB *)"[BARCODE] '%c' scan=%s (character only; no motor action)\n",
+                      s3_barcode_character(code),
+                      (code & S3_BC_REVERSED) ? "reverse" : "forward");
+        }
+        (void)tk_dly_tsk(20);
+    }
+}
+#endif
 
 #if APP_LINE_FOLLOW_ENABLED && !APP_TEST
 /* Controller owns IR interpretation; S2 owns motor hardware. */
@@ -157,6 +177,11 @@ EXPORT INT usermain(void)
 	CHECK(subsystem3_start(), "subsystem3_start");
 	CHECK(subsystem4_start(), "subsystem4_start");
 	CHECK(subsystem5_start(), "subsystem5_start");
+
+#if !APP_TEST
+    CHECK(app_start_task((FP)barcode_report_task, 16, TP_PRC1,
+                         "barcode_report"), "start barcode reporter");
+#endif
 
 #if APP_LINE_FOLLOW_ENABLED && !APP_TEST
     CHECK(app_start_task((FP)vehicle_controller_task, APP_PRI_CONTROLLER,

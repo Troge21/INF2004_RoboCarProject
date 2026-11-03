@@ -1,5 +1,18 @@
 # Subsystem 3 — test log
 
+## Barcode software update - 3 November 2026
+
+The sections below retain the original three-line-sensor setup and past test
+IDs as history. GP26 is now the barcode input; only GP6/GP16 contribute to line
+snapshots. See `BARCODE_GUIDE.md` for the current bench setup. Automatic driving
+is disabled pending the remaining sensors' physical arrangement.
+
+New on-target **synthetic software** checks: S3-U06 forward A, S3-U07 reverse A,
+S3-U08 short leading quiet rejection, S3-U09 malformed start rejection,
+S3-U10 invalid packed-result rejection. Host checks are in `test_barcode.py`.
+Neither set constitutes a completed hardware recognition trial. The original
+20/100 ms sampling notes below do not describe the new 500 us barcode sampler.
+
 **Subsystem:** IR sensing, line-pattern detection and barcode decoding  ·  2503451  ·   Troy Ang Songze (Troge21)  ·  `app_program/subsystem3/`
 
 See `testing/README.md` for how to run tests and record results.
