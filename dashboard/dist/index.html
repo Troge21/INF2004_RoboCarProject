@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f5f6f8">
+  <meta name="description" content="RoboCar mission control: live telemetry, sensor trends and MQTT communication diagnostics for INF2004.">
+  <title>RoboCar — Mission Control</title>
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to dashboard</a>
+  <aside class="sidebar" aria-label="Main navigation">
+    <a class="brand" href="#overview" aria-label="RoboCar home"><span class="brand-icon" data-icon="car"></span><span>robo<span class="brand-light">car</span><small>MISSION CONTROL</small></span></a>
+    <div class="workspace-label">WORKSPACE</div>
+    <nav>
+      <a class="nav-item active" href="#overview" data-tab="overview"><span data-icon="grid"></span>Overview<span class="nav-number">01</span></a>
+      <a class="nav-item" href="#sensors" data-tab="sensors"><span data-icon="wave"></span>Sensors & motion<span class="nav-number">02</span></a>
+      <a class="nav-item" href="#communications" data-tab="communications"><span data-icon="radio"></span>Communications<span class="nav-number">03</span></a>
+    </nav>
+    <div class="sidebar-vehicle"><div class="tiny-label">PROJECT VEHICLE</div><div class="vehicle-name"><span class="vehicle-dot offline" id="vehicle-connection-dot"></span>RoboCar AAI02</div><span class="muted">Raspberry Pi Pico W</span><div class="device-tags"><span>RP2040</span><span>micro T-Kernel</span></div><div class="vehicle-footer"><span data-icon="chip"></span><span>INF2004 · Embedded Systems</span></div></div>
+    <div class="sidebar-bottom"><span class="avatar">02</span><div>AAI02 Team<small>INF2004 RoboCar Project</small></div></div>
+  </aside>
+  <div class="shell">
+    <header class="topbar"><div class="breadcrumb">Workspace <span>/</span> <strong id="breadcrumb">Overview</strong></div><div class="topbar-actions"><span class="local-clock" id="clock"></span><span class="mode-badge disconnected" id="mode-badge"><i></i>Not connected</span><button class="button button-dark" id="connect-button"><span data-icon="plug"></span>Connect robot</button></div></header>
+    <main id="main" tabindex="-1">
+      <div class="page-heading"><div><div class="eyebrow">ROBOCAR / TELEMETRY</div><h1 id="page-title">Mission overview<span class="heading-dot">.</span></h1><p id="page-description">Live vehicle status and the latest measurements.</p></div><div class="page-actions"><button class="button button-white" id="export-button"><span data-icon="download"></span>Export data</button><span class="run-label offline"><i></i><span id="run-label">Awaiting connection</span></span></div></div>
+      <div class="source-notice" id="source-notice"><span data-icon="plug"></span><p><strong>Connect your RoboCar.</strong> Live measurements will appear when telemetry arrives.</p><button id="notice-connect">Connect your robot<span aria-hidden="true"> ↗</span></button></div>
+      <div class="section-toolbar"><div class="section-title"><span class="live-dot offline" id="live-dot"></span><strong id="feed-title">Not connected</strong><span class="toolbar-divider"></span><span id="last-update">No telemetry received</span></div><div class="chart-controls"><label class="sr-only" for="time-range">Chart time range</label><select id="time-range"><option value="30">Last 30 seconds</option><option value="60" selected>Last 60 seconds</option><option value="120">Last 2 minutes</option></select><button class="icon-button" id="pause-button" aria-label="Pause chart display" title="Pause chart display"><span data-icon="pause"></span></button></div></div>
+      <div id="dashboard-view"></div>
+      <footer class="page-footer"><span><i class="footer-dot"></i>RoboCar Mission Control <span class="muted">/ INF2004</span></span><span id="footer-source">Awaiting RoboCar connection</span></footer>
+    </main>
+  </div>
+  <dialog id="connection-dialog" aria-labelledby="connection-title"><form id="connection-form"><div class="dialog-heading"><div><div class="eyebrow">DATA SOURCE</div><h2 id="connection-title">Connect your robot</h2></div><button type="button" class="icon-button" id="close-dialog" aria-label="Close connection settings"><span data-icon="close"></span></button></div><p class="dialog-intro">Connect to your MQTT broker's WebSocket listener. Your Pico and this dashboard must use the same topics.</p><div class="connection-help"><span data-icon="info"></span><span>The current firmware supplies obstacle distance and heartbeat. Other sensor panels will show “Unavailable” until integrated. Live commands are pending firmware integration.</span></div><label>Broker WebSocket URL<input name="url" type="url" value="ws://localhost:9001" placeholder="ws://192.168.1.10:9001" required spellcheck="false"></label><div class="field-row"><label>Telemetry topic<input name="telemetryTopic" value="mtk3smp-pico/telemetry" required spellcheck="false"></label><label>Heartbeat topic<input name="heartbeatTopic" value="mtk3smp-pico/heartbeat" required spellcheck="false"></label></div><label>Telemetry decoder<select name="format"><option value="auto">Auto · current JSON / proposed compact v1</option><option value="json">Current firmware JSON</option><option value="compact-v1">Proposed compact distance v1</option></select></label><details><summary>Broker authentication <span class="muted">optional</span></summary><div class="field-row"><label>Username<input name="username" autocomplete="off" spellcheck="false"></label><label>Password<input name="password" type="password" autocomplete="off"></label></div><p class="field-note">Credentials stay in this tab's memory and are cleared when settings close. They are never saved or exported.</p></details><p class="form-error" id="connection-error" role="alert"></p><div class="dialog-footer"><button type="button" class="button button-white" id="disconnect-button" disabled>Disconnect</button><button type="submit" class="button button-dark"><span data-icon="plug"></span>Connect to broker</button></div><p class="field-note">Using a private ws:// broker? Run the dashboard locally. A hosted HTTPS page needs a reachable wss:// broker and browser network access.</p></form></dialog>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

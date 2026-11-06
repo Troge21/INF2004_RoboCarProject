@@ -1,0 +1,51 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {decodeTelemetry,decodeCompact,decodeHeartbeat,TelemetryStore,encoder} from '../dist/protocol.js';
+const payload=(overrides={})=>encoder.encode(JSON.stringify({sequence:12,obstacle_mm:451,obstacle_valid:true,...overrides}));
+
+test('current S1 firmware JSON decodes without inventing other sensor feeds',()=>{
+  const {sample,format}=decodeTelemetry(payload());
+  assert.equal(sample.obstacle_mm,451);assert.equal(sample.left_mps,null);assert.equal(sample.state,null);assert.equal(sample.faults,null);assert.match(format,/current firmware/);
+});
+test('no echo stays null and never becomes zero or clear space',()=>{
+  assert.equal(decodeTelemetry(payload({obstacle_mm:null,obstacle_valid:false})).sample.obstacle_mm,null);
+  assert.throws(()=>decodeTelemetry(payload({obstacle_mm:4000,obstacle_valid:false})),/must be null/);
+});
+test('malformed, out-of-range and ambiguous validity data are rejected',()=>{
+  for(const overrides of [{obstacle_mm:19},{obstacle_mm:4001},{obstacle_valid:1},{sequence:-1},{sequence:4294967296},{sequence:1.5}])assert.throws(()=>decodeTelemetry(payload(overrides)));
+  for(const data of [new Uint8Array(),encoder.encode('{bad'),encoder.encode('[]'),new Uint8Array([255,255])])assert.throws(()=>decodeTelemetry(data));
+});
+test('compact adapter matches documented six-byte golden vector',()=>{
+  const bytes=new Uint8Array([0x0c,0,0,0,0xc3,0x31]);
+  const sample=decodeCompact(bytes);assert.equal(sample.sequence,12);assert.equal(sample.obstacle_mm,451);assert.equal(sample.obstacle_valid,true);
+  assert.equal(decodeTelemetry(bytes).sample.obstacle_mm,451);
+  const subarray=new Uint8Array([99,...bytes,99]).subarray(1,7);assert.equal(decodeCompact(subarray).obstacle_mm,451);
+});
+test('compact adapter validates version, validity, length and maximum sequence',()=>{
+  assert.equal(decodeCompact(new Uint8Array([255,255,255,255,0,0x20])).sequence,0xffffffff);
+  assert.equal(decodeCompact(new Uint8Array([0,0,0,0,0,0x20])).obstacle_mm,null);
+  for(const bytes of [[0,0,0,0,0,0],[0,0,0,0,1,0x20],[0,0,0,0,255,0x3f],[0,0,0]])assert.throws(()=>decodeCompact(new Uint8Array(bytes)));
+});
+test('heartbeats match the existing firmware format exactly',()=>{
+  assert.equal(decodeHeartbeat(encoder.encode('hb 12')),12);
+  for(const text of ['hb -1','heartbeat','hb 12\n','hb 123456789012'])assert.throws(()=>decodeHeartbeat(encoder.encode(text)));
+});
+test('retained and rejected packets never refresh live telemetry or heartbeat',()=>{
+  const s=new TelemetryStore();s.ingest(payload(),'telemetry',1000);
+  assert.equal(s.ingest(payload({sequence:13}),'telemetry',2000,true),false);
+  assert.equal(s.lastTelemetry,1000);assert.equal(s.sample.sequence,12);
+  s.ingest(encoder.encode('hb 1'),'heartbeat',3000,true);assert.equal(s.lastHeartbeat,null);
+  assert.equal(s.rejected,2);assert.equal(s.packets[0].accepted,false);
+});
+test('sequence wrap, gaps, replay rejection and reboot observations',()=>{
+  const s=new TelemetryStore();s.ingest(payload({sequence:0xffffffff}),'telemetry',1000);
+  assert.equal(s.ingest(payload({sequence:0}),'telemetry',1500),true);
+  assert.equal(s.ingest(payload({sequence:3}),'telemetry',2000),true);assert.equal(s.sequenceGaps,2);
+  assert.equal(s.ingest(payload({sequence:3}),'telemetry',2500),false);assert.equal(s.ingest(payload({sequence:2}),'telemetry',3000),false);assert.equal(s.lastTelemetry,2000);
+  s.ingest(encoder.encode('hb 8'),'heartbeat',3500);s.ingest(encoder.encode('hb 0'),'heartbeat',4000);
+  assert.equal(s.ingest(payload({sequence:0}),'telemetry',4500),true);
+});
+test('history, packet and event buffers remain bounded',()=>{
+  const s=new TelemetryStore();for(let i=0;i<1000;i++){s.ingest(payload({sequence:i}),'telemetry',i*500);s.event('test');}
+  assert.equal(s.history.length,600);assert.equal(s.packets.length,30);assert.equal(s.events.length,80);assert.equal(s.telemetryCount,1000);
+});
