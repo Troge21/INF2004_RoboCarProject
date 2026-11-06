@@ -2,6 +2,7 @@
  * Only the built-in network task may operate the radio or MQTT client.
  */
 #include "subsystem1.h"
+#include "../subsystem3/subsystem3.h"
 #if TM_MQTT
 #include "mqtt_utk.h" /* shared plain-C bridge prototype, no lwIP calls here */
 #endif
@@ -14,7 +15,8 @@ typedef struct {
 } S1_INPUT;
 typedef struct {
     UW sampled_ms;
-    char payload[S1_PAYLOAD_CAPACITY];
+    S1_TELEMETRY sample;
+    S1_LINE_TELEMETRY line;
 } S1_OUTPUT;
 static ID telemetry_mbf;
 static ID network_tx_mbf;
@@ -34,22 +36,33 @@ static ER validate_sample(const S1_TELEMETRY *sample)
     return E_OK;
 }
 
-EXPORT INT s1_format_telemetry(const S1_TELEMETRY *sample, char *out, INT capacity)
+EXPORT INT s1_format_telemetry(const S1_TELEMETRY *sample,
+                              const S1_LINE_TELEMETRY *line, UW now_ms,
+                              char *out, INT capacity)
 {
-    /* Two 32-bit decimal values plus fixed JSON fit in this local buffer. */
+    /* Bounded JSON bench protocol; line state is packed into three bits.
+     * Freshness is rechecked at serialization, after any queue delay. */
     UB payload[S1_PAYLOAD_CAPACITY];
+    UINT line_bits = 0;
     INT len, i;
     if (out == NULL || capacity <= 0) return E_PAR;
     out[0] = '\0';
     if (validate_sample(sample) != E_OK) return E_PAR;
+    if (line != NULL) {
+        if (line->bits > 7U ||
+            (line->bits != 0 && !(line->bits & S1_LINE_VALID))) return E_PAR;
+        if ((UW)(now_ms - line->timestamp_ms) <= APP_IR_MAX_AGE_MS)
+            line_bits = line->bits;
+    }
     if (sample->obstacle_valid) {
         len = tm_sprintf(payload, (const UB *)
-            "{\"sequence\":%u,\"obstacle_mm\":%u,\"obstacle_valid\":true}",
-            (unsigned int)sample->sequence, (unsigned int)sample->obstacle_mm);
+            "{\"sequence\":%u,\"obstacle_mm\":%u,\"obstacle_valid\":true,\"line_bits\":%u}",
+            (unsigned int)sample->sequence, (unsigned int)sample->obstacle_mm,
+            (unsigned int)line_bits);
     } else {
         len = tm_sprintf(payload, (const UB *)
-            "{\"sequence\":%u,\"obstacle_mm\":null,\"obstacle_valid\":false}",
-            (unsigned int)sample->sequence);
+            "{\"sequence\":%u,\"obstacle_mm\":null,\"obstacle_valid\":false,\"line_bits\":%u}",
+            (unsigned int)sample->sequence, (unsigned int)line_bits);
     }
     if (len < 0 || len >= capacity) return E_PAR;
     for (i = 0; i <= len; ++i) out[i] = (char)payload[i];
@@ -69,8 +82,9 @@ EXPORT ER s1_submit_telemetry(const S1_TELEMETRY *sample)
 
 EXPORT INT s1_network_poll(char *out, unsigned int capacity)
 {
-    S1_OUTPUT msg;
-    INT count, size, i, len = E_TMOUT;
+    S1_OUTPUT msg, latest;
+    INT count, size;
+    BOOL have_latest = FALSE;
     if (out == NULL || capacity < S1_PAYLOAD_CAPACITY) return E_PAR;
     out[0] = '\0';
     if (network_tx_mbf <= 0) return E_OBJ;
@@ -80,15 +94,13 @@ EXPORT INT s1_network_poll(char *out, unsigned int capacity)
         if (size == E_TMOUT) break;
         if (size < 0) return size;
         if (size != (INT)sizeof(msg)) continue;
-        len = E_TMOUT;
         if ((UW)(uptime_ms() - msg.sampled_ms) > S1_FRESH_MS) continue;
-        for (i = 0; i < S1_PAYLOAD_CAPACITY - 1 && msg.payload[i]; ++i) {
-            out[i] = msg.payload[i];
-        }
-        out[i] = '\0';
-        len = i;
+        latest = msg;
+        have_latest = TRUE;
     }
-    return len;
+    if (!have_latest) return E_TMOUT;
+    return s1_format_telemetry(&latest.sample, &latest.line, uptime_ms(),
+                               out, (INT)capacity);
 }
 
 S1_COMMAND s1_parse_command(const unsigned char *payload, unsigned int length)
@@ -126,12 +138,19 @@ static void wifi_status_task(INT stacd, void *exinf)
         if (size == (INT)sizeof(input) &&
             (UW)(uptime_ms() - input.sampled_ms) <= S1_FRESH_MS) {
             S1_OUTPUT output = {0};
+            S3_LINE_DATA line = {0};
             output.sampled_ms = input.sampled_ms;
-            if (s1_format_telemetry(&input.sample, output.payload,
-                                    sizeof(output.payload)) > 0) {
-                /* Best effort: a full outbound buffer drops this sample. */
-                (void)tk_snd_mbf(network_tx_mbf, &output, sizeof(output), TMO_POL);
+            output.sample = input.sample;
+            /* S3 retains GPIO ownership. Its snapshot read never waits. */
+            if (subsystem3_get_line(&line) == E_OK && line.valid &&
+                line.pattern <= 3U &&
+                (UW)(uptime_ms() - line.timestamp_ms) <= APP_IR_MAX_AGE_MS) {
+                output.line.bits = (UB)(S1_LINE_VALID | line.pattern);
+                output.line.timestamp_ms = line.timestamp_ms;
             }
+            /* Keep raw snapshots until the network poll so a queued IR
+             * reading can expire without losing a fresh distance reading. */
+            (void)tk_snd_mbf(network_tx_mbf, &output, sizeof(output), TMO_POL);
         } else if (size < 0 && size != E_TMOUT) {
             CHECK(size, "S1 telemetry receive");
             tk_dly_tsk(100);

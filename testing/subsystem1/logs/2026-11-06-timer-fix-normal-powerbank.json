@@ -1,0 +1,13 @@
+{
+  "date": "2026-11-06",
+  "phase": "Final timer-startup image; complete power-off then normal USB power-bank boot WITHOUT BOOTSEL, confirmed by user; wiring unchanged",
+  "telemetryAccepted": 0,
+  "heartbeats": [],
+  "rejected": 0,
+  "validRanges": 0,
+  "invalidRanges": 0,
+  "minMm": null,
+  "maxMm": null,
+  "intervalMs": null,
+  "samples": []
+}

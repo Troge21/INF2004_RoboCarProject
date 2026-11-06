@@ -1,0 +1,25 @@
+{
+  "date": "2026-11-06",
+  "phase": "Power-bank recheck requested by user; board light reported on",
+  "durationSeconds": 12,
+  "telemetryAccepted": 24,
+  "heartbeats": [
+    "hb 19",
+    "hb 20",
+    "hb 21"
+  ],
+  "rejected": 0,
+  "validRanges": 24,
+  "invalidRanges": 0,
+  "minMm": 117,
+  "maxMm": 147,
+  "intervalMs": 469,
+  "samples": [
+    "{\"sequence\":203,\"obstacle_mm\":117,\"obstacle_valid\":true,\"line_bits\":5}",
+    "{\"sequence\":204,\"obstacle_mm\":117,\"obstacle_valid\":true,\"line_bits\":5}",
+    "{\"sequence\":205,\"obstacle_mm\":117,\"obstacle_valid\":true,\"line_bits\":5}",
+    "{\"sequence\":206,\"obstacle_mm\":117,\"obstacle_valid\":true,\"line_bits\":5}",
+    "{\"sequence\":207,\"obstacle_mm\":117,\"obstacle_valid\":true,\"line_bits\":5}",
+    "{\"sequence\":208,\"obstacle_mm\":117,\"obstacle_valid\":true,\"line_bits\":5}"
+  ]
+}

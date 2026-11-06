@@ -11,6 +11,33 @@ test('no echo stays null and never becomes zero or clear space',()=>{
   assert.equal(decodeTelemetry(payload({obstacle_mm:null,obstacle_valid:false})).sample.obstacle_mm,null);
   assert.throws(()=>decodeTelemetry(payload({obstacle_mm:4000,obstacle_valid:false})),/must be null/);
 });
+
+test('packed IR decodes all four centre/right patterns without a left line reading',()=>{
+  for (const [line_bits,expected] of [[4,[null,0,0]],[5,[null,0,1]],[6,[null,1,0]],[7,[null,1,1]]])
+    assert.deepEqual(decodeTelemetry(payload({line_bits})).sample.ir,expected);
+});
+
+test('unavailable IR stays distinct from valid background and overrides older array data',()=>{
+  const sample=decodeTelemetry(payload({line_bits:0,ir:[1,1,1]})).sample;
+  assert.deepEqual(sample.ir,[null,null,null]);assert.equal(sample.obstacle_mm,451);
+  assert.equal(decodeTelemetry(payload()).sample.ir,null);
+  assert.deepEqual(decodeTelemetry(payload({ir:[1,0,1]})).sample.ir,[null,0,1]);
+  assert.deepEqual(decodeTelemetry(payload({ir:[null,null,1]})).sample.ir,[null,null,1]);
+});
+
+test('reserved, noncanonical and nonnumeric IR fields are rejected',()=>{
+  for (const line_bits of [-1,1,2,3,8,256,4.5,'6',null,true])
+    assert.throws(()=>decodeTelemetry(payload({line_bits})),/line sensor bits/);
+});
+
+test('fresh IR disappears on expiry or disconnect while real history remains',()=>{
+  const s=new TelemetryStore();s.ingest(payload({line_bits:6}),'telemetry',1000);
+  assert.deepEqual(s.currentSample(3000,true).ir,[null,1,0]);
+  assert.equal(s.currentSample(3001,true),null);assert.equal(s.currentSample(1001,false),null);
+  assert.equal(s.currentSample(999,true),null);assert.equal(s.history.length,1);
+  s.ingest(payload({sequence:13,line_bits:0}),'telemetry',3500);
+  assert.deepEqual(s.currentSample(3500,true).ir,[null,null,null]);
+});
 test('malformed, out-of-range and ambiguous validity data are rejected',()=>{
   for(const overrides of [{obstacle_mm:19},{obstacle_mm:4001},{obstacle_valid:1},{sequence:-1},{sequence:4294967296},{sequence:1.5}])assert.throws(()=>decodeTelemetry(payload(overrides)));
   for(const data of [new Uint8Array(),encoder.encode('{bad'),encoder.encode('[]'),new Uint8Array([255,255])])assert.throws(()=>decodeTelemetry(data));

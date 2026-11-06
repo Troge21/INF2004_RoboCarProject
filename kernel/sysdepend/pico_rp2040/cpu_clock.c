@@ -22,6 +22,11 @@
 #include <tk/tkernel.h>
 #include "sysdepend.h"
 
+/* RP2040 WATCHDOG.TICK drives the free-running microsecond TIMER too.
+ * Starting this tick generator does not enable watchdog-triggered resets. */
+#define RP2040_WATCHDOG_TICK        0x4005802cU
+#define RP2040_WATCHDOG_TICK_ENABLE (1U << 9)
+
 /* 
  * PLL initialization
  */
@@ -103,6 +108,13 @@ EXPORT void startup_clock(ATR clkatr)
 	while(!(in_w(CLK_REF+CLK_x_SELECTED)&(1<<2)));
 
 	out_w(CLK_REF+CLK_x_DIV, div);
+
+	/* USB BOOTSEL starts this tick in ROM; direct flash boot does not.
+	 * This port does not run Pico SDK runtime_init_clocks(), so establish
+	 * the 1 MHz timebase ourselves on EVERY boot. clk_ref is now XOSC MHz;
+	 * divide by XOSC_MHz to give TIMER and watchdog one tick per us.
+	 * Otherwise echo timestamps and barcode alarms depend on how we booted. */
+	out_w(RP2040_WATCHDOG_TICK, RP2040_WATCHDOG_TICK_ENABLE | XOSC_MHz);
 
 	/* CLK SYS settings */
 	div = (TMCLK_MHz << 8) / TMCLK_MHz;

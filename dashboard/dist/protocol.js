@@ -5,6 +5,17 @@ export const STATES = ['Ready', 'Following line', 'Turning left', 'Turning right
 function finite(value, min = 0, max = Infinity) {
   return typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max ? value : null;
 }
+function decodeLineSensors(data) {
+  if (Object.hasOwn(data, 'line_bits')) {
+    const bits = data.line_bits;
+    if (!Number.isInteger(bits) || bits < 0 || bits > 7 || (bits !== 0 && !(bits & 4)))
+      throw new Error('Invalid packed line sensor bits');
+    return bits & 4 ? [null, (bits >> 1) & 1, bits & 1] : [null, null, null];
+  }
+  // Older JSON may supply an array. Left is reserved for barcode capture.
+  return Array.isArray(data.ir) && data.ir.length === 3 && data.ir.every(x => x === null || x === 0 || x === 1)
+    ? [null, data.ir[1], data.ir[2]] : null;
+}
 export function validateTelemetry(data) {
   if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Telemetry must be an object');
   if (!Number.isInteger(data.sequence) || data.sequence < 0 || data.sequence > 0xffffffff) throw new Error('Invalid sequence');
@@ -17,7 +28,7 @@ export function validateTelemetry(data) {
     state: STATES.includes(data.state) ? data.state : null,
     left_mps: finite(data.left_mps, -5, 5), right_mps: finite(data.right_mps, -5, 5),
     distance_m: finite(data.distance_m), hump_mm: finite(data.hump_mm, 0, 1000), max_hump_mm: finite(data.max_hump_mm, 0, 1000),
-    ir: Array.isArray(data.ir) && data.ir.length === 3 && data.ir.every(x => x === 0 || x === 1) ? [...data.ir] : null,
+    ir: decodeLineSensors(data),
     barcode: ['Turn left', 'Turn right', 'Go straight', 'U-turn'].includes(data.barcode) ? data.barcode : null,
     faults: Array.isArray(data.faults) && data.faults.length <= 16 && data.faults.every(x => typeof x === 'string' && x.length <= 60) ? [...data.faults] : null,
     scan: Array.isArray(data.scan) && data.scan.length <= 181 && data.scan.every(x => x && finite(x.angle, 0, 180) !== null && (x.distance_mm === null || finite(x.distance_mm, 20, 4000) !== null)) ? data.scan.map(x => ({angle:x.angle, distance_mm:x.distance_mm})) : null
@@ -50,6 +61,10 @@ export function hex(bytes) { return [...bytes].map(x => x.toString(16).padStart(
 
 export class TelemetryStore {
   constructor() { this.reset(); }
+  currentSample(now = Date.now(), connected = true) {
+    const age = this.lastTelemetry === null ? Infinity : now - this.lastTelemetry;
+    return connected && age >= 0 && age <= 2000 ? this.sample : null;
+  }
   reset() {
     this.history=[]; this.events=[]; this.packets=[]; this.sample=null;
     this.lastTelemetry=null; this.lastHeartbeat=null; this.lastSequence=null; this.lastHeartbeatCounter=null;

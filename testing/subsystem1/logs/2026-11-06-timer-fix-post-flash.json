@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-06",
+  "phase": "Immediately after BOOTSEL flashing the timer-startup fix; laptop USB; wiring unchanged",
+  "telemetryAccepted": 24,
+  "heartbeats": [
+    "hb 4",
+    "hb 5"
+  ],
+  "rejected": 0,
+  "validRanges": 24,
+  "invalidRanges": 0,
+  "minMm": 159,
+  "maxMm": 178,
+  "intervalMs": 520,
+  "samples": [
+    "{\"sequence\":71,\"obstacle_mm\":169,\"obstacle_valid\":true,\"line_bits\":4}",
+    "{\"sequence\":72,\"obstacle_mm\":169,\"obstacle_valid\":true,\"line_bits\":4}",
+    "{\"sequence\":73,\"obstacle_mm\":178,\"obstacle_valid\":true,\"line_bits\":4}",
+    "{\"sequence\":74,\"obstacle_mm\":169,\"obstacle_valid\":true,\"line_bits\":5}",
+    "{\"sequence\":75,\"obstacle_mm\":169,\"obstacle_valid\":true,\"line_bits\":5}",
+    "{\"sequence\":76,\"obstacle_mm\":169,\"obstacle_valid\":true,\"line_bits\":5}"
+  ]
+}

@@ -1,0 +1,69 @@
+{
+    "recorded_date":  "2026-11-06",
+    "timezone":  "Asia/Kuala_Lumpur",
+    "base_commit":  "b4f6a6adc0695d26cdda81de037a86d42b738e4b",
+    "revision":  "Uncommitted working copy; not a formal commit-pinned hardware pass",
+    "build_flags":  "NET=lwip MQTT=1 TEST=1 SMP=1 CONSOLE=usb_cdc",
+    "files":  [
+                  {
+                      "sha256":  "563862433C5B2C75F78B141AC665DFFFDBE4C6B2711D3F187BC5463018C691DE",
+                      "path":  "app_program/subsystem1/subsystem1.c"
+                  },
+                  {
+                      "sha256":  "83DD1B2F6EB0B0A8C159F105E5A82FD419F37A0B1DDE547F895E8EEC4D69F75F",
+                      "path":  "app_program/subsystem1/subsystem1.h"
+                  },
+                  {
+                      "sha256":  "2B50ED7ED0E32C8FF525133C371F9A08D42CF91558D721049710E8F4CFCD3CA7",
+                      "path":  "app_program/subsystem1/subsystem1_test.c"
+                  },
+                  {
+                      "sha256":  "31F9425DF94DAD7E10F2148BA1348DFC9EBC1E5C8E9A50B5A7DACD133BA329DE",
+                      "path":  "app_program/subsystem3/subsystem3.h"
+                  },
+                  {
+                      "sha256":  "51FABA8D7D39EE290D1802980BC0214750541F59B546D0D0D02A36C5B2F220A1",
+                      "path":  "app_program/subsystem3/subsystem3.c"
+                  },
+                  {
+                      "sha256":  "D1126F928BCCA970D077BB72D52D0E2127E19EA608AF89C6E97EC2F70FAA6A88",
+                      "path":  "app_program/app.h"
+                  },
+                  {
+                      "sha256":  "33652629BD044F40A79FF602DF4BDCCFFFB88C23F34F9D002D5845D5E7152B28",
+                      "path":  "dashboard/dist/app.js"
+                  },
+                  {
+                      "sha256":  "A1060EC32837ABEA84C330408772FBDC50F0F7F29051959F54A1B444BFA1E16F",
+                      "path":  "dashboard/dist/protocol.js"
+                  },
+                  {
+                      "sha256":  "225B0C6941D93E82C90A43DA61D45AEF74D09A55A37883BD96F24F2DE18C67B3",
+                      "path":  "dashboard/dist/index.html"
+                  },
+                  {
+                      "sha256":  "3430DBD9597A1FC7EF65976F86BA0F449D2BCF3F8BF8781A849927A773D1D21D",
+                      "path":  "dashboard/dist/styles.css"
+                  },
+                  {
+                      "sha256":  "ACD58C93BDA9ED94796403339D7994081F0757A147A31A4FCE0266191B19AE83",
+                      "path":  "dashboard/tests/mqtt.test.mjs"
+                  },
+                  {
+                      "sha256":  "40CFD3D1E77D124CC98618F6D78D0A6145041967E0776BC29CB6D17A116711FD",
+                      "path":  "dashboard/tests/protocol.test.mjs"
+                  },
+                  {
+                      "sha256":  "25F890E5F8D8B3654355E7FAD95AF94B59B40D98C371D8463C8FE6F78C6A6259",
+                      "path":  "testing/subsystem1/host/test_telemetry.c"
+                  },
+                  {
+                      "sha256":  "7FE23B1A78A0D1F44B4C550ABD7FF8EF1DA162DBA7F59AF58746870A70712FA1",
+                      "path":  "testing/subsystem1/host/include/tm/tmonitor.h"
+                  },
+                  {
+                      "sha256":  "A520EE4CD4A647B890861E56E647A1CC4FABF20C458EFB99F8D2BEA342588909",
+                      "path":  "build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2"
+                  }
+              ]
+}

@@ -1,0 +1,28 @@
+✔ packet reader reassembles fragmented and coalesced MQTT messages (0.9374ms)
+✔ packet reader bounds untrusted lengths and rejects malformed varints (0.6726ms)
+✔ publish parser preserves binary bytes, retain flag and packet ID (0.8041ms)
+✔ live connection waits for both SUBACKs before declaring readiness (0.9794ms)
+✔ subscription failure never enables commands and disconnect cancels retries (0.3309ms)
+✔ unsafe or ambiguous broker/topic settings are rejected before opening a socket (0.183ms)
+✔ a subscribed dashboard stays empty until fresh telemetry arrives (0.8461ms)
+✔ current S1 firmware JSON decodes without inventing other sensor feeds (1.2458ms)
+✔ no echo stays null and never becomes zero or clear space (0.4304ms)
+✔ packed IR decodes all four centre/right patterns without a left line reading (0.7468ms)
+✔ unavailable IR stays distinct from valid background and overrides older array data (0.2601ms)
+✔ reserved, noncanonical and nonnumeric IR fields are rejected (0.2892ms)
+✔ fresh IR disappears on expiry or disconnect while real history remains (0.4085ms)
+✔ malformed, out-of-range and ambiguous validity data are rejected (0.386ms)
+✔ compact adapter matches documented six-byte golden vector (0.2857ms)
+✔ compact adapter validates version, validity, length and maximum sequence (0.2394ms)
+✔ heartbeats match the existing firmware format exactly (0.424ms)
+✔ retained and rejected packets never refresh live telemetry or heartbeat (0.2462ms)
+✔ sequence wrap, gaps, replay rejection and reboot observations (0.2238ms)
+✔ history, packet and event buffers remain bounded (4.31ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 109.8019

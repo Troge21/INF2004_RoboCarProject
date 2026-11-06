@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-06",
+  "phase": "Final timer-startup image; complete power-off then normal laptop USB boot WITHOUT BOOTSEL, confirmed by user; wiring unchanged",
+  "telemetryAccepted": 24,
+  "heartbeats": [
+    "hb 8",
+    "hb 9"
+  ],
+  "rejected": 0,
+  "validRanges": 24,
+  "invalidRanges": 0,
+  "minMm": 162,
+  "maxMm": 163,
+  "intervalMs": 499,
+  "samples": [
+    "{\"sequence\":92,\"obstacle_mm\":163,\"obstacle_valid\":true,\"line_bits\":4}",
+    "{\"sequence\":93,\"obstacle_mm\":163,\"obstacle_valid\":true,\"line_bits\":4}",
+    "{\"sequence\":94,\"obstacle_mm\":163,\"obstacle_valid\":true,\"line_bits\":4}",
+    "{\"sequence\":95,\"obstacle_mm\":163,\"obstacle_valid\":true,\"line_bits\":4}",
+    "{\"sequence\":96,\"obstacle_mm\":163,\"obstacle_valid\":true,\"line_bits\":4}",
+    "{\"sequence\":97,\"obstacle_mm\":163,\"obstacle_valid\":true,\"line_bits\":4}"
+  ]
+}

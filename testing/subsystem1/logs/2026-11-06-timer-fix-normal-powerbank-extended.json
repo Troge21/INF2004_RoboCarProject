@@ -1,0 +1,13 @@
+{
+  "date": "2026-11-06",
+  "phase": "Extended observation after normal power-bank boot; initial 15-second capture had no messages",
+  "durationSeconds": 25,
+  "telemetryAccepted": 0,
+  "heartbeats": [],
+  "rejected": 0,
+  "validRanges": 0,
+  "invalidRanges": 0,
+  "minMm": null,
+  "maxMm": null,
+  "samples": []
+}

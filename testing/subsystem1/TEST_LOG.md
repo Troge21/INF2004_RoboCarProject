@@ -34,9 +34,27 @@ There is no motor or encoder test in subsystem1.
 | S1-U25 | Null/out-of-range sample | E_PAR from formatter/submission; no queue access |
 | S1-U26 | Maximum sequence and valid distance | Exact JSON within fixed buffer |
 | S1-U27 | Invalid validity flag/output arguments | E_PAR |
+| S1-U28 | Centre black/right background at age 100 ms | Exact JSON, line_bits=6 |
+| S1-U29 | Fresh all-background snapshot | line_bits=4, distinct from unavailable |
+| S1-U30 | IR age 101 ms with fresh distance | line_bits=0, distance preserved |
+| S1-U31 | Fresh right-black snapshot across 32-bit uptime wrap | line_bits=5 |
+| S1-U32 | Source timestamp in the future | line_bits=0 |
+| S1-U33 | Noncanonical/reserved line bits | E_PAR, empty output |
+| S1-U34 | Host queue pipeline, both IR inputs black | line_bits=7 |
+| S1-U35 | Host advances clock after output enqueue | IR expires; distance preserved |
+| S1-U36 | S3 snapshot read reports busy/unavailable | line_bits=0, no reused data |
+| S1-U37 | S3 snapshot reports unsupported pattern | line_bits=0 |
+| S1-U38 | S3 snapshot is already stale when gathered | line_bits=0 |
+| S1-U39 | Fill input queue, submit fifth sample, poll output | Fifth send E_TMOUT; newest accepted sample selected; all-background=4 |
+| S1-U40 | Fill outbound queue, submit fifth sample | New sample dropped without blocking; newest accepted sample selected |
+| S1-U41 | Host expires distance while in input queue | No output published |
+| S1-U42 | Host expires distance while in outbound queue | E_TMOUT, empty output |
+| S1-U43 | Pico-only: read tick enable/divisor and compare hardware timer over a 1000 us CPU/SysTick busy interval, with local interrupts masked | Configured 1 MHz tick; elapsed hardware time 900..1100 us; repeat on normal cold boot |
 | S1-M01 | Build NET=lwip, boot near configured AP, observe USB status | init_done=1, init_result=0, ready=1; link=3 and an IP after connection |
 | S1-M02 | Boot with wrong AP password; then restore credentials and rebuild | No connection with wrong credentials; normal connection after restore |
 | S1-M03 | Build NET=lwip MQTT=1 against configured broker | mqtt connected/subscribed, recurring heartbeat TX and matching RX |
+| S1-M04 | Flash IR image; compare four C/R black/background patterns; disconnect car | Raw line_bits=4/6/5/7 respectively; dashboard matches C/R; left reserved for barcode; live values unavailable after freshness timeout |
+| S1-M05 | Compare BOOTSEL post-flash operation with complete power-off and normal USB/laptop and power-bank boots | Clock test S1-U43 passes on normal boot; distance measurements resume without reflashing; capture each power source separately |
 
 ## Results
 
@@ -66,7 +84,7 @@ Flash `build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2` using BOOTSEL.
 Open the USB serial console at 115200 baud. Expected local-test summary:
 
 ```text
-[TEST] subsystem1 SUMMARY 14 passed, 0 failed
+[TEST] subsystem1 SUMMARY 21 passed, 0 failed
 ```
 
 These parser tests do not require an AP or broker. To test them without
@@ -88,9 +106,10 @@ with the tested commit ID, operator and evidence as described in
 
 ## S5 distance telemetry bench setup
 
-No additional source files were added. S5 now submits each valid or failed
-measurement to S1 using `s1_submit_telemetry()`. S1's task formats JSON and
-queues it; `mqtt_utk_poll()` publishes only from the existing network task.
+S5 submits each valid or failed measurement to S1 using
+`s1_submit_telemetry()`. S1 gathers a nonblocking protected S3 line snapshot
+and queues raw snapshots. `s1_network_poll()` rechecks IR freshness and
+formats JSON; `mqtt_utk_poll()` publishes only from the existing network task.
 This is a temporary IF-13 bench route; replace it with controller routing
 through IF-03/09 during final integration. Commands and motors are unchanged.
 
@@ -105,14 +124,14 @@ optional `MQTT_TELEMETRY_TOPIC` overrides it. Heartbeats keep their old topic.
 4. On the Windows broker computer, open another PowerShell window and run:
 
    ```powershell
-   & "C:\Program Files\mosquitto\mosquitto_sub.exe" -h 127.0.0.1 -p 1883 -t "+/telemetry" -v
+   & "C:\Program Files\mosquitto\mosquitto_sub.exe" -h 172.20.10.2 -p 1883 -t "+/telemetry" -v
    ```
 
 5. Move a target closer/farther from the ultrasonic sensor. Expect around two
    updates per second (sample timing includes echo wait), for example:
 
    ```text
-   mtk3smp-pico/telemetry {"sequence":12,"obstacle_mm":451,"obstacle_valid":true}
+   mtk3smp-pico/telemetry {"sequence":12,"obstacle_mm":451,"obstacle_valid":true,"line_bits":6}
    ```
 
 6. A failed measurement must publish `obstacle_mm:null, obstacle_valid:false`
@@ -135,3 +154,148 @@ A deterministic host queue simulation also checked input overflow, newest-sample
 selection, invalid/null forwarding, and expiry at input/output. These are not
 on-board or MQTT integration passes. See integration tests INT-03 through INT-05;
 hardware outcomes remain pending.
+
+## Centre/right IR extension - 6 November 2026
+
+Use the laptop's actual WiFi address for the subscriber above (172.20.10.2
+is the current bench address). The default Windows broker service on
+127.0.0.1:1883 is separate from the dual-listener bench broker.
+
+S1 uses the existing S3 snapshot reader; S3 GPIO code and the kernel network
+service are unchanged. Bit 2 of `line_bits` means valid, bit 1 means centre
+black and bit 0 means right black. Values 0 and 4 differ: unavailable versus
+valid all-background. Timestamp checks use unsigned uptime subtraction and
+the controller's 100 ms IR age limit, including after outbound queue delay.
+This is still a JSON bench protocol, not the complete packed-data change.
+
+S1-U28 through S1-U33 run in the on-device test image and on the host.
+S1-U34 through S1-U42 are host-only queue/scheduler checks in
+`host/test_telemetry.c`; they compile the real S1 C sources and public
+interfaces with stub kernel queues, clock and S3 reader. They never send
+samples to a live MQTT broker. Windows host reproduction, at repository root:
+
+```powershell
+$hostTelemetryExe = Join-Path $env:TEMP 'robocar-s1-ir-tests.exe'
+& 'C:\msys64\ucrt64\bin\gcc.exe' -std=c11 -Wall -Wextra -Werror -I testing/subsystem1/host/include testing/subsystem1/host/test_telemetry.c -o $hostTelemetryExe
+if ($LASTEXITCODE -eq 0) { & $hostTelemetryExe }
+```
+
+On Linux/WSL, use `gcc` with the same flags and a temporary output path.
+
+Development checks on the working copy based on commit `b4f6a6a`:
+
+| Check | Development outcome | Evidence |
+| --- | --- | --- |
+| Actual S1 parser/formatter source on host | 20 passed, 0 failed | [Host log](logs/2026-11-06-ir-host-tests.txt) |
+| Actual S1 queue pipeline on host | 9 passed, 0 failed | Same host log, S1-U34 through S1-U42 |
+| Dashboard MQTT/protocol tests | 20 passed, 0 failed | [Node log](logs/2026-11-06-ir-dashboard-tests.txt) |
+| WiFi/MQTT TEST firmware | Build succeeded | [Build output](logs/2026-11-06-ir-firmware-build.txt) |
+| Physical four-pattern IR / disconnect trial S1-M04 | PENDING | Flash and run with real sensors; no hardware pass claimed |
+| Visual browser QA | NOT RUN | Browser-control host unavailable |
+
+The [source fingerprint](logs/2026-11-06-ir-source-fingerprint.json) identifies
+the tested working-copy files and UF2. These are development checks, not
+commit-pinned submission results. After review/commit, rerun the required
+checks and append formal results with the tested commit and saved evidence.
+Existing historical results above remain unchanged.
+
+## BOOTSEL versus normal boot timebase - 6 November 2026
+
+The user clarified that distance works just after flashing through BOOTSEL,
+then fails after disconnect/reconnect and remains failed on laptop USB.
+The earlier supply-voltage concern does not establish this failure's cause.
+
+Code review found that `startup_clock()` never started WATCHDOG.TICK, which
+also supplies the RP2040 hardware TIMER used by S5 pulse widths and S3
+barcode sampling. The port does not execute Pico SDK runtime clock init.
+Raspberry Pi's [ROM USB boot path](https://github.com/raspberrypi/pico-bootrom/blob/master/bootrom/bootrom_main.c)
+enables the tick, so BOOTSEL can mask the omission. The normal flash path
+does not perform that same USB initialization.
+
+The local fix configures the tick after configuring clk_ref, with divisor 12
+for a 12 MHz reference, giving 1 MHz. This enables the tick generator,
+not the watchdog reset mechanism. Kernel startup is shared platform code
+and should be included in the team's review of this patch.
+
+S1-U43 is an actual on-board clock-rate check. It is intentionally omitted
+from host tests, which cannot test the physical timer. Expected current Pico
+summary is 21 checks; the host parser/formatter suite remains 20 plus the
+9 queue checks. The existing IR evidence above predates this additional check.
+
+The updated WiFi/MQTT TEST image built successfully; see
+[build output](logs/2026-11-06-timer-startup-build.txt). S1-M05 remains pending
+until cold boots and live distance measurements are observed. The earlier
+image is preserved as
+`build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test_before_tick_fix.uf2`.
+
+Do not raise the HC-SR04 supply to 5 V with ECHO directly connected to GP5.
+Hardware voltage requirements remain a separate integration issue; no
+resistor purchase or wiring change is needed to evaluate the timer fix.
+
+### Timing-check revisions and observed results
+
+The first check compared a 100 ms kernel sleep to the hardware timer during
+startup. It recorded 228722 hardware microseconds versus 110 kernel
+milliseconds and failed. That check combined hardware clock configuration
+with kernel tick accounting during initialization, so the mismatch did not
+isolate the hardware timebase. Preserve its
+[original FAIL output](logs/2026-11-06-timer-fix-post-flash-serial.txt).
+The initial image is archived as
+`build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test_tick_fix_initial_check.uf2`.
+
+The revised S1-U43 reads the tick enable/divisor and uses a 1000 us CPU/SysTick
+busy wait with local interrupts masked. It makes no kernel calls while masked
+and runs for less than one 10 ms kernel tick. On the actual Pico after the
+final flash, it measured **1009 us**, and the S1 summary was **21 passed,
+0 failed**. See [final post-flash serial output](logs/2026-11-06-timer-fix-final-post-flash-serial.txt)
+and [final build output](logs/2026-11-06-timer-startup-final-build.txt).
+
+The earlier post-flash live capture also received **24/24 valid distances**
+(159..178 mm) and two heartbeats with unchanged wiring; see
+[capture](logs/2026-11-06-timer-fix-post-flash.json). Post-flash success alone
+does not demonstrate the normal-boot fix: the user already reported that
+BOOTSEL flashing temporarily restored readings. S1-M05 requires the complete
+power-off comparisons below before claiming the reported fault is resolved.
+
+### Normal laptop USB cold boot
+
+The user confirmed switching off the car battery, removing USB for 5 seconds,
+and reconnecting laptop USB normally without BOOTSEL. On this boot:
+
+- S1-U43 passed: **1009 us** for a requested **1000 us** CPU wait.
+- All **21 S1 checks passed**, zero failed.
+- A 12-second live capture received **24/24 valid ultrasonic samples**,
+  **162..163 mm**, two heartbeats, no rejected messages, last interval 499 ms.
+- Sensor wiring and reported 3V3 supply were unchanged.
+
+Evidence: [normal-boot serial](logs/2026-11-06-timer-fix-normal-laptop-serial.txt),
+[live MQTT capture](logs/2026-11-06-timer-fix-normal-laptop.json),
+[final source/image fingerprint](logs/2026-11-06-timer-startup-final-fingerprint.json).
+This is observed development validation of the working copy. A power-bank
+cold boot remains the next comparison; neither test is an accuracy calibration
+or approval of an out-of-spec sensor supply.
+
+### Normal power-bank boot and later successful observation
+
+The user confirmed complete power-off followed by normal USB power-bank
+startup without BOOTSEL. The first 15-second observation and a subsequent
+25-second observation received no car messages, while broker subscriptions
+were ready. Do not discard those observations:
+[initial capture](logs/2026-11-06-timer-fix-normal-powerbank.json),
+[extended capture](logs/2026-11-06-timer-fix-normal-powerbank-extended.json).
+
+The user then reported the board light was on and requested another check.
+That 12-second capture received **24/24 valid ultrasonic readings**,
+**117..147 mm**, **three heartbeats** (`hb 19`, `hb 20`, `hb 21`), no rejected
+messages, and fresh IR snapshots (`line_bits:5`, centre background/right black).
+See [successful power-bank recheck](logs/2026-11-06-timer-fix-powerbank-recheck.json).
+No supply-voltage or wiring changes were made during this troubleshooting.
+
+The normal laptop cold boot and the later power-bank reading success support
+the startup-clock correction for the reported BOOTSEL dependency. However,
+WiFi association/startup timing and any intervening physical actions were not
+continuously instrumented, so this is **not** a measured recovery-time pass
+or proof of successful readings immediately after every power-bank boot.
+Retest S1-M05 after committing, with continuous timestamps and repeated boots.
+IR messages arrived, but the four known physical line patterns remain a
+separate pending test.

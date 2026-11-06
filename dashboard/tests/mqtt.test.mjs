@@ -55,11 +55,14 @@ test('a subscribed dashboard stays empty until fresh telemetry arrives',()=>{
     ws.receive(packet(0x20,new Uint8Array([0,0])));
     ws.receive(packet(0x90,new Uint8Array([0,1,0,0])));
     assert.equal(c.ready,true);assert.equal(store.sample,null);assert.equal(store.history.length,0);
-    const body=concat(mqttString('car/telemetry'),enc.encode(JSON.stringify({sequence:1,obstacle_mm:451,obstacle_valid:true})));
+    const body=concat(mqttString('car/telemetry'),enc.encode(JSON.stringify({sequence:1,obstacle_mm:451,obstacle_valid:true,line_bits:6})));
     ws.receive(packet(0x31,body));
     assert.equal(store.sample,null);assert.equal(store.history.length,0);
     ws.receive(packet(0x30,body));
     assert.equal(store.sample.obstacle_mm,451);assert.equal(store.sample.left_mps,null);assert.equal(store.history.length,1);
-    c.disconnect();ws.receive(packet(0x30,body));assert.equal(store.history.length,1);
+    assert.deepEqual(store.sample.ir,[null,1,0]);
+    const unavailable=concat(mqttString('car/telemetry'),enc.encode(JSON.stringify({sequence:2,obstacle_mm:451,obstacle_valid:true,line_bits:0})));
+    ws.receive(packet(0x30,unavailable));assert.deepEqual(store.sample.ir,[null,null,null]);
+    c.disconnect();ws.receive(packet(0x30,body));assert.equal(store.history.length,2);
   }finally{c.disconnect();}
 });

@@ -1,0 +1,47 @@
+[TEST] === test run start ===
+[TEST] S1-U14 PASS  STOP accepted without NUL terminator
+[TEST] S1-U15 PASS  STATUS accepted
+[TEST] S1-U16 PASS  null and empty inputs rejected
+[TEST] S1-U17 PASS  unknown and lowercase commands rejected
+[TEST] S1-U18 PASS  incomplete command rejected
+[TEST] S1-U19 PASS  extra bytes and whitespace rejected
+[TEST] S1-U20 PASS  embedded and trailing NUL rejected
+[TEST] S1-U21 PASS  oversized length rejected before reading payload
+[TEST] S1-U22 PASS  valid distance JSON
+[TEST] S1-U23 PASS  invalid distance is null, not clear space
+[TEST] S1-U24 PASS  small output buffer rejected without overflow
+[TEST] S1-U25 PASS  null and out-of-range sample rejected
+[TEST] S1-U26 PASS  maximum sequence and distance fit payload
+[TEST] S1-U27 PASS  invalid validity flag and output arguments rejected
+[TEST] S1-U28 PASS  centre black and right background remain valid at 100 ms
+[TEST] S1-U29 PASS  valid all-background differs from unavailable
+[TEST] S1-U30 PASS  IR expires after 100 ms without losing distance
+[TEST] S1-U31 PASS  right black snapshot stays fresh across uptime wrap
+[TEST] S1-U32 PASS  future timestamp cannot appear fresh
+[TEST] S1-U33 PASS  noncanonical or reserved line bits rejected
+[CLOCK] tick=3596 timer_us=1009 cpu_wait_us=1000
+[TEST] S1-U43 PASS  microsecond TIMER configured and advancing at 1 MHz
+[TEST] subsystem1 SUMMARY 21 passed, 0 failed
+[TEST] subsystem2: encoder calibration disabled (S2_ENCODER_CALIBRATION=0).
+[TEST] S3-U06 PASS  synthetic forward *A*
+[TEST] S3-U07 PASS  synthetic reverse *A*
+[TEST] S3-U08 PASS  short leading quiet rejected
+[TEST] S3-U09 PASS  malformed start rejected
+[TEST] S3-U10 PASS  invalid packed codes rejected
+[TEST] subsystem3 software (sensor not tested) SUMMARY 5 passed, 0 failed
+[TEST] S4-U02a PASS  flat acceleration vector computes 0.0 +/- 0.2 deg
+[TEST] S4-U02b PASS  +15 deg incline vector computes +15.0 +/- 0.5 deg
+[TEST] S4-U02c PASS  -15 deg decline vector computes -15.0 +/- 0.5 deg
+[TEST] S4-U02d PASS  +30 deg steep vector computes +30.0 +/- 1.0 deg
+[TEST] S4-U05a PASS  subsystem4_get_telemetry returns E_OK and valid snapshot
+[TEST] S4-U06a PASS  subsystem4_reset_run clears run maximum to 0 mm
+[TEST] S4-U07a PASS  mounted sensor front-up gives positive 15 deg
+[TEST] S4-U07b PASS  mounted sensor front-down gives negative 15 deg
+[TEST] S4-U07c PASS  mounted sensor flat gives zero pitch
+[TEST] S4-U07d PASS  side tilt does not produce longitudinal pitch
+[TEST] subsystem4 SUMMARY 10 passed, 0 failed
+[TEST] S5-U03 PASS  echo widths convert to 100 and 1000 mm
+[TEST] S5-U04 PASS  specified 20 to 4000 mm range accepted
+[TEST] S5-U05 PASS  invalid echo widths rejected and distance cleared
+[TEST] subsystem5 conversion (hardware not checked) SUMMARY 3 passed, 0 failed
+[TEST] === test run end ===

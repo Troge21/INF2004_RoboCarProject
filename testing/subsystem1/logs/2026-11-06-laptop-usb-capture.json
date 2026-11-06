@@ -1,0 +1,51 @@
+{
+  "recordedDate": "2026-11-06",
+  "powerSource": "Laptop USB, confirmed by user; ultrasonic VCC reported connected to Pico 3V3",
+  "durationSeconds": 12,
+  "telemetryAccepted": 26,
+  "heartbeats": [
+    "hb 19",
+    "hb 20",
+    "hb 21"
+  ],
+  "rejected": 0,
+  "validRanges": 0,
+  "invalidRanges": 26,
+  "minMm": null,
+  "maxMm": null,
+  "intervalMs": 500,
+  "samples": [
+    {
+      "accepted": true,
+      "payload": "{\"sequence\":200,\"obstacle_mm\":null,\"obstacle_valid\":false,\"line_bits\":4}"
+    },
+    {
+      "accepted": true,
+      "payload": "{\"sequence\":201,\"obstacle_mm\":null,\"obstacle_valid\":false,\"line_bits\":4}"
+    },
+    {
+      "accepted": true,
+      "payload": "{\"sequence\":202,\"obstacle_mm\":null,\"obstacle_valid\":false,\"line_bits\":4}"
+    },
+    {
+      "accepted": true,
+      "payload": "{\"sequence\":203,\"obstacle_mm\":null,\"obstacle_valid\":false,\"line_bits\":4}"
+    },
+    {
+      "accepted": true,
+      "payload": "{\"sequence\":204,\"obstacle_mm\":null,\"obstacle_valid\":false,\"line_bits\":4}"
+    },
+    {
+      "accepted": true,
+      "payload": "{\"sequence\":205,\"obstacle_mm\":null,\"obstacle_valid\":false,\"line_bits\":4}"
+    },
+    {
+      "accepted": true,
+      "payload": "{\"sequence\":206,\"obstacle_mm\":null,\"obstacle_valid\":false,\"line_bits\":4}"
+    },
+    {
+      "accepted": true,
+      "payload": "{\"sequence\":207,\"obstacle_mm\":null,\"obstacle_valid\":false,\"line_bits\":4}"
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+    "date":  "2026-11-06",
+    "timezone":  "Asia/Kuala_Lumpur",
+    "base_commit":  "b4f6a6adc0695d26cdda81de037a86d42b738e4b",
+    "revision":  "Uncommitted working copy; hardware cold-boot test pending",
+    "build_flags":  "NET=lwip MQTT=1 TEST=1",
+    "files":  [
+                  {
+                      "sha256":  "0993661384A5A1B26FCEA476C42BD463913428DDCD973DB2D23C32436A93EEFD",
+                      "path":  "kernel/sysdepend/pico_rp2040/cpu_clock.c"
+                  },
+                  {
+                      "sha256":  "6F2DCADEA4924246706DC6A048C190D147D76651E0160DC0BFE9BF10DD1487E0",
+                      "path":  "app_program/subsystem1/subsystem1_test.c"
+                  },
+                  {
+                      "sha256":  "7BE877966167BD7560ADD69B08E27FD1135D63CA7A4634D90F1C7764EA513B92",
+                      "path":  "build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2"
+                  },
+                  {
+                      "sha256":  "A520EE4CD4A647B890861E56E647A1CC4FABF20C458EFB99F8D2BEA342588909",
+                      "path":  "build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test_before_tick_fix.uf2"
+                  }
+              ]
+}
