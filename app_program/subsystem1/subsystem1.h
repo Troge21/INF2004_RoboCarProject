@@ -3,35 +3,24 @@
 #define SUBSYSTEM1_H
 
 #include "../app.h"
+#include "s1_protocol.h"
 
 #define S1_TASK_PRIORITY 12
 #define S1_WIFI_LOG_ENABLED 0 /* set to 1 to restore WiFi status output */
 
 /* Temporary S5 -> S1 bench interface; later supplied by the controller.
  * Nonblocking sends: E_TMOUT means full (new sample dropped).
- * Invalid readings encode null, never a clear-space distance. */
-#define S1_PAYLOAD_CAPACITY 128
-typedef struct {
-    UW sequence;
-    UW obstacle_mm;
-    UB obstacle_valid; /* exactly 0 or 1; valid distance 20..4000 mm */
-} S1_TELEMETRY;
-/* Packed line snapshot: bit 2 valid, bit 1 centre black, bit 0 right black.
- * Zero means unavailable; 4 means a valid all-background reading.
- * timestamp_ms is local metadata for freshness, not a wire field. */
-#define S1_LINE_VALID 4U
-typedef struct {
-    UW timestamp_ms;
-    UB bits;
-} S1_LINE_TELEMETRY;
+ * Use s1_make_telemetry() to validate raw values before packing.
+ * Distance zero encodes unavailable, never a clear-space distance. */
+#define S1_PAYLOAD_CAPACITY S1_TELEMETRY_BYTES
 IMPORT ER s1_submit_telemetry(const S1_TELEMETRY *sample);
-IMPORT INT s1_format_telemetry(const S1_TELEMETRY *sample,
+IMPORT INT s1_encode_telemetry(const S1_TELEMETRY *sample,
                               const S1_LINE_TELEMETRY *line, UW now_ms,
-                              char *out, INT capacity);
+                              UB *out, UINT capacity);
 /* Network task only: removes latest fresh payload, no waiting.
- * Returns length or negative error; output is NUL terminated.
+ * Returns exact binary length or negative error; no NUL terminator.
  * E_TMOUT means no fresh payload. Buffer must hold S1_PAYLOAD_CAPACITY bytes. */
-IMPORT INT s1_network_poll(char *out, unsigned int capacity);
+IMPORT INT s1_network_poll(unsigned char *out, unsigned int capacity);
 
 /* Proposed vocabulary for local tests, not an agreed wire protocol.
  * Parsing does not execute commands or establish freshness/authorization. */

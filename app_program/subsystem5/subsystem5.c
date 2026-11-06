@@ -112,12 +112,10 @@ static void ultrasonic_task(INT stacd, void *exinf)
         UW mm, pulse;
         const char *error = measure(&mm, &pulse);
         S1_TELEMETRY sample = {0};
-        sample.sequence = sequence++;
-        sample.obstacle_mm = mm;
-        sample.obstacle_valid = (error == NULL);
+        er = s1_make_telemetry(&sample, sequence++, mm, error == NULL);
         /* Temporary bench route; final measurements go via the controller.
          * Never delay sensing for WiFi, a disconnected broker or full queue. */
-        er = s1_submit_telemetry(&sample);
+        if (er == E_OK) er = s1_submit_telemetry(&sample);
         if (er != E_OK && er != E_TMOUT) CHECK(er, "S5 -> S1 telemetry");
         if (S5_ULTRA_LOG_ENABLED) {
             if (error == NULL) {

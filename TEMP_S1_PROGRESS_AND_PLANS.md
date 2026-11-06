@@ -23,16 +23,44 @@ ordered plan, not promised calendar deadlines.
 | 6 Nov 2026 | Add centre/right IR telemetry | Code implemented; physical trial pending | S1 reads protected S3 snapshot; three packed line bits; freshness checks; dashboard distinguishes unknown/background/black |
 | 6 Nov 2026 | Validate IR code and produce new UF2 | Development checks passed | 20 dashboard tests; 20 S1 source checks plus 9 queue checks on host; WiFi/MQTT TEST firmware built |
 | 6 Nov 2026 | Observe IR-capable firmware on real hardware | Live messages observed; physical pattern check pending | Fresh line_bits=4 received over MQTT; exact flashed image hash not independently confirmed |
+| 6 Nov 2026 | Clarify dashboard IR names | Done | Barcode IR = GP26; Left IR = GP6 (firmware calls it centre); Right IR = GP16. Display names and CSV header updated; wiring, bits and steering unchanged |
 | 6 Nov 2026 | Fix BOOTSEL-dependent microsecond clock startup and check normal operation | Fix flashed; normal laptop and power-bank readings observed | Explicit 1 MHz tick on every boot. Laptop cold boot: S1 21/21, 24/24 valid distances (162..163 mm). Later power-bank capture: 24/24 valid distances (117..147 mm), 3 heartbeats. Initial power-bank windows had no messages; recovery timing remains unmeasured. Wiring unchanged |
 | Separate hardware follow-up | Review HC-SR04 voltage/interface requirements | Open; not established as the cause of boot-dependent failure | User confirms VCC on 3V3 and ECHO directly to GP5, with no resistors supplied. Standard module is specified for 5 V; never raise supply to 5 V with ECHO direct. First evaluate startup fix without changing wiring |
-| Next | Verify IR image and test all physical patterns | Pending | Confirm image revision; centre/right states agree with black tape and white surface; unplug car and observe unavailable values |
+| Current bench follow-up | Verify IR image and test all physical patterns | User reports line_bits working; detailed evidence pending | Record all four black/background values, image identity and stale-value behavior |
 | Following | Validate and integrate IMU/hump telemetry | Pending | Confirm getter correctness, estimator validity and encoder speed dependency with S4 owner |
 | Following | Integrate measured wheel speeds and distance | Waiting for S2 interface | Normal firmware currently has no encoder feedback; duty percentage is not measured speed |
 | Following | Agree controller telemetry and command interfaces | Pending team integration | Move temporary bench route to agreed controller snapshots; agree allowed commands and response semantics |
-| Following | Complete packed-data change requirement | Pending | Agreed bit widths/units/validity/version, synchronized state, binary firmware/dashboard agreement and before/after evidence |
+| 6 Nov 2026 | Convert current S1 telemetry and queues for Change Requirement 1 | Code/build and offline checks passed; user reports live packed messages | Six-byte telemetry, five-byte heartbeat, packed queue records; 69 to 6 payload bytes and 192 to 144 queue-buffer bytes; linked static RAM unchanged |
+| 6 Nov 2026 | Observe packed telemetry in the dashboard | User-reported functional check | User sees working line_bits, six-byte telemetry and five-byte messages; distance/restart/timing checks still need recorded results |
+| Following | Complete group-wide packed-data requirement | Pending | Other subsystem/controller/fault/command conversions and physical correctness/performance evidence remain |
 | Following | Implement permitted supervisory commands | Pending | Validated, bounded command routing to controller, acknowledgements, expiry/replay handling and controller-owned execution |
 | Following | Test WiFi/MQTT loss and recovery | Pending | Record distinct car-side recovery and browser-side recovery; five timed trials |
 | Final | Collect submission evidence and documentation | Pending | Commit identity, logs, timing results, protocol/representation tables, memory/message comparison and group demo evidence |
+
+## Change Requirement 1 in plain language
+
+The professor asks us to keep the same required information while storing
+and sending it with the minimum number of bits needed for its range. It
+applies to application data in RAM, task/ISR sharing, queue messages and
+MQTT payloads across the whole group. It also requires a representation
+table, RAM and message-size comparisons, and correctness/performance evidence.
+
+Our current stage converts the working distance/IR/heartbeat path first,
+so later measurements can be added using the packed representation from
+the start. It does not finish every teammate's application-state conversion
+or the not-yet-integrated command path.
+
+The new code uses six-byte binary telemetry and five-byte heartbeats.
+Example application payload: 69 to 6 bytes. Four-slot S1 queue-buffer requests:
+192 to 144 bytes including kernel message padding. Linked static RAM stays
+82740 bytes; runtime peak heap/stack use still needs measurement. The code
+passed 33 C host checks, 27 dashboard tests and 19914 C-to-JavaScript telemetry
+vectors plus three heartbeat vectors. The user now reports working line bits
+and six-/five-byte messages in the real dashboard. Physical performance,
+packed distance/restart checks and the on-device summary remain unrecorded.
+
+See [the implementation and evidence report](testing/subsystem1/CHANGE_REQUIREMENT_1.md)
+for the field table, exact format, measurements and remaining coverage.
 
 ## What works now
 
@@ -43,9 +71,10 @@ ordered plan, not promised calendar deadlines.
 - Real ultrasonic distance and heartbeats were observed end to end.
 - The dashboard rejects retained/invalid/replayed telemetry, tracks freshness,
   preserves bounded received history and exports real data.
-- IR-capable firmware is now observed sending fresh centre/right snapshots
-  (`line_bits:4`) from the real Pico. **The four physical IR patterns still
-  need testing, and the exact flashed image hash has not been confirmed.**
+- The user reports that line bits work as intended and recent messages have
+  the expected six-/five-byte sizes. The exact four-pattern observations
+  and running-image identity have not been independently captured; see the
+  [packed bench observation](testing/subsystem1/logs/2026-11-06-cr1-user-bench-observation.md).
 - In the initial power-source comparison, communication worked on both sources,
   but every observed ultrasonic reading was invalid. Later startup-code work
   restored valid readings; preserve the original observations in the
@@ -59,11 +88,32 @@ ordered plan, not promised calendar deadlines.
   silent; association/recovery timing and repeated cold boots still need
   controlled trials.
 
-Current image: `build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2`.
+Current packed build (user reports packed telemetry running):
+`build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2`.
+The last independently captured serial tests used JSON with the clock-startup
+fix; the current user observation supports packed delivery. The website's
+Auto decoder accepts both. Select Auto or Packed v2 for the current build;
+expect 25 S1 checks on-device, including the hardware clock check, but this
+summary has not yet been captured. The older JSON image is saved locally as
+`build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test_before_cr1.uf2`.
 Build flags: `NET=lwip MQTT=1 TEST=1`. With the current configuration,
 TEST disables normal driving and encoder calibration remains off.
 
-## Current IR milestone
+## Current IR milestone and dashboard names
+
+The dashboard uses role-based labels. Firmware and earlier test records keep
+their existing names, so use this mapping when reading code:
+
+| Dashboard name | GPIO | Firmware terminology |
+| --- | --- | --- |
+| Barcode IR | GP26 | Left/barcode input |
+| Left IR | GP6 | Centre line input |
+| Right IR | GP16 | Right line input |
+
+Only the names displayed in the dashboard and the CSV header change.
+`line_bits`, wire data positions, GPIO configuration and steering logic stay
+the same. CSV `ir_left` now names the GP6 reading formerly exported as
+`ir_centre`. The left line reading is not the GP26 barcode input.
 
 Data path:
 
@@ -71,17 +121,21 @@ Data path:
 S5 distance sample -> S1 input queue
                        + S3 protected centre/right snapshot
                     -> S1 output queue (raw snapshots)
-                    -> freshness check + JSON formatting in network poll
+                    -> freshness check + six-byte serialization in network poll
                     -> existing MQTT service -> Mosquitto -> dashboard
 ```
 
-Example updated payload:
+Example current packed payload (sequence 12, 451 mm, left black/right background):
 
-```json
-{"sequence":12,"obstacle_mm":451,"obstacle_valid":true,"line_bits":6}
+```text
+0c 00 00 00 c3 e1
 ```
 
-| `line_bits` | Centre | Right |
+The dashboard still presents decoded measurements; it does not show zero
+sentinels as real distance readings. Historical JSON examples remain in the
+older test records.
+
+| `line_bits` | Left line IR (GP6) | Right line IR (GP16) |
 | --- | --- | --- |
 | 0 | Unavailable | Unavailable |
 | 4 | Background | Background |
@@ -89,16 +143,19 @@ Example updated payload:
 | 6 | Black | Background |
 | 7 | Black | Black |
 
-Bit 2 is validity; bit 1 is centre; bit 0 is right. Bits are stored in one
-unsigned byte locally and represented as a number in JSON. The source
+Bit 2 is validity; bit 1 is left line IR (GP6, firmware centre); bit 0 is
+right line IR (GP16). The three line bits are stored within the binary frame; a local line snapshot
+uses five bytes including its 32-bit timestamp. The decoded inspector shows
+`line_bits` as a number for readability. The source
 timestamp remains local metadata. S1 clears IR validity if a snapshot is
 older than 100 ms when collected or serialized. All browser current values
 expire after 2 seconds without fresh telemetry or on disconnect. The left
 GP26 input remains barcode-only. Validity means a successful recent snapshot;
 it cannot establish that an individual digital sensor is correctly wired.
 
-The final change requirement remains open: most fields and MQTT messages
-have not yet been converted to the agreed minimum-bit binary representation.
+The group-wide change requirement remains open. The current S1 telemetry/heartbeat
+path and its queues are packed; other application fields and commands still
+need conversion and real hardware performance evidence.
 
 ## Physical check to run next
 
@@ -107,17 +164,19 @@ have not yet been converted to the agreed minimum-bit binary representation.
       `dashboard/mosquitto.local.conf`.
 - [ ] Start the custom Mosquitto broker and local dashboard server.
 - [x] Observe IR-capable firmware sending real `line_bits` messages.
-- [ ] Confirm the board uses the current built IR UF2; reflash if needed.
-- [x] Confirm the current on-device S1 summary: **21 passed, 0 failed**,
-      including hardware timer check S1-U43 after a normal power-on.
+- [x] Observe live packed message sizes and functional line_bits (user-reported;
+      exact running-image identity not independently captured).
+- [ ] Confirm the packed image on-device S1 summary: **25 passed, 0 failed**,
+      including hardware timer check S1-U43 after a normal power-on. The earlier
+      JSON image passed 21 checks; that is historical evidence, not a packed-image pass.
 - [ ] With both line sensors on white/background, observe `line_bits:4`.
-- [ ] Centre on black only: observe `line_bits:6` and centre indicator filled.
+- [ ] Left line IR (GP6) on black only: observe `line_bits:6` and left indicator filled.
 - [ ] Right on black only: observe `line_bits:5` and right indicator filled.
 - [ ] Both on black: observe `line_bits:7` and both indicators filled.
-- [ ] Confirm the left tile says "Reserved for barcode".
+- [ ] Confirm the Barcode IR tile says "Dedicated barcode input".
 - [ ] Disconnect the car; within about 2 seconds plus the display refresh,
       observe unavailable line readings rather than false background.
-- [ ] Reconnect, confirm fresh readings return, and export CSV with C/R values.
+- [ ] Reconnect, confirm fresh readings return, and export CSV with L/R line values.
 - [ ] Save serial/MQTT observations and append actual results to the test log.
 
 Do not infer hardware success from host unit tests. Use a stationary bench

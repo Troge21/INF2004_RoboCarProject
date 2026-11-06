@@ -51,7 +51,7 @@ static void publish_done_cb(void *arg, err_t result);
 
 void mqtt_utk_poll(void)
 {
-    char payload[128];
+    UB payload[S1_TELEMETRY_BYTES];
     int len = s1_network_poll(payload, sizeof(payload));
     err_t err;
 
@@ -62,7 +62,8 @@ void mqtt_utk_poll(void)
     err = mqtt_publish(client, MQTT_TELEMETRY_TOPIC, payload, (u16_t)len,
                        0, 0, publish_done_cb, NULL);
     if(err == ERR_OK) {
-        tm_printf((UB*)"mqtt: TX [" MQTT_TELEMETRY_TOPIC "] %s\n", payload);
+        tm_printf((UB*)"mqtt: TX [" MQTT_TELEMETRY_TOPIC "] %u binary bytes\n",
+                  (unsigned int)len);
     } else {
         tm_printf((UB*)"mqtt: telemetry dropped, err=%d\n", (int)err);
     }
@@ -94,19 +95,19 @@ static void incoming_data_cb(void *arg, const u8_t *data, u16_t len, u8_t flags)
 
 	for(i = 0; i < len; i++) {
 		if(rx_len < (MQTT_UTK_RX_DATA_MAX - 1)) {
-			/* The console is a terminal -- keep raw bytes from a
-			 * payload this demo did not publish from scrambling it. */
-			UB c = data[i];
-			rx_data[rx_len++] = (c >= 0x20 && c < 0x7f)? c: '.';
+			/* Preserve bytes; only render hex to the console below. */
+			rx_data[rx_len++] = data[i];
 		} else {
 			rx_truncated = 1;
 		}
 	}
 
 	if((flags & MQTT_DATA_FLAG_LAST) != 0) {
-		rx_data[rx_len] = '\0';
-		tm_printf((UB*)"mqtt: RX [%s] \"%s\"%s\n", rx_topic, rx_data,
-			  rx_truncated? " (truncated)": "");
+		tm_printf((UB*)"mqtt: RX [%s] %u bytes%s hex:", rx_topic,
+			  (unsigned int)rx_len, rx_truncated? " (truncated)": "");
+		for(i = 0; i < rx_len; ++i)
+			tm_printf((UB*)" %02x", (unsigned int)rx_data[i]);
+		tm_printf((UB*)"\n");
 	}
 }
 
@@ -130,15 +131,16 @@ static void publish_done_cb(void *arg, err_t result)
 
 static void heartbeat_timeout(void *arg)
 {
-	static unsigned int	count = 0;
-	UB			payload[48];
+	static uint32_t		count = 0;
+	UB			payload[S1_HEARTBEAT_BYTES];
 	int			len;
 
 	(void)arg;
 
 	if(mqtt_client_is_connected(client)) {
-		len = tm_sprintf(payload, (const UB*)"hb %u", count++);
-		tm_printf((UB*)"mqtt: TX [" MQTT_TOPIC "] \"%s\"\n", payload);
+		len = s1_pack_heartbeat(count++, payload, sizeof(payload));
+		tm_printf((UB*)"mqtt: TX [" MQTT_TOPIC "] %u binary bytes\n",
+		          (unsigned int)len);
 		(void)mqtt_publish(client, MQTT_TOPIC, payload, (u16_t)len,
 				   0 /* qos */, 0 /* retain */,
 				   publish_done_cb, NULL);

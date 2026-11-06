@@ -5,6 +5,7 @@
 
 #ifndef MQTT_UTK_H
 #define MQTT_UTK_H
+#include "../../../../app_program/subsystem1/s1_protocol.h"
 
 /*
  * Call once, from cyw43_utk_task() the first time the link reaches
@@ -19,6 +20,6 @@ void mqtt_utk_start(void);
 void mqtt_utk_poll(void);
 
 /* S1 queue bridge ABI; deliberately no kernel or SDK headers in this file. */
-int s1_network_poll(char *out, unsigned int capacity);
+int s1_network_poll(unsigned char *out, unsigned int capacity);
 
 #endif /* MQTT_UTK_H */

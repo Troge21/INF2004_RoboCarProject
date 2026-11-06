@@ -1,0 +1,194 @@
+{
+  "date": "2026-11-06",
+  "timezone": "Asia/Kuala_Lumpur",
+  "base_commit": "6961c87a7120145eab9ed572d1fb7bcef1b22df3",
+  "revision": "Uncommitted working copy; new packed image not flashed",
+  "build_flags": "NET=lwip MQTT=1 TEST=1 SMP=1 CONSOLE=usb_cdc",
+  "layout_before": {
+    "sample_bytes": 12,
+    "line_snapshot_bytes": 8,
+    "input_record_bytes": 16,
+    "output_record_bytes": 24,
+    "input_buffer_bytes": 80,
+    "output_buffer_bytes": 112,
+    "example_telemetry_bytes": 69
+  },
+  "layout_after": {
+    "sample_bytes": 6,
+    "line_snapshot_bytes": 5,
+    "input_record_bytes": 10,
+    "output_record_bytes": 14,
+    "input_buffer_bytes": 64,
+    "output_buffer_bytes": 80,
+    "example_telemetry_bytes": 6
+  },
+  "link_before": {
+    "text": 346052,
+    "data": 100,
+    "bss": 82640,
+    "file": "mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test_before_cr1.elf",
+    "static_ram": 82740
+  },
+  "link_after": {
+    "text": 346532,
+    "data": 100,
+    "bss": 82640,
+    "file": "mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.elf",
+    "static_ram": 82740
+  },
+  "queue_buffer_request_reduction_bytes": 48,
+  "payload_comparisons": [
+    {
+      "kind": "telemetry",
+      "logical_json": "{\"sequence\":12,\"obstacle_mm\":451,\"obstacle_valid\":true,\"line_bits\":6}",
+      "before_bytes": 69,
+      "after_bytes": 6
+    },
+    {
+      "kind": "telemetry",
+      "logical_json": "{\"sequence\":12,\"obstacle_mm\":null,\"obstacle_valid\":false,\"line_bits\":0}",
+      "before_bytes": 71,
+      "after_bytes": 6
+    },
+    {
+      "kind": "telemetry",
+      "logical_json": "{\"sequence\":4294967295,\"obstacle_mm\":4000,\"obstacle_valid\":true,\"line_bits\":7}",
+      "before_bytes": 78,
+      "after_bytes": 6
+    },
+    {
+      "kind": "heartbeat",
+      "counter": 0,
+      "before_bytes": 4,
+      "after_bytes": 5
+    },
+    {
+      "kind": "heartbeat",
+      "counter": 12,
+      "before_bytes": 5,
+      "after_bytes": 5
+    },
+    {
+      "kind": "heartbeat",
+      "counter": 4294967295,
+      "before_bytes": 13,
+      "after_bytes": 5
+    }
+  ],
+  "tests": {
+    "c_codec": 24,
+    "c_queue": 9,
+    "dashboard": 27,
+    "c_to_js_telemetry": 19914,
+    "c_to_js_heartbeat": 3,
+    "c_reserved_distance_codes": 114
+  },
+  "limits": [
+    "No packed firmware physical delivery/timing trials yet",
+    "No runtime heap/stack high-water measurement",
+    "No full-group application-data conversion claimed",
+    "Remote command protocol/controller integration still pending"
+  ],
+  "hashes": [
+    {
+      "path": "app_program/subsystem1/s1_protocol.h",
+      "sha256": "780319b6c5714e2a45c6c580dadc22b420c7ede9c81636617c98544f8df3469c"
+    },
+    {
+      "path": "app_program/subsystem1/s1_protocol.c",
+      "sha256": "7a0ea94b19296399dc3b5f39199bce27233c56a429515819ad39514634817636"
+    },
+    {
+      "path": "app_program/subsystem1/subsystem1.h",
+      "sha256": "a7a763a76a627017d80c098baf42f5446b6bdd9941e7bd2a920ca23b33ebf03e"
+    },
+    {
+      "path": "app_program/subsystem1/subsystem1.c",
+      "sha256": "abe98cf5504473360694743ba36ac4d5805215875424039f32e55db3abe92400"
+    },
+    {
+      "path": "app_program/subsystem1/subsystem1_test.c",
+      "sha256": "39e59df662aa47fa3f2bc418fd8a3f8c06f97afc8e05877d4e1a00b71718b1df"
+    },
+    {
+      "path": "app_program/subsystem3/subsystem3.h",
+      "sha256": "31f9425df94dad7e10f2148ba1348dfc9ebc1e5c8e9a50b5a7dacd133ba329de"
+    },
+    {
+      "path": "app_program/subsystem3/subsystem3.c",
+      "sha256": "51faba8d7d39ee290d1802980bc0214750541f59b546d0d0d02a36c5b2f220a1"
+    },
+    {
+      "path": "app_program/subsystem5/subsystem5.c",
+      "sha256": "6d2b97b7b93e52b659c642022e918069b646eca85ee5a34ba8fc2d1c311b31e8"
+    },
+    {
+      "path": "lib/liblwip/sysdepend/pico_rp2040/mqtt_utk.c",
+      "sha256": "2c72b5c891a7932c39f4ef015ea7810c0031f90a3de7f62918734177db08ef9a"
+    },
+    {
+      "path": "lib/liblwip/sysdepend/pico_rp2040/mqtt_utk.h",
+      "sha256": "d373c4d137c917b610a92e2ed906a002d68ee915bae1b7b91bce4f2786fd33fc"
+    },
+    {
+      "path": "kernel/sysdepend/pico_rp2040/cpu_clock.c",
+      "sha256": "0993661384a5a1b26fcea476c42bd463913428ddcd973db2d23c32436a93eefd"
+    },
+    {
+      "path": "kernel/tkernel/messagebuf.h",
+      "sha256": "f2d5cdba82bb6078934b6b17fc4d8bd6588e8224815d2cc4453cb46eb8754bc8"
+    },
+    {
+      "path": "kernel/tkernel/messagebuf.c",
+      "sha256": "c6a58bd36ec601de5b6efe3df42ddf7a798952ce938f445b0d77e248f4d80f49"
+    },
+    {
+      "path": "dashboard/dist/app.js",
+      "sha256": "a2b9e370f6cf6b0d5a90b3c8baa4a672170ba30d3dad44d7972fd9f578d35ffe"
+    },
+    {
+      "path": "dashboard/dist/protocol.js",
+      "sha256": "657c02abf0b7a351ffb2db568d61b5cfb9c474ee4836ea75a5e0cfa74ac313a1"
+    },
+    {
+      "path": "dashboard/dist/index.html",
+      "sha256": "2fdf65c7c0d82eff68b72d1b84e6d86da00845a7402f0707cea0c26590b127b8"
+    },
+    {
+      "path": "dashboard/tests/protocol.test.mjs",
+      "sha256": "060f8c2caf7f90de94eda3f8bce051c8152d3e6ef6049b16e51bd0a2817c5561"
+    },
+    {
+      "path": "dashboard/tests/mqtt.test.mjs",
+      "sha256": "bb15f53daf6f7d4daec108e9330e7198ce02ea16ad9c9dd87554b35624e2480e"
+    },
+    {
+      "path": "testing/subsystem1/host/test_telemetry.c",
+      "sha256": "5033704a641871c0767c2fb905665089e14419837a94a38a735b031d7cbb6980"
+    },
+    {
+      "path": "testing/subsystem1/host/measure_layout.c",
+      "sha256": "701422c090a94ea404c785eb166a1e49a1cdb5ff0e59af37633244c81c418975"
+    },
+    {
+      "path": "testing/subsystem1/host/emit_frames.c",
+      "sha256": "eaa8f4df9bf770489b4d996841db0d5eac444f117e303cbb7f14c72ad00f47f7"
+    },
+    {
+      "path": "testing/subsystem1/host/check_wire.mjs",
+      "sha256": "4c90791fe23a8981614a4c004be3580a3daf3d9effe1912c08004dc9ccb8fd02"
+    },
+    {
+      "path": "build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test_before_cr1.elf",
+      "sha256": "d6bc8d27c4bf70cabd1eab34116cc3902805d5f0c7e13fc93e52c478c6451b6c"
+    },
+    {
+      "path": "build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.elf",
+      "sha256": "e535cff495006a7fa207ff220861c7c936c87dfca2f8266f1f72b3f68821c3e2"
+    },
+    {
+      "path": "build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2",
+      "sha256": "eea1968adc94381c34ca5ff060da077eed985dd3fb2f6192b26cef9b86a66d2a"
+    }
+  ]
+}

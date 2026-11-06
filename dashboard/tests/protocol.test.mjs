@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {decodeTelemetry,decodeCompact,decodeHeartbeat,TelemetryStore,encoder} from '../dist/protocol.js';
+import {decodeTelemetry,decodeCompact,decodePackedV2,decodeHeartbeat,packetText,TelemetryStore,encoder} from '../dist/protocol.js';
 const payload=(overrides={})=>encoder.encode(JSON.stringify({sequence:12,obstacle_mm:451,obstacle_valid:true,...overrides}));
 
 test('current S1 firmware JSON decodes without inventing other sensor feeds',()=>{
   const {sample,format}=decodeTelemetry(payload());
-  assert.equal(sample.obstacle_mm,451);assert.equal(sample.left_mps,null);assert.equal(sample.state,null);assert.equal(sample.faults,null);assert.match(format,/current firmware/);
+  assert.equal(sample.obstacle_mm,451);assert.equal(sample.left_mps,null);assert.equal(sample.state,null);assert.equal(sample.faults,null);assert.match(format,/legacy firmware/);
 });
 test('no echo stays null and never becomes zero or clear space',()=>{
   assert.equal(decodeTelemetry(payload({obstacle_mm:null,obstacle_valid:false})).sample.obstacle_mm,null);
@@ -56,6 +56,71 @@ test('compact adapter validates version, validity, length and maximum sequence',
 test('heartbeats match the existing firmware format exactly',()=>{
   assert.equal(decodeHeartbeat(encoder.encode('hb 12')),12);
   for(const text of ['hb -1','heartbeat','hb 12\n','hb 123456789012'])assert.throws(()=>decodeHeartbeat(encoder.encode(text)));
+});
+
+test('actual packed v2 golden vector preserves binary zeros and line readings',()=>{
+  const bytes=new Uint8Array([12,0,0,0,0xc3,0xe1]);
+  const {sample,format}=decodeTelemetry(bytes);
+  assert.match(format,/Packed v2/);assert.equal(sample.sequence,12);
+  assert.equal(sample.line_bits,6);
+  assert.equal(sample.obstacle_mm,451);assert.deepEqual(sample.ir,[null,1,0]);
+  assert.equal(sample.left_mps,null);assert.equal(sample.state,null);
+  const offset=new Uint8Array([99,...bytes,99]).subarray(1,7);
+  assert.deepEqual(decodePackedV2(offset),sample);
+});
+
+test('packed v2 preserves no echo and all canonical line states independently',()=>{
+  for(const [bits,ir] of [[0,[null,null,null]],[4,[null,0,0]],[5,[null,0,1]],[6,[null,1,0]],[7,[null,1,1]]]) {
+    const bytes=new Uint8Array([255,255,255,255,0,0x80|(bits<<4)]);
+    const sample=decodePackedV2(bytes);
+    assert.equal(sample.sequence,0xffffffff);assert.equal(sample.obstacle_mm,null);
+    assert.equal(sample.obstacle_valid,false);assert.deepEqual(sample.ir,ir);
+  }
+  assert.equal(decodePackedV2(new Uint8Array([0,0,0,0,20,0x80])).obstacle_mm,20);
+  assert.equal(decodePackedV2(new Uint8Array([0,0,0,0,0xa0,0xff])).obstacle_mm,4000);
+});
+
+test('packed v2 rejects invalid lengths, tags, reserved ranges and line encodings',()=>{
+  for(const length of [0,5,7])assert.throws(()=>decodePackedV2(new Uint8Array(length)));
+  assert.throws(()=>decodePackedV2(new Uint8Array([0,0,0,0,20,0])),/marker/);
+  for(const distance of [1,19,4001,4095])
+    assert.throws(()=>decodePackedV2(new Uint8Array([0,0,0,0,distance&255,0x80|(distance>>>8)])));
+  for(const bits of [1,2,3])
+    assert.throws(()=>decodePackedV2(new Uint8Array([0,0,0,0,20,0x80|(bits<<4)])),/line sensor bits/);
+});
+
+test('packed heartbeats preserve full counter and remain unambiguous with legacy text',()=>{
+  for(const count of [0,12,0x30206268,0xffffffff]) {
+    const bytes=new Uint8Array(5);bytes[0]=0x80;new DataView(bytes.buffer).setUint32(1,count,true);
+    assert.equal(decodeHeartbeat(bytes),count);
+  }
+  assert.equal(decodeHeartbeat(encoder.encode('hb 0')),0);
+  assert.equal(decodeHeartbeat(encoder.encode('hb 4294967295')),0xffffffff);
+  for(const bytes of [new Uint8Array([0x80]),new Uint8Array([0x80,0,0,0]),new Uint8Array([0x80,0,0,0,0,0])])
+    assert.throws(()=>decodeHeartbeat(bytes),/5 bytes/);
+  assert.throws(()=>decodeHeartbeat(encoder.encode('hb 4294967296')),/uint32/);
+});
+
+test('packed telemetry uses the same retention, freshness and sequence protections',()=>{
+  const s=new TelemetryStore(),bytes=new Uint8Array([12,0,0,0,0xc3,0xe1]);
+  assert.equal(s.ingest(bytes,'telemetry',1000,true),false);
+  assert.equal(s.ingest(bytes,'telemetry',1000,false,'packed-v2'),true);
+  assert.equal(s.lastPayloadBytes,6);assert.deepEqual(s.currentSample(2000).ir,[null,1,0]);
+  assert.equal(s.ingest(bytes,'telemetry',1500),false);
+  assert.equal(s.currentSample(3001),null);assert.equal(s.history.length,1);
+});
+
+test('packet inspector shows decoded binary counters and preserves each packet value',()=>{
+  const s=new TelemetryStore();
+  s.ingest(new Uint8Array([12,0,0,0,0xc3,0xe1]),'telemetry',1000);
+  const first=s.packets[0];
+  s.ingest(new Uint8Array([0x80,0,0,0,0]),'heartbeat',1100);
+  assert.deepEqual(JSON.parse(packetText(s.packets[0])),{counter:0});
+  s.ingest(new Uint8Array([13,0,0,0,20,0xc0]),'telemetry',1500);
+  assert.equal(JSON.parse(packetText(first)).obstacle_mm,451);
+  s.ingest(new Uint8Array([0x80,0]),'heartbeat',2000);
+  assert.match(packetText(s.packets[0]),/Rejected/);assert.match(packetText(s.packets[0]),/80 00/);
+  assert.doesNotMatch(packetText(s.packets[0]),/\uFFFD/);
 });
 test('retained and rejected packets never refresh live telemetry or heartbeat',()=>{
   const s=new TelemetryStore();s.ingest(payload(),'telemetry',1000);

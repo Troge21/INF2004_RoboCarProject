@@ -28,18 +28,18 @@ There is no motor or encoder test in subsystem1.
 | S1-U19 | Parse STOP NOW and STOP with newline | Invalid |
 | S1-U20 | Parse embedded or trailing NUL | Invalid |
 | S1-U21 | Parse oversized length | Invalid, no payload access |
-| S1-U22 | Format valid 451 mm sample | Exact JSON with numeric distance and true validity |
-| S1-U23 | Format invalid measurement | Distance=null, validity=false |
-| S1-U24 | Format into too-small buffer | E_PAR, empty output, guard byte preserved |
+| S1-U22 | Encode valid 451 mm sample | Exact six-byte packed v2 vector |
+| S1-U23 | Encode invalid measurement | Distance code zero; browser decodes null/false |
+| S1-U24 | Encode into too-small buffer | E_PAR, output/guard bytes unchanged |
 | S1-U25 | Null/out-of-range sample | E_PAR from formatter/submission; no queue access |
-| S1-U26 | Maximum sequence and valid distance | Exact JSON within fixed buffer |
+| S1-U26 | Maximum sequence and valid distance | Exact packed bytes, no value truncation |
 | S1-U27 | Invalid validity flag/output arguments | E_PAR |
-| S1-U28 | Centre black/right background at age 100 ms | Exact JSON, line_bits=6 |
+| S1-U28 | Left line (firmware centre) black/right background at age 100 ms | Exact packed bytes, line_bits=6 |
 | S1-U29 | Fresh all-background snapshot | line_bits=4, distinct from unavailable |
 | S1-U30 | IR age 101 ms with fresh distance | line_bits=0, distance preserved |
 | S1-U31 | Fresh right-black snapshot across 32-bit uptime wrap | line_bits=5 |
 | S1-U32 | Source timestamp in the future | line_bits=0 |
-| S1-U33 | Noncanonical/reserved line bits | E_PAR, empty output |
+| S1-U33 | Noncanonical/reserved line bits | E_PAR, output unchanged |
 | S1-U34 | Host queue pipeline, both IR inputs black | line_bits=7 |
 | S1-U35 | Host advances clock after output enqueue | IR expires; distance preserved |
 | S1-U36 | S3 snapshot read reports busy/unavailable | line_bits=0, no reused data |
@@ -48,13 +48,19 @@ There is no motor or encoder test in subsystem1.
 | S1-U39 | Fill input queue, submit fifth sample, poll output | Fifth send E_TMOUT; newest accepted sample selected; all-background=4 |
 | S1-U40 | Fill outbound queue, submit fifth sample | New sample dropped without blocking; newest accepted sample selected |
 | S1-U41 | Host expires distance while in input queue | No output published |
-| S1-U42 | Host expires distance while in outbound queue | E_TMOUT, empty output |
+| S1-U42 | Host expires distance while in outbound queue | E_TMOUT, no payload returned |
 | S1-U43 | Pico-only: read tick enable/divisor and compare hardware timer over a 1000 us CPU/SysTick busy interval, with local interrupts masked | Configured 1 MHz tick; elapsed hardware time 900..1100 us; repeat on normal cold boot |
+| S1-U44 | Check packed application object sizes | Measurement=6 bytes, local line snapshot=5 bytes |
+| S1-U45 | Encode heartbeat counter 0 and uint32 maximum | Exact five-byte golden vectors |
+| S1-U46 | Heartbeat null/too-small output | Error with no buffer writes |
+| S1-U47 | Raw values that could alias valid values if masked first | Out-of-range distance and line pattern rejected before packing |
 | S1-M01 | Build NET=lwip, boot near configured AP, observe USB status | init_done=1, init_result=0, ready=1; link=3 and an IP after connection |
 | S1-M02 | Boot with wrong AP password; then restore credentials and rebuild | No connection with wrong credentials; normal connection after restore |
 | S1-M03 | Build NET=lwip MQTT=1 against configured broker | mqtt connected/subscribed, recurring heartbeat TX and matching RX |
 | S1-M04 | Flash IR image; compare four C/R black/background patterns; disconnect car | Raw line_bits=4/6/5/7 respectively; dashboard matches C/R; left reserved for barcode; live values unavailable after freshness timeout |
 | S1-M05 | Compare BOOTSEL post-flash operation with complete power-off and normal USB/laptop and power-bank boots | Clock test S1-U43 passes on normal boot; distance measurements resume without reflashing; capture each power source separately |
+| S1-M06 | Flash packed v2, use Auto/Packed v2 dashboard, move target and check IR patterns | Six-byte telemetry, five-byte heartbeats; real distance and correct left/right states; unavailable stays distinct from background/clear space |
+| S1-M07 | Compare timing before/after packing under matched conditions; exercise AP/broker outages | Required telemetry/heartbeat intervals and recovery targets met; record actual timings, failures and conditions |
 
 ## Results
 
@@ -84,7 +90,7 @@ Flash `build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2` using BOOTSEL.
 Open the USB serial console at 115200 baud. Expected local-test summary:
 
 ```text
-[TEST] subsystem1 SUMMARY 21 passed, 0 failed
+[TEST] subsystem1 SUMMARY 25 passed, 0 failed
 ```
 
 These parser tests do not require an AP or broker. To test them without
@@ -104,7 +110,7 @@ Save serial output under `testing/subsystem1/logs/` and append actual results
 with the tested commit ID, operator and evidence as described in
 `testing/README.md`. No hardware result is recorded until run on a board.
 
-## S5 distance telemetry bench setup
+## Earlier JSON distance telemetry bench setup
 
 S5 submits each valid or failed measurement to S1 using
 `s1_submit_telemetry()`. S1 gathers a nonblocking protected S3 line snapshot
@@ -299,3 +305,44 @@ or proof of successful readings immediately after every power-bank boot.
 Retest S1-M05 after committing, with continuous timestamps and repeated boots.
 IR messages arrived, but the four known physical line patterns remain a
 separate pending test.
+
+## Change Requirement 1 packed telemetry stage - 6 November 2026
+
+The latest built image uses six-byte binary distance/IR telemetry and
+five-byte binary heartbeats. Its expected S1 on-device summary is now
+**25 passed, 0 failed** (24 codec/parser checks plus hardware clock check
+S1-U43). The successful 21-check JSON image trials above remain historical
+evidence. The user now reports working line bits and six-/five-byte messages
+from the packed bench session; on-device test output and physical timing
+have not been captured for this image.
+
+The source constructor validates raw ranges before packing, avoiding silent
+bit truncation. Input/output records are 10/14 bytes with compile-time ARM
+size assertions. Kernel message buffers round each record and add an INT
+header; requests are therefore 64/80 bytes for four slots, not just four
+times the raw data lengths. The host queue harness enforces that capacity.
+
+Development validation of the current working copy:
+
+| Check | Outcome | Evidence |
+| --- | --- | --- |
+| Actual S1 C codec/parser | 24 passed, 0 failed on host | [Final host log](logs/2026-11-06-cr1-host-final-tests.txt) |
+| Actual S1 C queue pipeline | 9 passed, 0 failed with kernel-aligned capacity | Same host log, S1-U34..U42 |
+| Browser protocol/MQTT/inspector tests | 27 passed, 0 failed | [Node log](logs/2026-11-06-cr1-dashboard-tests.txt) |
+| Actual C bytes decoded by JS and preserved through MQTT framing | 19914 telemetry vectors + 3 heartbeats passed; all 114 reserved distance codes rejected by C | [Contract log](logs/2026-11-06-cr1-c-to-js-tests.txt) |
+| ARM WiFi/MQTT TEST image | Build succeeded | [Final build](logs/2026-11-06-cr1-build-final.txt) |
+| Packed Pico-to-browser delivery S1-M06 | PARTIAL, user-reported | Working line bits and six-/five-byte messages; distance, unavailable states and controlled per-pattern results remain to be recorded. [Observation](logs/2026-11-06-cr1-user-bench-observation.md) |
+| Packed timing/recovery and runtime RAM S1-M07 | PENDING | Physical measurements required |
+
+See [implementation, bit table and measurements](CHANGE_REQUIREMENT_1.md)
+and [source/image fingerprint and comparison data](logs/2026-11-06-cr1-evidence.json).
+Measured example payload: 69 to 6 bytes. Requested S1 queue buffers: 192 to
+144 bytes. Linked data+bss: 82740 bytes before and after. Runtime heap/stack
+high-water use is not measured. The five-byte heartbeat is larger than
+`hb 0` (4 bytes), equal to `hb 12`, and smaller than the full-range counter
+text (13 bytes); the report explains its compatibility marker.
+
+The original ASCII command parser remains a local proposed vocabulary,
+not the final compact remote-command protocol. Other subsystem state,
+controller/fault data and commands still need group-wide CR1 work. Review,
+commit and rerun formal evidence against the final revision before submission.

@@ -28,6 +28,7 @@ export function validateTelemetry(data) {
     state: STATES.includes(data.state) ? data.state : null,
     left_mps: finite(data.left_mps, -5, 5), right_mps: finite(data.right_mps, -5, 5),
     distance_m: finite(data.distance_m), hump_mm: finite(data.hump_mm, 0, 1000), max_hump_mm: finite(data.max_hump_mm, 0, 1000),
+    line_bits: Object.hasOwn(data,'line_bits') ? data.line_bits : null,
     ir: decodeLineSensors(data),
     barcode: ['Turn left', 'Turn right', 'Go straight', 'U-turn'].includes(data.barcode) ? data.barcode : null,
     faults: Array.isArray(data.faults) && data.faults.length <= 16 && data.faults.every(x => typeof x === 'string' && x.length <= 60) ? [...data.faults] : null,
@@ -46,18 +47,44 @@ export function decodeCompact(bytes) {
   if (!valid && (packed & 0xfff) !== 0) throw new Error('Invalid frame must clear distance bits');
   return validateTelemetry({ sequence:view.getUint32(0,true), obstacle_valid:valid, obstacle_mm:valid ? packed & 0xfff : null });
 }
+// Actual S1 v2: seq:32, distance:12 (zero=unavailable), IR:3, tag:1.
+export function decodePackedV2(bytes) {
+  if (bytes.length !== 6) throw new Error('Packed v2 frame must contain 6 bytes');
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const word = view.getUint16(4, true);
+  if (!(word & 0x8000)) throw new Error('Unsupported packed v2 format marker');
+  const distance = word & 0x0fff;
+  return validateTelemetry({sequence:view.getUint32(0,true),
+    obstacle_valid:distance !== 0, obstacle_mm:distance === 0 ? null : distance,
+    line_bits:(word >>> 12) & 7});
+}
 export function decodeTelemetry(payload, format = 'auto') {
   const bytes = payload instanceof Uint8Array ? payload : new Uint8Array(payload);
   if (bytes.length === 0 || bytes.length > 16384) throw new Error('Invalid telemetry length');
+  if (format === 'packed-v2' || (format === 'auto' && bytes.length === 6 && (bytes[5] & 0x80)))
+    return {sample:decodePackedV2(bytes), format:'Packed v2 · distance + line IR'};
   const compact = format === 'compact-v1' || (format === 'auto' && bytes.length === 6 && (bytes[5] >>> 5) === 1);
-  return compact ? {sample:decodeCompact(bytes), format:'Compact v1 · proposed'} : {sample:validateTelemetry(JSON.parse(decoder.decode(bytes))), format:'JSON · current firmware'};
+  return compact ? {sample:decodeCompact(bytes), format:'Compact v1 · legacy proposed'} : {sample:validateTelemetry(JSON.parse(decoder.decode(bytes))), format:'JSON · legacy firmware'};
 }
 export function decodeHeartbeat(payload) {
-  const text = decoder.decode(payload);
+  const bytes = payload instanceof Uint8Array ? payload : new Uint8Array(payload);
+  if (bytes[0] === 0x80) {
+    if (bytes.length !== 5) throw new Error('Packed heartbeat must contain 5 bytes');
+    return new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength).getUint32(1,true);
+  }
+  const text = decoder.decode(bytes);
   if (!/^hb [0-9]{1,10}$/.test(text)) throw new Error('Unrecognised heartbeat');
-  return Number(text.slice(3));
+  const count = Number(text.slice(3));
+  if (count > 0xffffffff) throw new Error('Heartbeat counter exceeds uint32');
+  return count;
 }
 export function hex(bytes) { return [...bytes].map(x => x.toString(16).padStart(2,'0')).join(' '); }
+export function packetText(packet) {
+  if (!packet) return 'Waiting for a message…';
+  if (packet.accepted && packet.decoded !== null)
+    return JSON.stringify(packet.decoded,null,2);
+  return `${packet.accepted?'Accepted':'Rejected'}: ${packet.detail}\n\n${hex(packet.bytes)}`;
+}
 
 export class TelemetryStore {
   constructor() { this.reset(); }
@@ -76,7 +103,7 @@ export class TelemetryStore {
   }
   ingest(bytes, kind, at=Date.now(), retained=false, format='auto', topic='') {
     this.messageCount++; this.totalBytes+=bytes.length;
-    const packet={at,topic,bytes:new Uint8Array(bytes),kind,accepted:false,detail:''};
+    const packet={at,topic,bytes:new Uint8Array(bytes),kind,accepted:false,detail:'',decoded:null};
     this.packets.unshift(packet); this.packets.length=Math.min(this.packets.length,30);
     try {
       if (retained) throw new Error('Retained message ignored; waiting for a fresh sample');
@@ -86,7 +113,8 @@ export class TelemetryStore {
           this.lastSequence=null;
           this.event('Heartbeat counter restarted','Sequence baseline reset; the robot may have rebooted','neutral',at);
         }
-        this.lastHeartbeatCounter=count; this.lastHeartbeat=at; packet.accepted=true; packet.detail='Heartbeat'; return true;
+        this.lastHeartbeatCounter=count; this.lastHeartbeat=at; packet.accepted=true;
+        packet.decoded={counter:count};packet.detail=bytes[0]===0x80?'Packed v2 heartbeat':'Legacy heartbeat';return true;
       }
       const decoded=decodeTelemetry(bytes,format), sample=decoded.sample;
       if (this.lastSequence!==null) {
@@ -102,7 +130,7 @@ export class TelemetryStore {
       this.sample=sample; this.lastTelemetry=at; this.telemetryCount++; this.lastPayloadBytes=bytes.length; this.format=decoded.format;
       this.history.push({...sample,at,interval:this.lastInterval,bytes:bytes.length});
       if(this.history.length>600) this.history.shift();
-      packet.accepted=true; packet.detail=decoded.format; return true;
+      packet.accepted=true; packet.decoded=sample; packet.detail=decoded.format; return true;
     } catch (error) { this.rejected++; packet.detail=error.message; this.event('Message rejected',error.message,'warning',at); return false; }
   }
 }

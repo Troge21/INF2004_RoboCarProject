@@ -41,12 +41,15 @@ static int failures, checks;
 static UW clock_ms;
 static jmp_buf idle;
 static int running;
-static struct { unsigned head, count, size; unsigned char data[4][256]; INT lengths[4]; } queues[3];
+static struct { unsigned head, count, size, capacity; unsigned char data[4][256]; INT lengths[4]; } queues[3];
 static int queue_count;
 static ER tk_get_tim(SYSTIM *now) { now->lo = clock_ms; now->hi = 0; return E_OK; }
 static ID tk_cre_mbf(const T_CMBF *config) {
     if (++queue_count > 2 || config->maxmsz > 256) abort();
     queues[queue_count].size = (unsigned)config->maxmsz;
+    queues[queue_count].capacity = (unsigned)config->bufsz /
+        (sizeof(INT) + (((unsigned)config->maxmsz + sizeof(INT) - 1U) / sizeof(INT)) * sizeof(INT));
+    if (queues[queue_count].capacity > 4) abort();
     return queue_count;
 }
 static ER tk_del_mbf(ID id) { (void)id; return E_OK; }
@@ -58,7 +61,7 @@ static ER tk_snd_mbf(ID id, const void *msg, INT length, INT timeout) {
     (void)timeout;
     if (id < 1 || id > queue_count) return E_OBJ;
     if (length < 0 || (unsigned)length > queues[id].size) return E_PAR;
-    if (queues[id].count == 4) return E_TMOUT;
+    if (queues[id].count == queues[id].capacity) return E_TMOUT;
     tail = (queues[id].head + queues[id].count) % 4;
     memcpy(queues[id].data[tail], msg, (size_t)length);
     queues[id].lengths[tail] = length;
@@ -79,11 +82,6 @@ static INT tk_rcv_mbf(ID id, void *msg, INT timeout) {
     --queues[id].count;
     return length;
 }
-static INT tm_sprintf(UB *out, const UB *format, ...) {
-    int result; va_list args; va_start(args, format);
-    result = vsprintf((char *)out, (const char *)format, args);
-    va_end(args); return result;
-}
 static INT tm_printf(UB *format, ...) {
     char text[1024]; int result; va_list args; va_start(args, format);
     result = vsnprintf(text, sizeof(text), (const char *)format, args);
@@ -97,6 +95,7 @@ static INT tm_printf(UB *format, ...) {
 static S3_LINE_DATA source_line;
 static ER source_result = E_OK;
 ER subsystem3_get_line(S3_LINE_DATA *sample) { *sample = source_line; return source_result; }
+#include "../../../app_program/subsystem1/s1_protocol.c"
 #include "../../../app_program/subsystem1/subsystem1.c"
 #include "../../../app_program/subsystem1/subsystem1_test.c"
 
@@ -116,69 +115,81 @@ static void reset_at(UW now, UINT pattern) {
     source_line.valid = TRUE; source_result = E_OK;
     if (subsystem1_init() != E_OK) abort();
 }
+static int packet_is(const UB *bytes, INT length, UW sequence, UINT mm, UINT line)
+{
+    S1_TELEMETRY actual;
+    if (length != (INT)S1_TELEMETRY_BYTES) return 0;
+    memcpy(actual.bytes, bytes, sizeof(actual.bytes));
+    return s1_validate_telemetry(&actual) == S1_CODEC_OK &&
+           s1_sequence(&actual) == sequence && s1_distance(&actual) == mm &&
+           s1_line_bits(&actual) == line;
+}
 int main(void) {
-    S1_TELEMETRY sample = {42, 451, 1};
-    char payload[S1_PAYLOAD_CAPACITY];
+    S1_TELEMETRY sample = {{0}};
+    UB payload[S1_PAYLOAD_CAPACITY];
     int i, full, length;
     puts("Development host validation; GPIO, radio and MQTT hardware are not exercised.");
     subsystem1_test();
+    (void)s1_make_telemetry(&sample, 42, 451, 1);
 
     reset_at(1000, 3);
     (void)s1_submit_telemetry(&sample); pump();
     length = s1_network_poll(payload, sizeof(payload));
-    expect("S1-U34", length > 0 && strstr(payload, "\"line_bits\":7}"),
+    expect("S1-U34", length > 0 && packet_is(payload, length, 42, 451, 7),
            "real S1 queue pipeline maps both-black snapshot");
 
     reset_at(1000, 2);
     (void)s1_submit_telemetry(&sample); pump(); clock_ms = 1101;
     length = s1_network_poll(payload, sizeof(payload));
-    expect("S1-U35", length > 0 && strstr(payload, "\"obstacle_mm\":451") && strstr(payload, "\"line_bits\":0}"),
+    expect("S1-U35", length > 0 && packet_is(payload, length, 42, 451, 0),
            "IR expires in output queue while distance remains usable");
 
     reset_at(1000, 3); source_result = E_TMOUT;
     (void)s1_submit_telemetry(&sample); pump();
     length = s1_network_poll(payload, sizeof(payload));
-    expect("S1-U36", length > 0 && strstr(payload, "\"line_bits\":0}"),
+    expect("S1-U36", length > 0 && packet_is(payload, length, 42, 451, 0),
            "busy or unavailable S3 snapshot cannot reuse old bits");
 
     reset_at(1000, 4);
     (void)s1_submit_telemetry(&sample); pump();
     length = s1_network_poll(payload, sizeof(payload));
-    expect("S1-U37", length > 0 && strstr(payload, "\"line_bits\":0}"),
+    expect("S1-U37", length > 0 && packet_is(payload, length, 42, 451, 0),
            "unsupported S3 pattern remains unavailable");
 
     reset_at(1000, 2); source_line.timestamp_ms = 899;
     (void)s1_submit_telemetry(&sample); pump();
     length = s1_network_poll(payload, sizeof(payload));
-    expect("S1-U38", length > 0 && strstr(payload, "\"line_bits\":0}"),
+    expect("S1-U38", length > 0 && packet_is(payload, length, 42, 451, 0),
            "stale source snapshot rejected before outbound queue");
 
     reset_at(1000, 0);
-    for (i = 0; i < 4; ++i) { sample.sequence = (UW)i; (void)s1_submit_telemetry(&sample); }
+    for (i = 0; i < 4; ++i) { (void)s1_make_telemetry(&sample, (UW)i, 451, 1); (void)s1_submit_telemetry(&sample); }
     full = s1_submit_telemetry(&sample); pump();
     length = s1_network_poll(payload, sizeof(payload));
-    expect("S1-U39", full == E_TMOUT && length > 0 && strstr(payload, "\"sequence\":3,") && strstr(payload, "\"line_bits\":4}"),
+    expect("S1-U39", full == E_TMOUT && length > 0 && packet_is(payload, length, 3, 451, 4),
            "full input is nonblocking; newest fresh all-background snapshot selected");
 
     reset_at(1000, 2);
-    for (i = 0; i < 5; ++i) { sample.sequence = (UW)i; (void)s1_submit_telemetry(&sample); pump(); }
+    for (i = 0; i < 5; ++i) { (void)s1_make_telemetry(&sample, (UW)i, 451, 1); (void)s1_submit_telemetry(&sample); pump(); }
     length = s1_network_poll(payload, sizeof(payload));
-    expect("S1-U40", length > 0 && strstr(payload, "\"sequence\":3,"),
+    expect("S1-U40", length > 0 && packet_is(payload, length, 3, 451, 6),
            "full outbound queue drops new sample without blocking sensing");
 
     reset_at(1000, 1);
     (void)s1_submit_telemetry(&sample); clock_ms = 3001; pump();
-    expect("S1-U41", s1_network_poll(payload, sizeof(payload)) == E_TMOUT && payload[0] == '\0',
+    payload[0] = 0xa5;
+    expect("S1-U41", s1_network_poll(payload, sizeof(payload)) == E_TMOUT && payload[0] == 0xa5,
            "distance expired in input queue is not published");
 
     reset_at(1000, 1);
     (void)s1_submit_telemetry(&sample); pump(); clock_ms = 3001;
-    expect("S1-U42", s1_network_poll(payload, sizeof(payload)) == E_TMOUT && payload[0] == '\0',
+    payload[0] = 0xa5;
+    expect("S1-U42", s1_network_poll(payload, sizeof(payload)) == E_TMOUT && payload[0] == 0xa5,
            "distance expired in outbound queue is not published");
 
     printf("[HOST] queue SUMMARY %d checks, %d total failures\n", checks, failures);
     printf("Queue storage: input=%u bytes; output=%u bytes (four messages plus length headers each)\n",
-           (unsigned)(4 * (sizeof(S1_INPUT) + sizeof(INT))),
-           (unsigned)(4 * (sizeof(S1_OUTPUT) + sizeof(INT))));
+           (unsigned)S1_MBF_STORAGE(sizeof(S1_INPUT)),
+           (unsigned)S1_MBF_STORAGE(sizeof(S1_OUTPUT)));
     return failures ? 1 : 0;
 }

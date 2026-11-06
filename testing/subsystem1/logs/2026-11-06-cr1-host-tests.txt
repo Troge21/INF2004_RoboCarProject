@@ -1,0 +1,37 @@
+Development host validation; GPIO, radio and MQTT hardware are not exercised.
+[TEST] S1-U14 PASS  STOP accepted without NUL terminator
+[TEST] S1-U15 PASS  STATUS accepted
+[TEST] S1-U16 PASS  null and empty inputs rejected
+[TEST] S1-U17 PASS  unknown and lowercase commands rejected
+[TEST] S1-U18 PASS  incomplete command rejected
+[TEST] S1-U19 PASS  extra bytes and whitespace rejected
+[TEST] S1-U20 PASS  embedded and trailing NUL rejected
+[TEST] S1-U21 PASS  oversized length rejected before reading payload
+[TEST] S1-U22 PASS  distance has exact six-byte binary golden vector
+[TEST] S1-U23 PASS  invalid distance uses zero sentinel, never clear-space distance
+[TEST] S1-U24 PASS  small binary buffer rejected without writing
+[TEST] S1-U25 PASS  null and out-of-range samples rejected before queue access
+[TEST] S1-U26 PASS  maximum sequence and distance preserved
+[TEST] S1-U27 PASS  invalid validity and output arguments rejected
+[TEST] S1-U28 PASS  left line black remains valid at age 100 ms
+[TEST] S1-U29 PASS  valid background differs from unavailable
+[TEST] S1-U30 PASS  queued IR expires without losing distance
+[TEST] S1-U31 PASS  freshness survives uptime wrap
+[TEST] S1-U32 PASS  future timestamp cannot appear fresh
+[TEST] S1-U33 PASS  noncanonical line bits rejected without writing
+[TEST] S1-U44 PASS  application snapshots use packed byte layouts
+[TEST] S1-U45 PASS  binary heartbeat preserves zero and full counter
+[TEST] S1-U46 PASS  heartbeat output bounds preserved
+[TEST] S1-U47 PASS  raw values rejected before masking could turn them into valid data
+[TEST] subsystem1 SUMMARY 24 passed, 0 failed
+[HOST] S1-U34 PASS real S1 queue pipeline maps both-black snapshot
+[HOST] S1-U35 PASS IR expires in output queue while distance remains usable
+[HOST] S1-U36 PASS busy or unavailable S3 snapshot cannot reuse old bits
+[HOST] S1-U37 PASS unsupported S3 pattern remains unavailable
+[HOST] S1-U38 PASS stale source snapshot rejected before outbound queue
+[HOST] S1-U39 PASS full input is nonblocking; newest fresh all-background snapshot selected
+[HOST] S1-U40 PASS full outbound queue drops new sample without blocking sensing
+[HOST] S1-U41 PASS distance expired in input queue is not published
+[HOST] S1-U42 PASS distance expired in outbound queue is not published
+[HOST] queue SUMMARY 9 checks, 0 total failures
+Queue storage: input=56 bytes; output=72 bytes (four messages plus length headers each)

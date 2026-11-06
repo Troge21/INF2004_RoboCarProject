@@ -9,15 +9,21 @@
 
 #define S1_QUEUE_DEPTH 4
 #define S1_FRESH_MS 2000U
+/* Kernel MBFs charge a length header plus word-rounded message storage.
+ * Account for padding so all four packed records still fit. */
+#define S1_MBF_STORAGE(bytes) (S1_QUEUE_DEPTH * (sizeof(INT) + \
+    (((bytes) + sizeof(INT) - 1U) / sizeof(INT)) * sizeof(INT)))
 typedef struct {
     S1_TELEMETRY sample;
-    UW sampled_ms;
+    UB sampled_ms[4];
 } S1_INPUT;
 typedef struct {
-    UW sampled_ms;
     S1_TELEMETRY sample;
-    S1_LINE_TELEMETRY line;
+    UB sampled_ms[4];
+    UB line_sampled_ms[4];
 } S1_OUTPUT;
+_Static_assert(sizeof(S1_INPUT) == 10, "input queue must not add padding");
+_Static_assert(sizeof(S1_OUTPUT) == 14, "output queue must not add padding");
 static ID telemetry_mbf;
 static ID network_tx_mbf;
 
@@ -30,43 +36,16 @@ static UW uptime_ms(void)
 
 static ER validate_sample(const S1_TELEMETRY *sample)
 {
-    if (sample == NULL || sample->obstacle_valid > 1) return E_PAR;
-    if (sample->obstacle_valid &&
-        (sample->obstacle_mm < 20 || sample->obstacle_mm > 4000)) return E_PAR;
-    return E_OK;
+    return s1_validate_telemetry(sample) == S1_CODEC_OK ? E_OK : E_PAR;
 }
 
-EXPORT INT s1_format_telemetry(const S1_TELEMETRY *sample,
+EXPORT INT s1_encode_telemetry(const S1_TELEMETRY *sample,
                               const S1_LINE_TELEMETRY *line, UW now_ms,
-                              char *out, INT capacity)
+                              UB *out, UINT capacity)
 {
-    /* Bounded JSON bench protocol; line state is packed into three bits.
-     * Freshness is rechecked at serialization, after any queue delay. */
-    UB payload[S1_PAYLOAD_CAPACITY];
-    UINT line_bits = 0;
-    INT len, i;
-    if (out == NULL || capacity <= 0) return E_PAR;
-    out[0] = '\0';
-    if (validate_sample(sample) != E_OK) return E_PAR;
-    if (line != NULL) {
-        if (line->bits > 7U ||
-            (line->bits != 0 && !(line->bits & S1_LINE_VALID))) return E_PAR;
-        if ((UW)(now_ms - line->timestamp_ms) <= APP_IR_MAX_AGE_MS)
-            line_bits = line->bits;
-    }
-    if (sample->obstacle_valid) {
-        len = tm_sprintf(payload, (const UB *)
-            "{\"sequence\":%u,\"obstacle_mm\":%u,\"obstacle_valid\":true,\"line_bits\":%u}",
-            (unsigned int)sample->sequence, (unsigned int)sample->obstacle_mm,
-            (unsigned int)line_bits);
-    } else {
-        len = tm_sprintf(payload, (const UB *)
-            "{\"sequence\":%u,\"obstacle_mm\":null,\"obstacle_valid\":false,\"line_bits\":%u}",
-            (unsigned int)sample->sequence, (unsigned int)line_bits);
-    }
-    if (len < 0 || len >= capacity) return E_PAR;
-    for (i = 0; i <= len; ++i) out[i] = (char)payload[i];
-    return len;
+    INT len = s1_pack_telemetry(sample, line, now_ms, APP_IR_MAX_AGE_MS,
+                               out, capacity);
+    return len < 0 ? E_PAR : len;
 }
 
 EXPORT ER s1_submit_telemetry(const S1_TELEMETRY *sample)
@@ -76,17 +55,17 @@ EXPORT ER s1_submit_telemetry(const S1_TELEMETRY *sample)
     if (er != E_OK) return er;
     if (telemetry_mbf <= 0) return E_OBJ;
     msg.sample = *sample;
-    msg.sampled_ms = uptime_ms();
+    s1_write_u32(msg.sampled_ms, uptime_ms());
     return tk_snd_mbf(telemetry_mbf, &msg, sizeof(msg), TMO_POL);
 }
 
-EXPORT INT s1_network_poll(char *out, unsigned int capacity)
+EXPORT INT s1_network_poll(unsigned char *out, unsigned int capacity)
 {
     S1_OUTPUT msg, latest;
+    S1_LINE_TELEMETRY line = {{0}};
     INT count, size;
     BOOL have_latest = FALSE;
     if (out == NULL || capacity < S1_PAYLOAD_CAPACITY) return E_PAR;
-    out[0] = '\0';
     if (network_tx_mbf <= 0) return E_OBJ;
     /* Bounded work in the radio owner; discard old samples, keep newest. */
     for (count = 0; count < S1_QUEUE_DEPTH; ++count) {
@@ -94,13 +73,14 @@ EXPORT INT s1_network_poll(char *out, unsigned int capacity)
         if (size == E_TMOUT) break;
         if (size < 0) return size;
         if (size != (INT)sizeof(msg)) continue;
-        if ((UW)(uptime_ms() - msg.sampled_ms) > S1_FRESH_MS) continue;
+        if ((UW)(uptime_ms() - s1_read_u32(msg.sampled_ms)) > S1_FRESH_MS) continue;
         latest = msg;
         have_latest = TRUE;
     }
     if (!have_latest) return E_TMOUT;
-    return s1_format_telemetry(&latest.sample, &latest.line, uptime_ms(),
-                               out, (INT)capacity);
+    s1_write_u32(line.bytes, s1_read_u32(latest.line_sampled_ms));
+    line.bytes[4] = (UB)s1_line_bits(&latest.sample);
+    return s1_encode_telemetry(&latest.sample, &line, uptime_ms(), out, capacity);
 }
 
 S1_COMMAND s1_parse_command(const unsigned char *payload, unsigned int length)
@@ -136,18 +116,22 @@ static void wifi_status_task(INT stacd, void *exinf)
         S1_INPUT input;
         INT size = tk_rcv_mbf(telemetry_mbf, &input, 100);
         if (size == (INT)sizeof(input) &&
-            (UW)(uptime_ms() - input.sampled_ms) <= S1_FRESH_MS) {
+            (UW)(uptime_ms() - s1_read_u32(input.sampled_ms)) <= S1_FRESH_MS) {
             S1_OUTPUT output = {0};
             S3_LINE_DATA line = {0};
-            output.sampled_ms = input.sampled_ms;
-            output.sample = input.sample;
+            S1_LINE_TELEMETRY packed_line = {{0}};
+            s1_write_u32(output.sampled_ms, s1_read_u32(input.sampled_ms));
             /* S3 retains GPIO ownership. Its snapshot read never waits. */
             if (subsystem3_get_line(&line) == E_OK && line.valid &&
                 line.pattern <= 3U &&
                 (UW)(uptime_ms() - line.timestamp_ms) <= APP_IR_MAX_AGE_MS) {
-                output.line.bits = (UB)(S1_LINE_VALID | line.pattern);
-                output.line.timestamp_ms = line.timestamp_ms;
+                (void)s1_make_line(&packed_line, line.pattern, 1,
+                                   line.timestamp_ms);
             }
+            if (s1_encode_telemetry(&input.sample, &packed_line, uptime_ms(),
+                                    output.sample.bytes, sizeof(output.sample.bytes)) < 0)
+                continue;
+            s1_write_u32(output.line_sampled_ms, s1_read_u32(packed_line.bytes));
             /* Keep raw snapshots until the network poll so a queued IR
              * reading can expire without losing a fresh distance reading. */
             (void)tk_snd_mbf(network_tx_mbf, &output, sizeof(output), TMO_POL);
@@ -197,11 +181,11 @@ EXPORT ER subsystem1_init(void)
 
     mbf.mbfatr = TA_TFIFO;
     mbf.maxmsz = sizeof(S1_INPUT);
-    mbf.bufsz = S1_QUEUE_DEPTH * (sizeof(S1_INPUT) + sizeof(INT));
+    mbf.bufsz = S1_MBF_STORAGE(sizeof(S1_INPUT));
     telemetry_mbf = tk_cre_mbf(&mbf);
     if (telemetry_mbf < E_OK) return telemetry_mbf;
     mbf.maxmsz = sizeof(S1_OUTPUT);
-    mbf.bufsz = S1_QUEUE_DEPTH * (sizeof(S1_OUTPUT) + sizeof(INT));
+    mbf.bufsz = S1_MBF_STORAGE(sizeof(S1_OUTPUT));
     network_tx_mbf = tk_cre_mbf(&mbf);
     if (network_tx_mbf < E_OK) {
         tk_del_mbf(telemetry_mbf);

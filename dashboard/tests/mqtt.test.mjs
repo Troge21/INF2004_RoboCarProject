@@ -66,3 +66,19 @@ test('a subscribed dashboard stays empty until fresh telemetry arrives',()=>{
     c.disconnect();ws.receive(packet(0x30,body));assert.equal(store.history.length,2);
   }finally{c.disconnect();}
 });
+
+test('actual packed v2 bytes survive MQTT framing and reach the telemetry store',()=>{
+  const store=new TelemetryStore();
+  const c=new MqttConnection(options,{WebSocketClass:FakeSocket,onMessage:m=>store.ingest(m.payload,'telemetry',1000,m.retained,'auto',m.topic)});
+  try {
+    c.connect();const ws=FakeSocket.instances.at(-1);ws.open();
+    ws.receive(packet(0x20,new Uint8Array([0,0])));ws.receive(packet(0x90,new Uint8Array([0,1,0,0])));
+    const bytes=new Uint8Array([12,0,0,0,0xc3,0xe1]);
+    const frame=packet(0x30,concat(mqttString(options.telemetryTopic),bytes));
+    ws.receive(frame.subarray(0,5));assert.equal(store.sample,null);
+    ws.receive(frame.subarray(5));
+    assert.equal(store.sample.sequence,12);assert.equal(store.sample.obstacle_mm,451);
+    assert.deepEqual(store.sample.ir,[null,1,0]);assert.equal(store.lastPayloadBytes,6);
+    assert.deepEqual(store.packets[0].bytes,bytes);
+  } finally { c.disconnect(); }
+});
