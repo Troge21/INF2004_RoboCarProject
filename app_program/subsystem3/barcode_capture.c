@@ -1,3 +1,5 @@
+/* Barcode capture: sample GP26 using a timer interrupt and queue timestamped
+ * black/white transitions. Decoding is performed later by the S3 task. */
 #include "barcode_capture.h"
 #include "subsystem3.h"
 #include <sys/sysdef.h>
@@ -42,6 +44,7 @@ static void barcode_sample_isr(UINT intno)
     out_w(TIMER_ALARM2, in_w(TIMER_TIMERAWL) + S3_BC_SAMPLE_US);
 }
 
+/* Start timer alarm 2 sampling on core 0 and return the initial input state. */
 ER s3_capture_start(UW *now_us, BOOL *black)
 {
     T_DINT dint = {0};
@@ -71,6 +74,7 @@ ER s3_capture_start(UW *now_us, BOOL *black)
     return E_OK;
 }
 
+/* Read the oldest transition; report empty or lost capture data without waiting. */
 ER s3_capture_read(UW *now_us, BOOL *black)
 {
     ER er;

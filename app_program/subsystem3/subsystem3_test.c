@@ -1,3 +1,4 @@
+/* On-board barcode software checks, enabled only in TEST=1 builds. */
 #include "subsystem3.h"
 
 #if APP_TEST

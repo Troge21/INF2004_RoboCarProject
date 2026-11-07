@@ -1,22 +1,12 @@
-/* S3: centre/right line inputs and LEFT-sensor Code 39 acquisition. */
+/* S3 coordinates line readings and barcode scanning in one sensor task.
+ * Line steering and recovery are handled by the controller in app_main.c. */
 #include "subsystem3.h"
 #include "barcode_capture.h"
+#include "line_detection.h"
 
-static ID s_line_sem, s_barcode_mbf;
-static S3_LINE_DATA s_line;
+static ID s_barcode_mbf;
 
-EXPORT ER subsystem3_get_line(S3_LINE_DATA *sample)
-{
-    ER er;
-    if (sample == NULL) return E_PAR;
-    if (s_line_sem <= 0) return E_OBJ;
-    er = tk_wai_sem(s_line_sem, 1, TMO_POL);
-    if (er != E_OK) return er;
-    *sample = s_line;
-    (void)tk_sig_sem(s_line_sem, 1);
-    return sample->valid ? E_OK : E_TMOUT;
-}
-
+/* Barcode results: expose decoded events and queue new successful results. */
 EXPORT ER subsystem3_get_barcode(UB *code)
 {
     INT size;
@@ -40,10 +30,6 @@ static void barcode_result(int status, UB code, UW *rejected, UW *dropped)
 
 static void ir_task(INT stacd, void *exinf)
 {
-    const UINT pins[] = {
-        S3_BARCODE_PIN,
-        S3_IR_CENTRE_PIN, S3_IR_RIGHT_PIN,
-    };
     S3_BARCODE_DECODER decoder;
     UW stamp, rejected = 0, dropped = 0, lost = 0;
     UW last_report_ms = 0;
@@ -51,10 +37,11 @@ static void ir_task(INT stacd, void *exinf)
     UINT i;
     ER er;
     (void)stacd; (void)exinf;
-    for (i = 0; i < sizeof(pins)/sizeof(pins[0]); ++i) {
-        er = gpio_set_pin(pins[i], GPIO_MODE_IN);
-        if (er != E_OK) { CHECK(er, "IR gpio_set_pin"); tk_ext_tsk(); return; }
-    }
+    /* Sensor startup: configure inputs, start capture, reset the decoder. */
+    er = gpio_set_pin(S3_BARCODE_PIN, GPIO_MODE_IN);
+    if (er != E_OK) { CHECK(er, "IR gpio_set_pin"); tk_ext_tsk(); return; }
+    er = s3_line_configure();
+    if (er != E_OK) { CHECK(er, "IR gpio_set_pin"); tk_ext_tsk(); return; }
     er = s3_capture_start(&stamp, &black);
     if (er != E_OK) { CHECK(er, "barcode timer setup"); tk_ext_tsk(); return; }
     s3_barcode_reset(&decoder, black, stamp);
@@ -67,9 +54,9 @@ static void ir_task(INT stacd, void *exinf)
     }
     for (;;) {
         UB code;
-        UINT pattern = 0;
-        SYSTIM now;
-        /* A noisy input cannot cause an unbounded drain loop. */
+        S3_LINE_DATA line;
+        /* Barcode scanning: process a bounded batch of captured edges,
+         * handle capture loss, and pass decoder results to the queue. */
         for (i = 0; i < S3_BC_EDGE_CAPACITY; ++i) {
             int status;
             er = s3_capture_read(&stamp, &black);
@@ -87,33 +74,24 @@ static void ir_task(INT stacd, void *exinf)
             status = s3_barcode_edge(&decoder, black, stamp, &code);
             barcode_result(status, code, &rejected, &dropped);
         }
-        pattern = (gpio_get_val(S3_IR_CENTRE_PIN) == S3_IR_BLACK_LEVEL ? 2U : 0U)
-                | (gpio_get_val(S3_IR_RIGHT_PIN) == S3_IR_BLACK_LEVEL ? 1U : 0U);
-        (void)tk_get_tim(&now);
-        if (tk_wai_sem(s_line_sem, 1, TMO_POL) == E_OK) {
-            s_line.pattern = pattern; /* LEFT/BARCODE NEVER participates. */
-            s_line.timestamp_ms = (UW)now.lo;
-            s_line.valid = TRUE;
-            (void)tk_sig_sem(s_line_sem, 1);
-        }
-        if (S3_IR_LOG_ENABLED && (UW)((UW)now.lo - last_report_ms) >= 5000U) {
+        /* Line detection: read and publish the centre/right sensor pattern. */
+        s3_line_sample(&line);
+        if (S3_IR_LOG_ENABLED && (UW)(line.timestamp_ms - last_report_ms) >= 5000U) {
             tm_printf((UB *)"[IR] line C=%u R=%u pattern=%u; barcode rejected=%u lost=%u dropped=%u\n",
-                      (pattern >> 1) & 1U, pattern & 1U, pattern, rejected, lost, dropped);
-            last_report_ms = (UW)now.lo;
+                      (line.pattern >> 1) & 1U, line.pattern & 1U, line.pattern,
+                      rejected, lost, dropped);
+            last_report_ms = line.timestamp_ms;
         }
         (void)tk_dly_tsk(S3_IR_PERIOD_MS);
     }
 }
 
+/* Lifecycle: prepare the line lock and barcode queue before tasks start. */
 EXPORT ER subsystem3_init(void)
 {
-    T_CSEM sem = {0};
     T_CMBF mbf = {0};
-    sem.sematr = TA_TFIFO | TA_FIRST;
-    sem.isemcnt = sem.maxsem = 1;
-    s_line.valid = FALSE;
-    s_line_sem = tk_cre_sem(&sem);
-    if (s_line_sem < E_OK) return s_line_sem;
+    ER er = s3_line_init();
+    if (er != E_OK) return er;
     mbf.mbfatr = TA_TFIFO;
     mbf.bufsz = 64;
     mbf.maxmsz = 1;
@@ -121,6 +99,7 @@ EXPORT ER subsystem3_init(void)
     return s_barcode_mbf < E_OK ? s_barcode_mbf : E_OK;
 }
 
+/* Start the existing S3 sensor task on core 0. */
 EXPORT ER subsystem3_start(void)
 {
     ID tid = app_start_task((FP)ir_task, S3_PRI_IR, TP_PRC1, "ir_task");

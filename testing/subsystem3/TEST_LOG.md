@@ -91,3 +91,21 @@ Commit the firmware changes before the next recorded run, build and flash that r
 
 | Date | Test ID | Commit | Tester | Result | Log / evidence | Notes |
 |---|---|---|---|---|---|---|
+
+## Development check - line-reading extraction, 8 November 2026
+
+Local changes based on `0c2ff82`: line GPIO setup, sampling, semaphore and
+`subsystem3_get_line()` implementation moved into `line_detection.c/.h`.
+The existing S3 task still configures GP26, processes barcode edges, calls
+the line sampler, prints diagnostics and requests its 20 ms delay. Public
+interfaces, sensor pins/polarity, task priority/core, controller recovery and
+barcode capture/decoding settings are unchanged.
+
+`python testing/subsystem3/test_barcode.py`: all 12 host test groups passed,
+including the actual S3 task and snapshot API across all four centre/right
+patterns, both barcode levels, and line following enabled/disabled. The
+host harness now includes both source modules. Normal firmware compilation,
+linking and UF2 generation succeeded, including the new line module. The
+Windows-CRLF-aware whitespace check passed. The usual image is
+`build_make/mtk3pico_smp1_usb_cdc_wifi.uf2`; no extra UF2 copy was created.
+No firmware was flashed or physical sensor/driving test performed.

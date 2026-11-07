@@ -41,6 +41,7 @@ typedef struct {
     UW search_start_ms;
 } APP_LINE_TRACKER;
 
+/* Line steering: convert the centre/right pattern into motor duty requests. */
 static void app_line_speeds(UINT pattern, INT *left, INT *right)
 {
     if (left == NULL || right == NULL) return;
@@ -55,7 +56,9 @@ static void app_line_speeds(UINT pattern, INT *left, INT *right)
     }
 }
 
-/* Recover once per line loss; timeout stays stopped until reacquisition. */
+/* Line recovery: on both-white, search toward the last known side for a
+ * bounded time. Missing/stale data, no side history or timeout means stop;
+ * detecting black again resumes tracking. */
 static void app_track_line(APP_LINE_TRACKER *tracker, UINT pattern,
                            BOOL fresh, UW now_ms, INT *left, INT *right)
 {
@@ -84,6 +87,7 @@ static void app_track_line(APP_LINE_TRACKER *tracker, UINT pattern,
     else *left = APP_RECOVERY_DUTY;
 }
 
+/* Controller: read fresh S3 data, apply steering/recovery, send requests to S2. */
 static void vehicle_controller_task(INT stacd, void *exinf)
 {
     APP_LINE_TRACKER tracker = {0};

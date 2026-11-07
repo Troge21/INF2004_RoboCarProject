@@ -210,7 +210,8 @@ class BarcodeTests(unittest.TestCase):
     def compile_line_harness(self, pin, extra=None):
         directory = Path(self.temp.name)
         source = directory/f'line-{pin}.c'
-        actual = (ROOT/'app_program/subsystem3/subsystem3.c').read_text()
+        actual = '\n'.join((ROOT/'app_program/subsystem3'/name).read_text()
+                           for name in ('line_detection.c', 'subsystem3.c'))
         harness = Path(__file__).with_name('line_input_harness.c').read_text()
         source.write_text(harness.replace('/* SUBSYSTEM_SOURCE */', actual))
         executable = directory/(f'line-{pin}.exe' if os.name == 'nt' else f'line-{pin}')

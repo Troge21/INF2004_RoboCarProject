@@ -1,3 +1,5 @@
+/* Barcode decoding: turn measured black/white durations into a validated
+ * one-character Code 39 result, including forward/reverse scan direction. */
 #include "barcode_decoder.h"
 #include <stddef.h>
 
@@ -65,6 +67,8 @@ static int classify(const uint32_t *widths, unsigned *pattern, uint32_t *narrow)
     return 1;
 }
 
+/* Complete-frame validation: check widths, gaps, white margins, start/stop
+ * guards and the data character before returning a packed result. */
 int s3_barcode_decode(const uint32_t widths[S3_BC_RUNS],
                       uint32_t leading_white_us, uint32_t trailing_white_us,
                       uint8_t *code)
@@ -104,6 +108,8 @@ int s3_barcode_decode(const uint32_t widths[S3_BC_RUNS],
     return S3_BC_INVALID;
 }
 
+/* Streaming decoder: reset, poll and edge() collect a frame over successive
+ * calls, enforce timeouts, and wait for trailing white before reporting. */
 void s3_barcode_reset(S3_BARCODE_DECODER *decoder, int black, uint32_t now_us)
 {
     if (decoder == NULL) return;
