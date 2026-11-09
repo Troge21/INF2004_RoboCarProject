@@ -53,11 +53,13 @@ static int classify(const uint32_t *widths, unsigned *pattern, uint32_t *narrow)
     for (i = 6; i < 9U; ++i) w += sorted[i];
     n /= 6U;
     w /= 3U;
+    /* Empirical sensor allowance: mean wide/narrow ratio 1.8 through 4.0. */
     if (n < S3_BC_MIN_NARROW_US || n > S3_BC_MAX_NARROW_US ||
-        w * 10U < n * 18U || w * 10U > n * 34U) return 0;
+        w * 10U < n * 18U || w * 10U > n * 40U) return 0;
     for (i = 0; i < 9U; ++i) {
         uint32_t mean = i < 6U ? n : w;
-        if (sorted[i] * 4U < mean * 3U || sorted[i] * 4U > mean * 5U) return 0;
+        /* Allow +/-40% around each cluster mean for hand-scan variation. */
+        if (sorted[i] * 5U < mean * 3U || sorted[i] * 5U > mean * 7U) return 0;
     }
     /* A clear split is necessary even at the tolerance boundaries. */
     if (sorted[6] * 10U < sorted[5] * 14U) return 0;

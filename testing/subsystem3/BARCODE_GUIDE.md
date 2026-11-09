@@ -50,12 +50,18 @@ the capture and flushes old edges. This detects observed sampling delays;
 it cannot recover a pulse that occurs entirely between samples.
 
 The accepted nominal narrow-element interval is 2-100 ms. Wide elements must
-form a separate cluster with a mean ratio of 1.8-3.4 times narrow. Elements
-within either cluster must lie within 25% of its mean, and character-to-character
+form a separate cluster with a mean ratio of 1.8-4.0 times narrow. Elements
+within either cluster must lie within 40% of its mean, and character-to-character
 narrow means must differ by no more than 40%. These are prototype tolerances,
-not measured sensor guarantees. An uninterrupted element over 350 ms or a
+not measured sensor guarantees. An uninterrupted element over 600 ms or a
 frame over 8 seconds times out. Motion must remain reasonably steady during
 a scan; sharp steering or stopping halfway through a barcode can invalidate it.
+The 40% consistency tolerance accommodates the recorded reverse A hand scan
+from 9 November 2026. Replay passes in software; repeat physical scans to assess
+recognition reliability. Wider tolerance also admits more distorted inputs.
+The empirical 4.0 ratio ceiling accommodates the recorded reverse F frame
+with measured ratios of 3.84 and 3.78. It is a prototype sensor allowance,
+not a claim about printed Code 39 specification limits or physical accuracy.
 
 White quiet zones must last at least ten estimated narrow widths at BOTH
 ends. Leave generous white margins when printing/cutting the supplied samples;
@@ -85,6 +91,7 @@ inventory and before/after RAM/timing evidence remain separate work.
    files are picked up by the existing wildcard source rule. Rebuild after changing settings so the UF2 matches the intended mode.
 3. Open the USB serial monitor. Expect an IR setup line containing
    `barcode=GP26` and `barcode sample=500 us`. A setup error is not a valid scan.
+   The timing-log build also prints `trace=BC-TRACE-1` on startup.
 4. Move the A label steadily across the left sensor, including white space
    before and after the bars. Expected decoded output:
    `[BARCODE] 'A' scan=forward (character only; no motor action)`.
@@ -93,6 +100,15 @@ inventory and before/after RAM/timing evidence remain separate work.
 6. Try partial labels, stopping on black, insufficient white margins, and a
    very fast pass. These must not result in a navigation action. Diagnostic
    `rejected`/`lost` counters help distinguish decode and acquisition failures.
+   A new rejection prints three lines: `[BARCODE] REJECT ...`, `[BARCODE]
+   timing ...`, and `[BARCODE] runs_us=...`. Copy all three from one pass.
+   `INVALID_FRAME` is a complete frame that failed validation;
+   `TRAILING_WHITE_INTERRUPTED` is a candidate interrupted by new black before
+   enough trailing white. `RUN_TIMEOUT` and `FRAME_TIMEOUT` distinguish a
+   section over 600 ms from an entire frame over 8 seconds. For timeouts,
+   `runs_us` contains only completed sections; `timing run_us` is the unfinished
+   section. `CAPTURE_LOST` means the capture driver discarded unreliable data.
+   These logs preserve the existing decoder limits and state layout.
 7. Record sensor height, lighting, printed barcode dimensions, direction,
    scan speed, expected/actual character and counter changes. Run at least
    ten trials per sample/direction before claiming recognition accuracy.

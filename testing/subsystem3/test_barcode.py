@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import random
+import re
 import shutil
 import subprocess
 import tempfile
@@ -17,6 +18,9 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 VECTORS = json.loads(Path(__file__).with_name('barcode_vectors.json').read_text())
 MASK = 0xffffffff
+MAX_RUN_US = int(re.search(r'^#define\s+S3_BC_MAX_RUN_US\s+(\d+)U',
+                         (ROOT/'app_program/subsystem3/barcode_decoder.h').read_text(),
+                         re.MULTILINE).group(1))
 
 
 class Decoder(c.Structure):
@@ -137,7 +141,7 @@ class BarcodeTests(unittest.TestCase):
         corrupt = base.copy(); corrupt[28] = 15000; cases.append(corrupt)
         corrupt = base.copy(); corrupt[9] = 0xffffffff; cases.append(corrupt)
         cases += [widths('A', 1000), widths('A', 110000), widths('A', 5000, 1.3),
-                  widths('A', 5000, 4), widths('*')]
+                  widths('A', 5000, 4.2), widths('*')]
         for runs in cases:
             self.assertEqual(self.decode(runs), (2, 0))
         self.assertEqual(self.decode(base, lead=49999), (2, 0))
@@ -145,6 +149,78 @@ class BarcodeTests(unittest.TestCase):
         corrupt = base.copy()
         for i in range(20, 29): corrupt[i] *= 2
         self.assertEqual(self.decode(corrupt), (2, 0))
+
+    def test_recorded_reverse_a_hand_scan(self):
+        # Actual 9 November trace: rejected by the former +/-25% check.
+        runs = [74016, 72523, 197040, 61543, 220537, 52507, 72008, 144521,
+                43510, 62005, 114018, 57008, 55009, 180019, 40007, 76011,
+                66009, 67514, 240036, 76513, 66008, 73506, 210630, 73028,
+                151034, 67015, 56010, 154033, 61009]
+        expected = 0x80 | 0x40 | VECTORS['alphabet'].index('A')
+        self.assertEqual(self.decode(runs), (1, expected))
+        decoder, now, events = self.scan(runs)
+        self.assertEqual(events, [])
+        self.assertEqual(decoder.pending, 1)
+        quiet = decoder.quiet
+        self.assertEqual(quiet, 660960)
+        self.assertEqual(self.poll(decoder, now+quiet-1), (0, 0))
+        self.assertEqual(self.poll(decoder, now+quiet), (1, expected))
+        self.assertEqual(self.lib.s3_barcode_character(expected), b'A')
+        self.assertEqual(self.poll(decoder, now+quiet+1), (0, 0))
+
+    def test_recorded_reverse_f_scan(self):
+        # Complete recorded F frame: previous 3.4 ratio limit rejected it.
+        runs = [64012, 50010, 156570, 48508, 145019, 48513, 43508, 144058,
+                63011, 86516, 49225, 38016, 47505, 170572, 185051, 42508,
+                172024, 49010, 48502, 45029, 50020, 41510, 175538, 44506,
+                134518, 46509, 42508, 202027, 46006]
+        expected = 0x80 | 0x40 | VECTORS['alphabet'].index('F')
+        self.assertEqual(self.decode(runs), (1, expected))
+        decoder, now, events = self.scan(runs)
+        self.assertEqual(events, [])
+        self.assertEqual(decoder.pending, 1)
+        self.assertEqual(decoder.quiet, 451760)
+        self.assertEqual(self.poll(decoder, now+451759), (0, 0))
+        self.assertEqual(self.poll(decoder, now+451760), (1, expected))
+        self.assertEqual(self.lib.s3_barcode_character(expected), b'F')
+        self.assertEqual(self.poll(decoder, now+451761), (0, 0))
+
+    def test_wide_narrow_ratio_boundaries(self):
+        for char in VECTORS['alphabet']:
+            for reverse in (False, True):
+                for ratio, valid in ((1.79, False), (1.8, True),
+                                     (4.0, True), (4.01, False)):
+                    with self.subTest(char=char, reverse=reverse, ratio=ratio):
+                        status, code = self.decode(widths(char, 12000, ratio, reverse))
+                        if valid:
+                            self.assertEqual(status, 1)
+                            self.assertEqual(self.lib.s3_barcode_character(code).decode(), char)
+                            self.assertEqual(bool(code & 64), reverse)
+                        else:
+                            self.assertEqual((status, code), (2, 0))
+
+    def test_cluster_tolerance_boundaries(self):
+        # Balance changes so cluster means stay fixed at 12000/36000 us.
+        # Exact +/-40% passes; a 1 us excursion beyond either end fails.
+        for bit, mean in (('0', 12000), ('1', 36000)):
+            indices = [i for i, b in enumerate(VECTORS['patterns']['*']) if b == bit]
+            lower, upper = mean*3//5, mean*7//5
+            for excursion in ('boundary', 'below', 'above'):
+                with self.subTest(cluster=bit, excursion=excursion):
+                    runs = widths('A', narrow=12000)
+                    runs[indices[0]], runs[indices[1]] = lower, upper
+                    if excursion == 'below':
+                        runs[indices[0]] -= 1
+                        runs[indices[2]] += 1
+                    elif excursion == 'above':
+                        runs[indices[1]] += 1
+                        runs[indices[2]] -= 1
+                    status, code = self.decode(runs)
+                    if excursion == 'boundary':
+                        self.assertEqual(status, 1)
+                        self.assertEqual(self.lib.s3_barcode_character(code), b'A')
+                    else:
+                        self.assertEqual((status, code), (2, 0))
 
     def test_stream_reports_once_after_trailing_quiet(self):
         for char in ('A', 'Z', '0', '%'):
@@ -165,8 +241,9 @@ class BarcodeTests(unittest.TestCase):
 
     def test_partial_and_stuck_signal_timeout(self):
         decoder, now, _ = self.scan(widths('A')[:10])
-        self.assertEqual(self.poll(decoder, now+350001), (3, 0))
-        self.assertEqual(self.poll(decoder, now+700000), (0, 0))
+        self.assertEqual(self.poll(decoder, now+MAX_RUN_US), (0, 0))
+        self.assertEqual(self.poll(decoder, now+MAX_RUN_US+1), (3, 0))
+        self.assertEqual(self.poll(decoder, now+MAX_RUN_US+2), (0, 0))
         self.lib.s3_barcode_reset(c.byref(decoder), 1, now)
         self.assertEqual(self.poll(decoder, now+1000000), (0, 0))
 

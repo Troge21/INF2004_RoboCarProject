@@ -9,7 +9,7 @@
 #define S3_BC_RUNS             29U
 #define S3_BC_MIN_NARROW_US    2000U
 #define S3_BC_MAX_NARROW_US    100000U
-#define S3_BC_MAX_RUN_US       350000U
+#define S3_BC_MAX_RUN_US       600000U
 #define S3_BC_FRAME_TIMEOUT_US 8000000U
 #define S3_BC_QUIET_CAP_US     1000000U
 #define S3_BC_VALID            0x80U

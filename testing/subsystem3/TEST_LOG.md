@@ -109,3 +109,62 @@ linking and UF2 generation succeeded, including the new line module. The
 Windows-CRLF-aware whitespace check passed. The usual image is
 `build_make/mtk3pico_smp1_usb_cdc_wifi.uf2`; no extra UF2 copy was created.
 No firmware was flashed or physical sensor/driving test performed.
+
+## Barcode rejection timing log - 9 November 2026
+
+The user reports new rejections on each complete pass of a different label,
+confirmed to encode one Code 39 A. Added `BC-TRACE-1` startup identification and
+task-side rejection traces: status, completed run count, leading quiet time,
+current run/frame timing, required trailing quiet when relevant, and completed
+run widths. Capture loss also prints a separate message. Timeout metadata is
+saved before decoder resets or a new candidate starts at the same edge.
+
+The decoder, capture driver, accepted ratios/tolerances and binary result
+format are unchanged. The user's disabled line-following setting, 25/15 duty
+settings and 300 ms recovery are preserved. All 12 host test groups pass;
+the actual S3 task harness now checks invalid frames, interrupted trailing
+white, run/frame timeouts, old-frame metadata during an edge timeout, and
+successful A publication once. A new physical rejection trace is still needed
+to establish the cause; software checks alone do not establish recognition.
+
+The normal ARM firmware build and usual UF2 generation succeeded. The UF2
+payload contains the `BC-TRACE-1` marker and rejection status strings.
+No firmware was flashed; no extra UF2 copy was created.
+
+## Barcode width tolerance - 9 November 2026
+
+At the user's request, increased within-cluster width consistency from +/-25%
+to +/-40% in `barcode_decoder.c`. Wide/narrow ratio limits, cluster separation,
+character-to-character speed checks, gaps, quiet zones and timeouts are unchanged.
+The user's line-following and motor settings are preserved.
+
+All 14 host test groups pass. The latest recorded 29-run hand scan now decodes
+as reverse A, waits for its required 660960 us trailing white, and reports once.
+Additional tests accept both cluster boundaries at exactly +/-40% and reject
+1 us excursions beyond either boundary. Existing malformed-input, capture and
+task tests pass. The normal ARM build and usual UF2 generation succeeded;
+no extra image was created and no firmware was flashed. Wider acceptance needs
+repeated physical trials to assess recognition and false-positive behaviour.
+
+## Recorded reverse F ratio adjustment - 9 November 2026
+
+The latest complete 29-run F frame matches the reverse *F* pattern. Consistency,
+cluster separation, inter-character gaps, leading quiet and character speed
+checks pass. It was rejected solely by the 3.4 upper wide/narrow ratio bound:
+the data and stop characters measure approximately 3.84 and 3.78. Increased
+the empirical upper ratio bound to 4.0, retaining the 1.8 lower bound and all
+other decoder checks. The user's 600 ms section timeout and motor/line settings
+are preserved. This allowance does not establish printed-code compliance.
+
+All 16 host test groups pass. The recorded frame decodes as reverse F and waits
+for 451760 us trailing white before reporting once. New ratio tests cover the
+entire alphabet in both directions: 1.8 and 4.0 accepted, 1.79 and 4.01 rejected.
+The existing ratio-4 rejection case was deliberately replaced with ratio 4.2
+to reflect the new acceptance range. Timeout tests now use the configured run
+limit instead of assuming 350 ms, including checks at the boundary and 1 us
+beyond it. Existing malformed-input, capture and task checks still pass.
+
+Normal ARM compilation, linking and the usual UF2 generation succeeded. No
+extra UF2 was created or firmware flashed. The separate incomplete captures
+still need investigation; repeated physical recognition and wrong-letter rates
+have not been established by this software replay.

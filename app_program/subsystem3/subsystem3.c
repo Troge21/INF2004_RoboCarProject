@@ -17,15 +17,45 @@ EXPORT ER subsystem3_get_barcode(UB *code)
     return size == 1 ? E_OK : (size < E_OK ? size : E_IO);
 }
 
-static void barcode_result(int status, UB code, UW *rejected, UW *dropped)
+/* Save diagnostic timing before the decoder advances/reset its frame.
+ * All printing stays in this task; capture and decoding rules are unchanged. */
+static void barcode_process(S3_BARCODE_DECODER *decoder, UW stamp, BOOL black,
+                            BOOL is_edge, UW *rejected, UW *dropped)
 {
+    UB code;
+    UINT count = decoder->count, i;
+    UW run_us = stamp - decoder->last_edge_us;
+    UW frame_us = stamp - decoder->frame_start_us;
+    UW leading_us = decoder->leading_white_us;
+    BOOL pending = decoder->pending;
+    UW trailing_us = pending ? decoder->quiet_needed_us : 0;
+    int status = is_edge ? s3_barcode_edge(decoder, black, stamp, &code)
+                         : s3_barcode_poll(decoder, stamp, &code);
     ER er;
     if (status == S3_BC_OK) {
         er = tk_snd_mbf(s_barcode_mbf, &code, 1, TMO_POL);
         if (er != E_OK) ++*dropped;
         if (er != E_OK && S3_IR_LOG_ENABLED)
             tm_printf((UB *)"[BARCODE] result queue full: new result dropped\n");
-    } else if (status == S3_BC_INVALID || status == S3_BC_TIMEOUT) ++*rejected;
+    } else if (status == S3_BC_INVALID || status == S3_BC_TIMEOUT) {
+        const char *reason;
+        ++*rejected;
+        if (!S3_IR_LOG_ENABLED) return;
+        if (status == S3_BC_TIMEOUT)
+            reason = run_us > S3_BC_MAX_RUN_US ? "RUN_TIMEOUT" : "FRAME_TIMEOUT";
+        else {
+            count = decoder->count;
+            reason = pending ? "TRAILING_WHITE_INTERRUPTED" : "INVALID_FRAME";
+        }
+        tm_printf((UB *)"[BARCODE] REJECT %s; runs=%u/%u; leading_white_us=%u\n",
+                  reason, count, S3_BC_RUNS, leading_us);
+        tm_printf((UB *)"[BARCODE] timing run_us=%u frame_us=%u trailing_needed_us=%u\n",
+                  run_us, frame_us, trailing_us);
+        tm_printf((UB *)"[BARCODE] runs_us=");
+        for (i = 0; i < count && i < S3_BC_RUNS; ++i)
+            tm_printf((UB *)"%s%u", i == 0U ? "" : ",", decoder->widths[i]);
+        tm_printf((UB *)"\n");
+    }
 }
 
 static void ir_task(INT stacd, void *exinf)
@@ -46,6 +76,8 @@ static void ir_task(INT stacd, void *exinf)
     if (er != E_OK) { CHECK(er, "barcode timer setup"); tk_ext_tsk(); return; }
     s3_barcode_reset(&decoder, black, stamp);
     if (S3_IR_LOG_ENABLED) {
+        tm_printf((UB *)"[BARCODE] trace=BC-TRACE-1; max_run_us=%u frame_timeout_us=%u\n",
+                  S3_BC_MAX_RUN_US, S3_BC_FRAME_TIMEOUT_US);
         tm_printf((UB *)"[IR] barcode=GP%u; barcode sample=%u us; black level=%u\n",
                   S3_BARCODE_PIN, S3_BC_SAMPLE_US, S3_BARCODE_BLACK_LEVEL);
         tm_printf((UB *)"[IR] line centre=GP%u right=GP%u; 1=black; follow=%u; recovery=%u ms\n",
@@ -53,26 +85,24 @@ static void ir_task(INT stacd, void *exinf)
                   (UINT)(APP_LINE_FOLLOW_ENABLED && !APP_TEST), APP_RECOVERY_TIMEOUT_MS);
     }
     for (;;) {
-        UB code;
         S3_LINE_DATA line;
         /* Barcode scanning: process a bounded batch of captured edges,
          * handle capture loss, and pass decoder results to the queue. */
         for (i = 0; i < S3_BC_EDGE_CAPACITY; ++i) {
-            int status;
             er = s3_capture_read(&stamp, &black);
             if (er == E_IO) {
                 s3_barcode_reset(&decoder, black, stamp);
                 ++lost;
+                if (S3_IR_LOG_ENABLED)
+                    tm_printf((UB *)"[BARCODE] CAPTURE_LOST; frame discarded\n");
                 break;
             }
             if (er == E_TMOUT) {
-                status = s3_barcode_poll(&decoder, stamp, &code);
-                barcode_result(status, code, &rejected, &dropped);
+                barcode_process(&decoder, stamp, black, FALSE, &rejected, &dropped);
                 break;
             }
             if (er != E_OK) break;
-            status = s3_barcode_edge(&decoder, black, stamp, &code);
-            barcode_result(status, code, &rejected, &dropped);
+            barcode_process(&decoder, stamp, black, TRUE, &rejected, &dropped);
         }
         /* Line detection: read and publish the centre/right sensor pattern. */
         s3_line_sample(&line);

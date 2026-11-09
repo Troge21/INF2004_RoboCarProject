@@ -32,8 +32,8 @@
 #define APP_CONTROL_PERIOD_MS    20
 #define APP_IR_MAX_AGE_MS        100U
 #define APP_START_DELAY_MS       3000
-#define APP_FORWARD_DUTY         25
-#define APP_INNER_DUTY           20
+#define APP_FORWARD_DUTY         20
+#define APP_INNER_DUTY           15
 /* On all-white, pivot forward toward the last known side, then stop.
  * No side history means stop immediately. Both-black preserves history. */
 #define APP_RECOVERY_DUTY        20
