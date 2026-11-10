@@ -110,6 +110,55 @@ EXPORT void subsystem1_test(void)
     TEST_CHECK("S1-U47", s1_make_telemetry(&sample, 1, 4096U + 451U, 1) == S1_CODEC_INVALID &&
                s1_make_line(&line, 4, 1, 1000) == S1_CODEC_INVALID,
                "raw values rejected before masking could turn them into valid data");
+    {
+        S1_IMU_TELEMETRY imu;
+        const UB frame[11] = {1,0,0,0,0xc3,0xe1,0x1b,0x64,0x88,0x14,0};
+        (void)s1_make_telemetry(&sample, 1, 451, 1);
+        (void)s1_make_line(&line, 2, 1, 1000);
+        len = s1_make_imu(&imu, 150, 12, 34, 2, 0x11, 1000, 1000);
+        TEST_CHECK("S1-U48", len == 0 && sizeof(imu) == 13 &&
+            s1_pack_frame(&sample, &line, &imu, 1000, 100, payload, sizeof(payload)) == 11 &&
+            same_bytes(payload, frame, 11), "V3 matches independent 11-byte pitch/height golden vector");
+        (void)s1_make_imu(&imu, -900, 0, 0, 2, 0x11, 1000, 1000);
+        (void)s1_pack_frame(&sample, NULL, &imu, 1000, 100, payload, sizeof(payload));
+        len = payload[6] == 1 && (payload[7] & 7U) == 0;
+        (void)s1_make_imu(&imu, 900, 80, 80, 2, 0x31, 1000, 1000);
+        (void)s1_pack_frame(&sample, NULL, &imu, 1000, 100, payload, sizeof(payload));
+        TEST_CHECK("S1-U49", len && (s1_read_u32(payload + 6) & 2047U) == 1801U,
+            "full signed pitch range and maximum accepted height fit without truncation");
+        TEST_CHECK("S1-U50", s1_make_imu(&imu, 901, 0, 0, 2, 0x11, 0, 0) < 0 &&
+            s1_make_imu(&imu, -901, 0, 0, 2, 0x11, 0, 0) < 0 &&
+            s1_make_imu(&imu, 0, 81, 81, 2, 1, 0, 0) < 0 &&
+            s1_make_imu(&imu, 0, 0, 0, 8, 1, 0, 0) < 0,
+            "IMU raw range errors rejected before packing");
+        (void)s1_make_imu(&imu, 150, 12, 34, 2, 0x11, 1000, 1000);
+        (void)s1_pack_frame(&sample, NULL, &imu, 1100, 100, payload, sizeof(payload));
+        len = (s1_read_u32(payload + 6) & 2047U) == 1051U;
+        (void)s1_pack_frame(&sample, NULL, &imu, 1101, 100, payload, sizeof(payload));
+        len = len && (s1_read_u32(payload + 6) & 2047U) == 0U &&
+            ((s1_read_u32(payload + 6) >> 18) & 127U) == 34U;
+        (void)s1_pack_frame(&sample, NULL, &imu, 2001, 100, payload, sizeof(payload));
+        TEST_CHECK("S1-U51", len && s1_read_u32(payload + 6) == (7U << 25) && payload[10] == 0,
+            "queued pitch expires independently, then the whole stale IMU block expires");
+        (void)s1_make_imu(&imu, -150, 0, 0, 2, 0x11, 0xfffffff0U, 0xfffffff0U);
+        (void)s1_pack_frame(&sample, NULL, &imu, 16, 100, payload, sizeof(payload));
+        len = (s1_read_u32(payload + 6) & 2047U) == 751U;
+        (void)s1_make_imu(&imu, 0, 0, 0, 2, 0x11, 17, 17);
+        (void)s1_pack_frame(&sample, NULL, &imu, 16, 100, payload, sizeof(payload));
+        TEST_CHECK("S1-U52", len && s1_read_u32(payload + 6) == (7U << 25),
+            "IMU freshness handles uptime wrap and rejects future source time");
+        imu.bytes[4] |= 0x80U; payload[0] = 0xa5;
+        TEST_CHECK("S1-U53", s1_pack_frame(&sample, NULL, &imu, 17, 100, payload, sizeof(payload)) < 0 &&
+            payload[0] == 0xa5, "reserved IMU bits rejected without changing output");
+        TEST_CHECK("S1-U54", s1_pack_frame(&sample, NULL, NULL, 0, 100, small, sizeof(small)) < 0 &&
+            small[0] == 0xa5 && s1_pack_frame(&sample, NULL, NULL, 0, 100, NULL, 11) < 0,
+            "V3 buffer boundaries preserved");
+        TEST_CHECK("S1-U55", s1_make_imu(&imu, 0, 20, 12, 2, 1, 0, 0) < 0 &&
+            s1_make_imu(&imu, 0, 0, 0, 6, 0x91, 0, 0) < 0 &&
+            s1_make_imu(&imu, 0, 0, 0, 7, 1, 0, 0) < 0 &&
+            s1_make_imu(&imu, 0, 0, 0, 1, 0x11, 0, 0) < 0,
+            "contradictory validity, unavailable fields and height ordering rejected");
+    }
 #ifdef PICO_RP2040
     {
         UW raw_before, elapsed_us, tick;

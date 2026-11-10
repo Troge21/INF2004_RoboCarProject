@@ -59,6 +59,8 @@ typedef enum {
 #define S4_FLAG_HUMP_ACTIVE         (1U << 1)
 #define S4_FLAG_NEW_HUMP_EVENT      (1U << 2)
 #define S4_FLAG_MAX_UPDATED         (1U << 3)
+#define S4_FLAG_PITCH_VALID         (1U << 4) /* Fresh, calibrated sensor sample */
+#define S4_FLAG_SPEED_SUPPLIED      (1U << 5) /* Speed setter used; otherwise nominal */
 #define S4_FLAG_FAULT               (1U << 7)
 
 /*
@@ -73,7 +75,8 @@ typedef struct {
     uint8_t     state;              /* S4_STATE_E */
     uint8_t     flags;              /* S4_FLAG_* bitmask */
     uint32_t    traversal_time_ms;  /* Duration of the current/last hump */
-    uint32_t    timestamp_ms;       /* Kernel uptime timestamp in ms */
+    uint32_t    timestamp_ms;       /* Snapshot publication uptime; not getter time */
+    uint32_t    pitch_timestamp_ms; /* Last successful acceleration sample uptime */
 } HUMP_TELEMETRY_T;
 
 /* -------------------------------------------------------------------------
@@ -99,8 +102,10 @@ EXPORT ER subsystem4_get_telemetry(HUMP_TELEMETRY_T *p_telemetry);
 EXPORT ER subsystem4_reset_run(void);
 
 /*
- * Dynamic speed update from Subsystem 2 (Motor Encoders).
- * Improves height estimation accuracy across varying speeds.
+ * Dynamic measured speed update from Subsystem 2 (Motor Encoders).
+ * Zero is a valid stationary speed. Applied by the IMU owner task.
+ * Without this input, S4_FLAG_SPEED_SUPPLIED stays clear and estimates
+ * still use S4_DEFAULT_SPEED_MM_S; they are not encoder-validated heights.
  */
 EXPORT void subsystem4_set_speed_mm_s(uint16_t speed_mm_s);
 

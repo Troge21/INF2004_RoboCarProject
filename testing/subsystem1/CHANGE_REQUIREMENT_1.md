@@ -1,5 +1,10 @@
 # Change Requirement 1 for WiFi communication and telemetry
 
+**Stage record:** this report describes the original JSON-to-v2 conversion.
+The subsequent v3 extension and current build are documented in
+[IMU telemetry](IMU_TELEMETRY.md); its new fields, RAM costs and pending
+hardware tests are separate from the before/after figures below.
+
 Recorded 6 November 2026. Source: the professor-provided **Change Requirement
 1.docx**, titled "Minimum-Bit Data Representation". This is an implementation
 and evidence record for the current S1 telemetry path, not a declaration that
@@ -242,15 +247,17 @@ node --test dashboard/tests/*.test.mjs
 
 Linux/WSL can use `gcc` with the same flags and temporary output paths.
 Use the normal project firmware build with `NET=lwip MQTT=1 TEST=1`.
-The packed image is `build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2`;
-the old JSON image is preserved locally with `_before_cr1` in its filename.
+The standard output is `build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2`.
+It now contains the later IMU/v3 implementation, not this historical v2 stage.
+Old baseline images and duplicate variants were removed on 6 November at the
+user's request; the captured hashes, size measurements and logs remain.
 Firmware binaries contain local network settings: do not upload them as
 evidence. They remain ignored by Git; keep source fingerprints and reports.
 
-When ready for the hardware check, flash the new UF2, restart normally, and
-select **Auto** or **Packed v2** in the dashboard (not Legacy JSON). Verify
-six-byte accepted telemetry, five-byte heartbeats, real measurements and
-unavailable states. A text terminal subscriber will show binary characters;
+For the current hardware check, follow [the IMU/v3 guide](IMU_TELEMETRY.md),
+select **Auto** or **Packed v3**, and expect 11-byte telemetry with five-byte
+heartbeats. The six-byte v2 trials belong to this earlier stage. Verify real
+measurements and unavailable states. A text terminal subscriber shows binary characters;
 use the dashboard's decoded/hex inspector rather than expecting JSON text.
 
 ## Remaining project coverage

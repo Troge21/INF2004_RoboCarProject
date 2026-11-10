@@ -1,0 +1,1 @@
+/* No physical BSP operations in offline application tests. */

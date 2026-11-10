@@ -38,8 +38,9 @@ after changing firmware or its WiFi/broker settings.
    already running. Leave it open.
 4. Power the Pico normally, **without BOOTSEL**. Open
    **http://127.0.0.1:4173**, click **Connect robot**, and use the connection
-   settings below. For the local bench, use `ws://127.0.0.1:9001`, select
-   **Auto** or **Packed v2**, and leave broker username/password empty.
+   settings below. For the local bench, use `ws://127.0.0.1:9001` and leave
+   broker username/password empty. Packed v3 is fixed automatically; there
+   is no decoder selector.
 
 An optional PowerShell diagnostic subscriber is:
 
@@ -51,10 +52,25 @@ It waits silently when no messages arrive. It is not needed by the dashboard.
 Use the same WiFi address as the car-facing listener, rather than the separate
 broker on `127.0.0.1:1883`. Stop each foreground server/subscriber with Ctrl+C.
 
+## Rebuild firmware after pulling changes
+
+From an Ubuntu/WSL terminal at the repository root (the SDK path below is
+this laptop's existing installation):
+
+```sh
+make -B -C build_make PICO_SDK_PATH=/opt/robocar/pico-sdk-2.2.0 NET=lwip MQTT=1 TEST=1 -j8
+```
+
+Flash only `build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2`.
+`-B` recompiles all objects, including newly pulled files, and avoids reusing
+objects from another build profile. `TEST=1` is the current stationary
+sensor/communication build: it deliberately disables automatic driving.
+Pulling Git source alone does not update the Pico or the existing UF2.
+
 ## Features
 
 - Overview: latest readings, two wheel-speed traces, obstacle-distance history, robot status, digital IR indicators, faults and activity feed.
-- Sensors & motion: wheel speed, ultrasonic distance, hump height, run maximum, cumulative distance, IR readings and a servo scan profile.
+- Sensors & motion: wheel speed, ultrasonic distance, live IMU pitch/status, hump estimates and their speed assumption, run maximum, cumulative distance, IR readings and a servo scan profile.
 - Communications: delivery intervals, heartbeat age, subscriptions, payload sizes, sequence gaps, rejected messages, decoded/raw packet inspector and recent messages.
 - Last 30 / 60 / 120 seconds, chart hover values, pause display while continuing collection, and CSV export of received telemetry with `source=mqtt`.
 - **Command buttons stay disabled** until firmware integration: the current firmware does not route received commands to the controller. The dashboard sends no motor commands.
@@ -87,26 +103,39 @@ Use the locally served dashboard, click **Connect robot**, and enter:
 | Broker URL | `ws://localhost:9001` |
 | Telemetry topic | `mtk3smp-pico/telemetry` |
 | Heartbeat topic | `mtk3smp-pico/heartbeat` |
-| Decoder | Auto or Packed v2 |
+| Telemetry format | Packed v3, fixed automatically (11 bytes) |
 
 These topics match `config/wifi_secrets.example.h`. Change them if your firmware overrides the client ID/topics. The dashboard does not read your secrets file. Username/password, if supplied, are held only in tab memory for reconnects; input fields are cleared when the settings close. Disconnect using **Disconnect** in the connection settings.
 
 Build/flash the WiFi/MQTT firmware (`NET=lwip MQTT=1 TEST=1` for stationary
-bench testing; normal driving is disabled). The newly built firmware publishes
-**six-byte packed v2 telemetry** and **five-byte binary heartbeats** on the
-same topics. Select **Auto** or **Packed v2**, rather than Legacy JSON.
-For sequence 12, distance 451 mm and left line black/right background, the
-actual payload is:
+bench testing; normal driving is disabled). The new IMU build publishes
+**11-byte packed v3 telemetry** and **five-byte binary heartbeats** on the
+same topics. Flash `build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2`.
+This is the single current UF2; the identical `_imu` alias and obsolete
+firmware variants were removed on 6 November at the user's request.
+The dashboard now accepts only the current 11-byte telemetry and five-byte
+binary heartbeats. There is no decoder selector. Reflash the current UF2
+before using this dashboard if the car still runs older six-byte/JSON firmware.
+After pulling website changes, refresh the browser so it loads the new scripts.
+
+V3 adds live pitch, IMU state, last accepted hump and run maximum to the
+unchanged distance/IR prefix. The dashboard shows a Vehicle pitch graph and
+IMU & height status under Sensors & motion. Heights use nominal 150 mm/s
+until encoder speed is supplied; their accuracy remains unverified. Zero
+height codes mean no accepted hump yet, not a measured zero. Missing/faulted
+or stale pitch is unavailable. See the [IMU integration and test guide](../testing/subsystem1/IMU_TELEMETRY.md).
+
+For sequence 1, 451 mm, left black/right background, pitch +15.0 degrees,
+last accepted height 12 mm, maximum 34 mm and monitoring at nominal speed:
 
 ```text
-0c 00 00 00 c3 e1
+01 00 00 00 c3 e1 1b 64 88 14 00
 ```
 
-The dashboard decodes it into the same logical measurements previously sent
-as JSON. Distance code zero means unavailable and is displayed as unavailable,
-not as a measured 0 mm. IR validity is independent. Missing future measurements
-remain unavailable. The default Auto decoder also accepts the previous JSON
-firmware and text heartbeats, so you can update the website before flashing.
+Distance code zero still means unavailable, not a measured 0 mm. IR validity
+is independent. Wheel speed and other future measurements remain unavailable.
+Obsolete v1/v2/JSON telemetry and text heartbeats are rejected with a clear
+current-firmware message; no compatibility decoder remains.
 
 Only a successful MQTT connection **and both accepted subscriptions** count
 as broker connected. Robot presence is inferred separately from fresh
@@ -115,11 +144,14 @@ rejected, wraparound is supported, and a decreasing heartbeat counter resets
 the sequence baseline after a possible robot reboot. The decoded inspector
 shows readable measurements/counters; **Raw bytes** shows hexadecimal.
 
-The packed image has been built and tested offline. On 6 November, the user
-reported working line bits and six-byte/five-byte messages in the real
-dashboard. See the [bench observation](../testing/subsystem1/logs/2026-11-06-cr1-user-bench-observation.md).
-Packed-image distance, normal restart, unavailable-state and timing checks
-still need recorded results. Earlier captured hardware tests used JSON.
+The user reported functional v2 passes for distance/IR, stale readings,
+normal laptop restart and power-bank restart. See the [bench observation](../testing/subsystem1/logs/2026-11-06-cr1-user-bench-observation.md).
+On 10 November the user confirmed the apparent failure was a setup issue
+and the system works as intended. The UF2 was then rebuilt from the pulled
+barcode/line updates plus the current IMU code. The new rebuild has not been
+flashed by the agent. Hardware accuracy and the exact running revision were
+not independently captured.
+Packet timing, outage recovery and height accuracy remain unmeasured.
 
 ### Left/right line sensor labels and field
 
@@ -137,8 +169,8 @@ still refer to the GP6/GP16 pair, displayed as left/right on the dashboard.
 
 `line_bits` packs three logical bits: bit 2 = snapshot valid, bit 1 = left
 line IR (GP6) detects black, bit 0 = right line IR (GP16) detects black.
-It occupies bits 12..14 of the final packed word. Legacy JSON represents
-the same three-bit value as an integer:
+It occupies bits 12..14 of the distance/IR word. In the decoded message
+inspector it appears as the following readable integer:
 
 | Value | Left IR (GP6) | Right IR (GP16) | Meaning |
 | --- | --- | --- | --- |
@@ -170,48 +202,48 @@ left/right line IR black/background combinations against values 4, 5, 6, 7 above
 Then disconnect the car and verify both live indicators become unavailable.
 Do not mark this test passed until the real hardware behavior is observed.
 
-## Integration contract
+## Current measurement fields
 
-Current packed v2 carries distance and line IR only. Add later measurements
-by defining their ranges/bit widths and extending the versioned binary
-contract in both C and JavaScript. Do not revert the firmware to text simply
-to populate more graphs. For backward compatibility, the JSON decoder still
-accepts the following optional fields from older/development firmware; they
-are not fields present in the new six-byte frame:
-
-| Field | Unit / accepted representation |
+| Decoded field | Meaning |
 | --- | --- |
-| `left_mps`, `right_mps` | Finite speed in m/s, −5..5 (viewer sanity bounds; team must agree actual physical limits) |
-| `distance_m` | Nonnegative finite accumulated distance, metres |
-| `state` | `Ready`, `Following line`, `Turning left`, `Turning right`, `Scanning obstacle`, `Avoiding obstacle`, `Recovering line`, `Stopped`, `Fault` |
-| `ir` | Legacy array `[GP26, GP6, GP16]`, historically named `[left, centre, right]`, each 0, 1 or null. The GP26 slot is ignored for line sensing; GP6 is displayed as Left IR. `line_bits`, when present, takes precedence. |
-| `barcode` | `Turn left`, `Turn right`, `Go straight`, `U-turn`, or null |
-| `hump_mm`, `max_hump_mm` | Nonnegative finite height in millimetres, ≤1000 (viewer sanity bound) |
-| `faults` | Array of short fault descriptions; an empty array explicitly means no reported fault |
-| `scan` | At most 181 `{angle, distance_mm}` entries; angle 0..180°, distance 20..4000 mm or null |
+| `sequence` | 32-bit sample counter |
+| `obstacle_mm`, `obstacle_valid` | 20..4000 mm; unavailable is null/false |
+| `line_bits`, `ir` | Left GP6/right GP16 line states; GP26 remains barcode-only |
+| `pitch_deg` | Fresh calibrated IMU angle, degrees; null if unavailable |
+| `imu_state`, `imu_flags` | Sensor/calibration/hump status, separate from vehicle state |
+| `imu_speed_source` | Nominal 150 mm/s or externally supplied speed |
+| `hump_mm`, `max_hump_mm` | Last accepted estimate and run maximum; 6..80 mm or null |
+
+Wheel speed, travelled distance, vehicle state, barcode navigation and servo
+scan panels remain unavailable until real data is integrated. The latest
+barcode improvements are included in the firmware, but barcode results are
+still reported through the existing S3/controller interface and console;
+S1 does not consume another task's result queue to fill a graph.
+
+Add future fields by agreeing their ranges and updating this one binary
+contract in firmware and JavaScript together. There is no JSON fallback.
 
 ## Current compact telemetry contract
 
-The implemented v2 frame is sequence:32, distance:12 (zero unavailable),
-line flags:3 and format marker:1, totaling six bytes. It uses explicit
-little-endian byte operations, not a C struct copied onto the network.
+The implemented v3 frame preserves the six-byte v2 prefix: sequence:32,
+distance:12 (zero unavailable), line:3 and marker:1. It appends five bytes
+with pitch:11, last height:7, maximum:7, S4 state:3, flags:6 and six reserved
+zero bits. Total: **11 bytes**. Explicit little-endian operations define the
+layout. See [the current bit table, storage comparison and test evidence](../testing/subsystem1/IMU_TELEMETRY.md).
 
-The heartbeat is `80` followed by a four-byte little-endian counter. Its
-marker makes it unambiguous with old ASCII `hb N` messages; the application
-counter retains all 32 bits. The browser retains the old proposed distance-only
-v1 decoder for compatibility, but v1 was never this firmware's MQTT baseline.
+The heartbeat remains `80` followed by a four-byte little-endian counter.
+Its marker distinguishes binary from old ASCII `hb N`. The dashboard accepts only this current contract. Earlier decoder functions
+and format-selection controls have been removed.
 
-See [Change Requirement 1 implementation and evidence](../testing/subsystem1/CHANGE_REQUIREMENT_1.md)
-for bit positions, shared-data safety, RAM/message comparisons, tests and
-remaining team work. Example telemetry shrank **69 to 6 bytes**. Requested
-S1 queue buffers shrank **192 to 144 bytes**, preserving four slots after
-kernel alignment. Linked static RAM is **82740 bytes before and after**;
-this is not a whole-device heap/stack high-water measurement.
+The [original Change Requirement 1 report](../testing/subsystem1/CHANGE_REQUIREMENT_1.md)
+records the earlier like-for-like JSON-to-v2 conversion (example 69 to 6
+bytes, queue storage 192 to 144 bytes). The added IMU fields/source timestamps
+bring the current queue request to 192 bytes and linked static RAM to 82764
+bytes. These are feature costs; peak heap/stack use is still unmeasured.
 
-This completes the code conversion of the current telemetry path, not the
-entire group requirement. Other subsystem application state, controller/fault
-integration, binary supervisory commands and physical timing evidence remain.
-S3 GPIO code and steering are unchanged; S5 only adapts its S1 handoff.
+Other subsystem/controller data, binary commands and physical timing evidence
+remain group work. S4 retains sensor ownership; the new snapshot handoff and
+API changes need S4 owner review before team merge.
 
 ## Validation
 
@@ -219,6 +251,6 @@ S3 GPIO code and steering are unchanged; S5 only adapts its S1 handoff.
 npm test
 ```
 
-The Node tests cover the actual firmware JSON, no-echo handling, malformed inputs, binary golden vectors, sequence wrap/replay/reboot handling, bounded buffers, MQTT packet fragmentation, preservation of raw binary bytes, retained packets, subscription readiness and connection failures.
+The Node tests cover the current binary contract, no-echo handling, malformed/obsolete formats, independent golden vectors, IMU fault isolation, sequence wrap/replay/reboot handling, bounded buffers, MQTT fragmentation, retained packets and subscription readiness. See [the 10 November update record](../testing/subsystem1/TEST_LOG.md).
 
-Bench checks still required for packed v2: complete distance/IR and unavailable-state evidence, normal cold boot/power-bank restart, broker outage/recovery, timing trials, full-team sensor integration, and the final binary firmware schema. Reconnection figures in the browser measure browser socket/subscription recovery, not the Pico's WiFi restoration requirement. Runtime heap/stack RAM remains unmeasured; linked static RAM and queue-buffer comparisons are in the implementation report.
+Bench checks still required for packed v3: live pitch and sensor-state behavior, repeat distance/IR and unavailable-state checks, normal cold boot/power-bank restart, broker outage/recovery, timing trials, full-team sensor integration, and the final binary firmware schema. Reconnection figures in the browser measure browser socket/subscription recovery, not the Pico's WiFi restoration requirement. Runtime heap/stack RAM remains unmeasured; linked static RAM and queue-buffer comparisons are in the implementation report.

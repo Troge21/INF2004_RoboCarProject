@@ -12,7 +12,7 @@
  * Nonblocking sends: E_TMOUT means full (new sample dropped).
  * Use s1_make_telemetry() to validate raw values before packing.
  * Distance zero encodes unavailable, never a clear-space distance. */
-#define S1_PAYLOAD_CAPACITY S1_TELEMETRY_BYTES
+#define S1_PAYLOAD_CAPACITY S1_FRAME_BYTES
 IMPORT ER s1_submit_telemetry(const S1_TELEMETRY *sample);
 IMPORT INT s1_encode_telemetry(const S1_TELEMETRY *sample,
                               const S1_LINE_TELEMETRY *line, UW now_ms,

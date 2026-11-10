@@ -3,6 +3,7 @@
  */
 #include "subsystem1.h"
 #include "../subsystem3/subsystem3.h"
+#include "../subsystem4/subsystem4.h"
 #if TM_MQTT
 #include "mqtt_utk.h" /* shared plain-C bridge prototype, no lwIP calls here */
 #endif
@@ -21,9 +22,10 @@ typedef struct {
     S1_TELEMETRY sample;
     UB sampled_ms[4];
     UB line_sampled_ms[4];
+    S1_IMU_TELEMETRY imu;
 } S1_OUTPUT;
 _Static_assert(sizeof(S1_INPUT) == 10, "input queue must not add padding");
-_Static_assert(sizeof(S1_OUTPUT) == 14, "output queue must not add padding");
+_Static_assert(sizeof(S1_OUTPUT) == 27, "output queue must not add padding");
 static ID telemetry_mbf;
 static ID network_tx_mbf;
 
@@ -80,7 +82,9 @@ EXPORT INT s1_network_poll(unsigned char *out, unsigned int capacity)
     if (!have_latest) return E_TMOUT;
     s1_write_u32(line.bytes, s1_read_u32(latest.line_sampled_ms));
     line.bytes[4] = (UB)s1_line_bits(&latest.sample);
-    return s1_encode_telemetry(&latest.sample, &line, uptime_ms(), out, capacity);
+    size = s1_pack_frame(&latest.sample, &line, &latest.imu, uptime_ms(),
+                          APP_IR_MAX_AGE_MS, out, capacity);
+    return size < 0 ? E_PAR : size;
 }
 
 S1_COMMAND s1_parse_command(const unsigned char *payload, unsigned int length)
@@ -120,6 +124,13 @@ static void wifi_status_task(INT stacd, void *exinf)
             S1_OUTPUT output = {0};
             S3_LINE_DATA line = {0};
             S1_LINE_TELEMETRY packed_line = {{0}};
+            HUMP_TELEMETRY_T imu = {0};
+            (void)s1_make_imu(&output.imu, 0, 0, 0, 7, 0, 0, 0);
+            /* Read only the protected S4 publication; never operate I2C here. */
+            if (subsystem4_get_telemetry(&imu) == E_OK)
+                (void)s1_make_imu(&output.imu, imu.pitch_deg_x10,
+                    imu.current_hump_mm, imu.max_hump_mm, imu.state, imu.flags,
+                    imu.timestamp_ms, imu.pitch_timestamp_ms);
             s1_write_u32(output.sampled_ms, s1_read_u32(input.sampled_ms));
             /* S3 retains GPIO ownership. Its snapshot read never waits. */
             if (subsystem3_get_line(&line) == E_OK && line.valid &&

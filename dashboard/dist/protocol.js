@@ -1,82 +1,40 @@
-const decoder = new TextDecoder('utf-8', { fatal: true });
-export const encoder = new TextEncoder();
-export const STATES = ['Ready', 'Following line', 'Turning left', 'Turning right', 'Scanning obstacle', 'Avoiding obstacle', 'Recovering line', 'Stopped', 'Fault'];
+// Current firmware contract only: 11-byte telemetry and 5-byte heartbeat.
+export const IMU_STATES = ['Initializing','Calibrating','Monitoring','Ascending hump','Descending hump','Validating hump','Sensor fault'];
 
-function finite(value, min = 0, max = Infinity) {
-  return typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max ? value : null;
-}
-function decodeLineSensors(data) {
-  if (Object.hasOwn(data, 'line_bits')) {
-    const bits = data.line_bits;
-    if (!Number.isInteger(bits) || bits < 0 || bits > 7 || (bits !== 0 && !(bits & 4)))
-      throw new Error('Invalid packed line sensor bits');
-    return bits & 4 ? [null, (bits >> 1) & 1, bits & 1] : [null, null, null];
+export function decodeTelemetry(payload) {
+  const bytes=payload instanceof Uint8Array?payload:new Uint8Array(payload);
+  if(bytes.length!==11) throw new Error('Expected 11-byte telemetry (Packed v3); flash the current UF2');
+  const view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
+  const base=view.getUint16(4,true),distance=base&4095,line=(base>>>12)&7;
+  if(!(base&0x8000)) throw new Error('Unsupported telemetry format marker');
+  if(distance!==0&&(distance<20||distance>4000)) throw new Error('Obstacle distance outside 20-4000 mm');
+  if(line!==0&&(line<4||line>7)) throw new Error('Invalid line sensor bits');
+  const sample={sequence:view.getUint32(0,true),obstacle_valid:distance!==0,obstacle_mm:distance||null,
+    line_bits:line,ir:line?[null,(line>>1)&1,line&1]:[null,null,null],
+    pitch_deg:null,hump_mm:null,max_hump_mm:null,imu_state:null,imu_flags:null,imu_speed_source:null,
+    state:null,left_mps:null,right_mps:null,distance_m:null,barcode:null,faults:null,scan:null};
+  let word=0n;
+  for(let i=0;i<5;i++) word|=BigInt(bytes[6+i])<<BigInt(i*8);
+  const pitch=Number(word&2047n),height=Number((word>>11n)&127n),max=Number((word>>18n)&127n);
+  const state=Number((word>>25n)&7n),flags=Number((word>>28n)&63n);
+  const heightOK=x=>x===0||(x>=6&&x<=80);
+  if((word>>34n)!==0n||pitch>1801||!heightOK(height)||!heightOK(max)||height>max)
+    throw new Error('Invalid packed IMU field range or reserved bits');
+  if(state===7) {
+    if(word!==(7n<<25n)) throw new Error('Unavailable IMU must clear measurement fields');
+  } else {
+    if(((flags&1)&&(flags&32))||(pitch&&(!(flags&1)||(flags&32)||state<2||state>5)))
+      throw new Error('Invalid packed IMU validity/state');
+    Object.assign(sample,{pitch_deg:pitch?(pitch-901)/10:null,hump_mm:height||null,max_hump_mm:max||null,
+      imu_state:IMU_STATES[state],imu_flags:(flags&15)|((flags&16)<<1)|((flags&32)<<2)|(pitch?16:0),
+      imu_speed_source:flags&16?'supplied':'nominal'});
   }
-  // Older JSON may supply an array. Left is reserved for barcode capture.
-  return Array.isArray(data.ir) && data.ir.length === 3 && data.ir.every(x => x === null || x === 0 || x === 1)
-    ? [null, data.ir[1], data.ir[2]] : null;
-}
-export function validateTelemetry(data) {
-  if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Telemetry must be an object');
-  if (!Number.isInteger(data.sequence) || data.sequence < 0 || data.sequence > 0xffffffff) throw new Error('Invalid sequence');
-  if (typeof data.obstacle_valid !== 'boolean') throw new Error('Missing measurement validity');
-  if (data.obstacle_valid && (!Number.isInteger(data.obstacle_mm) || data.obstacle_mm < 20 || data.obstacle_mm > 4000)) throw new Error('Obstacle distance outside 20–4000 mm');
-  if (!data.obstacle_valid && data.obstacle_mm !== null) throw new Error('Invalid distance must be null');
-  return {
-    sequence: data.sequence, obstacle_valid: data.obstacle_valid,
-    obstacle_mm: data.obstacle_valid ? data.obstacle_mm : null,
-    state: STATES.includes(data.state) ? data.state : null,
-    left_mps: finite(data.left_mps, -5, 5), right_mps: finite(data.right_mps, -5, 5),
-    distance_m: finite(data.distance_m), hump_mm: finite(data.hump_mm, 0, 1000), max_hump_mm: finite(data.max_hump_mm, 0, 1000),
-    line_bits: Object.hasOwn(data,'line_bits') ? data.line_bits : null,
-    ir: decodeLineSensors(data),
-    barcode: ['Turn left', 'Turn right', 'Go straight', 'U-turn'].includes(data.barcode) ? data.barcode : null,
-    faults: Array.isArray(data.faults) && data.faults.length <= 16 && data.faults.every(x => typeof x === 'string' && x.length <= 60) ? [...data.faults] : null,
-    scan: Array.isArray(data.scan) && data.scan.length <= 181 && data.scan.every(x => x && finite(x.angle, 0, 180) !== null && (x.distance_mm === null || finite(x.distance_mm, 20, 4000) !== null)) ? data.scan.map(x => ({angle:x.angle, distance_mm:x.distance_mm})) : null
-  };
-}
-
-// Proposed distance-only adapter. It is not yet implemented or agreed in firmware.
-// 32-bit sequence (LE), followed by distance:12, valid:1, version:3 (LE).
-export function decodeCompact(bytes) {
-  if (bytes.length !== 6) throw new Error('Compact distance frame must contain 6 bytes');
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const packed = view.getUint16(4, true);
-  if (packed >>> 13 !== 1) throw new Error('Unsupported compact frame version');
-  const valid = Boolean(packed & 0x1000);
-  if (!valid && (packed & 0xfff) !== 0) throw new Error('Invalid frame must clear distance bits');
-  return validateTelemetry({ sequence:view.getUint32(0,true), obstacle_valid:valid, obstacle_mm:valid ? packed & 0xfff : null });
-}
-// Actual S1 v2: seq:32, distance:12 (zero=unavailable), IR:3, tag:1.
-export function decodePackedV2(bytes) {
-  if (bytes.length !== 6) throw new Error('Packed v2 frame must contain 6 bytes');
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const word = view.getUint16(4, true);
-  if (!(word & 0x8000)) throw new Error('Unsupported packed v2 format marker');
-  const distance = word & 0x0fff;
-  return validateTelemetry({sequence:view.getUint32(0,true),
-    obstacle_valid:distance !== 0, obstacle_mm:distance === 0 ? null : distance,
-    line_bits:(word >>> 12) & 7});
-}
-export function decodeTelemetry(payload, format = 'auto') {
-  const bytes = payload instanceof Uint8Array ? payload : new Uint8Array(payload);
-  if (bytes.length === 0 || bytes.length > 16384) throw new Error('Invalid telemetry length');
-  if (format === 'packed-v2' || (format === 'auto' && bytes.length === 6 && (bytes[5] & 0x80)))
-    return {sample:decodePackedV2(bytes), format:'Packed v2 · distance + line IR'};
-  const compact = format === 'compact-v1' || (format === 'auto' && bytes.length === 6 && (bytes[5] >>> 5) === 1);
-  return compact ? {sample:decodeCompact(bytes), format:'Compact v1 · legacy proposed'} : {sample:validateTelemetry(JSON.parse(decoder.decode(bytes))), format:'JSON · legacy firmware'};
+  return {sample,format:'Packed v3 - distance + line IR + IMU'};
 }
 export function decodeHeartbeat(payload) {
-  const bytes = payload instanceof Uint8Array ? payload : new Uint8Array(payload);
-  if (bytes[0] === 0x80) {
-    if (bytes.length !== 5) throw new Error('Packed heartbeat must contain 5 bytes');
-    return new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength).getUint32(1,true);
-  }
-  const text = decoder.decode(bytes);
-  if (!/^hb [0-9]{1,10}$/.test(text)) throw new Error('Unrecognised heartbeat');
-  const count = Number(text.slice(3));
-  if (count > 0xffffffff) throw new Error('Heartbeat counter exceeds uint32');
-  return count;
+  const bytes=payload instanceof Uint8Array?payload:new Uint8Array(payload);
+  if(bytes.length!==5||bytes[0]!==0x80) throw new Error('Expected 5-byte binary heartbeat');
+  return new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength).getUint32(1,true);
 }
 export function hex(bytes) { return [...bytes].map(x => x.toString(16).padStart(2,'0')).join(' '); }
 export function packetText(packet) {
@@ -101,7 +59,7 @@ export class TelemetryStore {
   event(title, detail='', tone='neutral', at=Date.now()) {
     this.events.unshift({title,detail,tone,at}); this.events.length=Math.min(this.events.length,80);
   }
-  ingest(bytes, kind, at=Date.now(), retained=false, format='auto', topic='') {
+  ingest(bytes, kind, at=Date.now(), retained=false, topic='') {
     this.messageCount++; this.totalBytes+=bytes.length;
     const packet={at,topic,bytes:new Uint8Array(bytes),kind,accepted:false,detail:'',decoded:null};
     this.packets.unshift(packet); this.packets.length=Math.min(this.packets.length,30);
@@ -114,9 +72,9 @@ export class TelemetryStore {
           this.event('Heartbeat counter restarted','Sequence baseline reset; the robot may have rebooted','neutral',at);
         }
         this.lastHeartbeatCounter=count; this.lastHeartbeat=at; packet.accepted=true;
-        packet.decoded={counter:count};packet.detail=bytes[0]===0x80?'Packed v2 heartbeat':'Legacy heartbeat';return true;
+        packet.decoded={counter:count};packet.detail='Binary heartbeat';return true;
       }
-      const decoded=decodeTelemetry(bytes,format), sample=decoded.sample;
+      const decoded=decodeTelemetry(bytes), sample=decoded.sample;
       if (this.lastSequence!==null) {
         const delta=(sample.sequence-this.lastSequence)>>>0;
         if (delta===0 || delta>0x7fffffff) throw new Error('Duplicate or out-of-order sequence');
@@ -126,6 +84,8 @@ export class TelemetryStore {
       this.lastInterval=this.lastTelemetry===null ? null : at-this.lastTelemetry;
       if (sample.state && sample.state!==this.sample?.state) this.event(sample.state,'Vehicle state changed','neutral',at);
       if (sample.barcode && sample.barcode!==this.sample?.barcode) this.event('Barcode decoded',sample.barcode,'success',at);
+      if(sample.imu_state && sample.imu_state!==this.sample?.imu_state)
+        this.event(`IMU · ${sample.imu_state}`,sample.imu_speed_source==='nominal'?'Height uses nominal speed; accuracy not verified':'External speed supplied; validate height on the course',sample.imu_state==='Sensor fault'?'warning':'neutral',at);
       if (!sample.obstacle_valid && this.sample?.obstacle_valid!==false) this.event('Range unavailable','No valid ultrasonic measurement','warning',at);
       this.sample=sample; this.lastTelemetry=at; this.telemetryCount++; this.lastPayloadBytes=bytes.length; this.format=decoded.format;
       this.history.push({...sample,at,interval:this.lastInterval,bytes:bytes.length});

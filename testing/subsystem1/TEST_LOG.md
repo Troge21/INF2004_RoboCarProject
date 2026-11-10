@@ -54,6 +54,20 @@ There is no motor or encoder test in subsystem1.
 | S1-U45 | Encode heartbeat counter 0 and uint32 maximum | Exact five-byte golden vectors |
 | S1-U46 | Heartbeat null/too-small output | Error with no buffer writes |
 | S1-U47 | Raw values that could alias valid values if masked first | Out-of-range distance and line pattern rejected before packing |
+| S1-U48 | V3 independent golden vector and snapshot layout | Exact 11-byte frame; 13-byte local IMU snapshot |
+| S1-U49 | Signed pitch limits and maximum accepted height | -900..900 tenths and 80 mm retained |
+| S1-U50 | Raw IMU range errors | Reject before truncation |
+| S1-U51 | Queued pitch and S4 publication expiry | Pitch expires after 100 ms; whole S4 block after 1000 ms |
+| S1-U52 | IMU uptime wrap/future timestamps | Wrap stays fresh; future source unavailable |
+| S1-U53 | IMU reserved bits | Reject without output writes |
+| S1-U54 | V3 buffer limits | Null/small output rejected |
+| S1-U55 | Contradictory IMU fields | Reject invalid state/validity/height ordering |
+| S1-U56 | Host S4 to S1 queue pipeline | Actual pitch and retained max forwarded |
+| S1-U57 | Host queued pitch expires | Retained height remains, pitch unavailable |
+| S1-U58 | Host busy S4 getter | Explicit unavailable IMU; distance/IR unaffected |
+| S1-U59 | Host stale S4 publication | Getter cannot refresh old source data |
+| S1-U60 | Host sensor fault | Fault status and retained height; no valid live pitch |
+| S1-U61 | Host invalid S4 values | Unavailable IMU rather than masked/truncated values |
 | S1-M01 | Build NET=lwip, boot near configured AP, observe USB status | init_done=1, init_result=0, ready=1; link=3 and an IP after connection |
 | S1-M02 | Boot with wrong AP password; then restore credentials and rebuild | No connection with wrong credentials; normal connection after restore |
 | S1-M03 | Build NET=lwip MQTT=1 against configured broker | mqtt connected/subscribed, recurring heartbeat TX and matching RX |
@@ -61,6 +75,7 @@ There is no motor or encoder test in subsystem1.
 | S1-M05 | Compare BOOTSEL post-flash operation with complete power-off and normal USB/laptop and power-bank boots | Clock test S1-U43 passes on normal boot; distance measurements resume without reflashing; capture each power source separately |
 | S1-M06 | Flash packed v2, use Auto/Packed v2 dashboard, move target and check IR patterns | Six-byte telemetry, five-byte heartbeats; real distance and correct left/right states; unavailable stays distinct from background/clear space |
 | S1-M07 | Compare timing before/after packing under matched conditions; exercise AP/broker outages | Required telemetry/heartbeat intervals and recovery targets met; record actual timings, failures and conditions |
+| S1-M08 | Flash IMU/v3, keep stationary for calibration, gently raise/lower front | 11-byte telemetry, 5-byte heartbeats, actual changing pitch and S4 status; existing distance/IR still work; nominal speed assumption visible |
 
 ## Results
 
@@ -90,7 +105,7 @@ Flash `build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2` using BOOTSEL.
 Open the USB serial console at 115200 baud. Expected local-test summary:
 
 ```text
-[TEST] subsystem1 SUMMARY 25 passed, 0 failed
+[TEST] subsystem1 SUMMARY 33 passed, 0 failed
 ```
 
 These parser tests do not require an AP or broker. To test them without
@@ -308,7 +323,7 @@ separate pending test.
 
 ## Change Requirement 1 packed telemetry stage - 6 November 2026
 
-The latest built image uses six-byte binary distance/IR telemetry and
+The original v2 image in this stage uses six-byte binary distance/IR telemetry and
 five-byte binary heartbeats. Its expected S1 on-device summary is now
 **25 passed, 0 failed** (24 codec/parser checks plus hardware clock check
 S1-U43). The successful 21-check JSON image trials above remain historical
@@ -331,7 +346,7 @@ Development validation of the current working copy:
 | Browser protocol/MQTT/inspector tests | 27 passed, 0 failed | [Node log](logs/2026-11-06-cr1-dashboard-tests.txt) |
 | Actual C bytes decoded by JS and preserved through MQTT framing | 19914 telemetry vectors + 3 heartbeats passed; all 114 reserved distance codes rejected by C | [Contract log](logs/2026-11-06-cr1-c-to-js-tests.txt) |
 | ARM WiFi/MQTT TEST image | Build succeeded | [Final build](logs/2026-11-06-cr1-build-final.txt) |
-| Packed Pico-to-browser delivery S1-M06 | PARTIAL, user-reported | Working line bits and six-/five-byte messages; distance, unavailable states and controlled per-pattern results remain to be recorded. [Observation](logs/2026-11-06-cr1-user-bench-observation.md) |
+| Packed Pico-to-browser delivery S1-M06 | Functional PASS, user-reported | Working line bits, six-/five-byte messages, target movement, stale readings, normal laptop and power-bank restarts. Exact per-pattern values and timings not captured. [Observation](logs/2026-11-06-cr1-user-bench-observation.md) |
 | Packed timing/recovery and runtime RAM S1-M07 | PENDING | Physical measurements required |
 
 See [implementation, bit table and measurements](CHANGE_REQUIREMENT_1.md)
@@ -346,3 +361,82 @@ The original ASCII command parser remains a local proposed vocabulary,
 not the final compact remote-command protocol. Other subsystem state,
 controller/fault data and commands still need group-wide CR1 work. Review,
 commit and rerun formal evidence against the final revision before submission.
+
+## IMU/v3 integration stage - 6 November 2026
+
+The previous section's four v2 functional bench checks passed according to
+the user. A new v3 image is now built, **not flashed by the agent**:
+`build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2`.
+The identical `_imu` alias and obsolete variants were removed at the user's
+request; the retained image matches the recorded IMU build hash.
+Expected S1 board summary: **33 passed, 0 failed**, not observed yet (32
+software checks plus clock check S1-U43). The 15 queue checks are host-only.
+
+| Check | Outcome | Evidence |
+| --- | --- | --- |
+| Actual S1 codec/parser + queue source | 32 + 15 passed, zero failures | [S1 host log](logs/2026-11-06-imu-s1-host-tests.txt) |
+| Actual S4 source, stub kernel/driver | 16 snapshot and owner-loop checks passed | [Snapshot log](logs/2026-11-06-imu-snapshot-tests.txt) |
+| Dashboard protocol/MQTT/store | 32 passed | [Node log](logs/2026-11-06-imu-dashboard-tests.txt) |
+| C bytes to JS decoder and MQTT framing | 19914 v2 + 4083 v3 frames, 3 heartbeats passed | [Contract log](logs/2026-11-06-imu-c-to-js-tests.txt) |
+| ARM WiFi/MQTT TEST image | Build passed | [Build log](logs/2026-11-06-imu-firmware-build.txt) |
+| Physical IMU/v3 S1-M08 | PENDING | Actual calibration/tilt, distance/IR regression, normal restarts and stale behavior still required |
+| Height accuracy, timing and peak RAM | PENDING | Actual course/encoder data and measured trials required |
+
+The integration fixes actual-vs-baseline pitch, source timestamps and
+snapshot synchronization. S4 retains sensor ownership; its API/snapshot
+changes need owner review. Heights remain nominal-speed estimates until
+measured speed is supplied. See [IMU contract and bench steps](IMU_TELEMETRY.md)
+and [build/source fingerprint](logs/2026-11-06-imu-evidence.json).
+Browser visual QA unavailable: browser access host unavailable.
+
+## Current-format decoder and pulled firmware - 10 November 2026
+
+The user clarified that the reported failure was a setup issue: the system
+works as intended and the car is powered by laptop USB. No IMU regression
+was reproduced, and no rollback or new S4/driver change was made in this
+update. Existing local IMU work is preserved alongside the pulled changes.
+
+Pulled base revision: `89b582fb870397c1e645226692ecc4cc6f2511ae` plus the local working-copy IMU/decoder changes.
+The latest commits separate S3 line sensing, tune barcode tolerance/ratio
+checks and update normal-build motor duty. Those changes are preserved.
+
+The UF2 was force-rebuilt (`make -B`) so all sources and profile flags were
+compiled together, including the new line_detection module. The linked image
+contains the BC-TRACE-1 diagnostic marker. Flags remain
+`NET=lwip MQTT=1 TEST=1 SMP=1 CONSOLE=usb_cdc`: this stationary test profile
+disables automatic driving. No firmware was flashed by the agent.
+
+Decoder cleanup: removed compact-v1, v2, JSON and ASCII-heartbeat fallback
+implementations and the format selector. Only 11-byte current telemetry and
+five-byte binary heartbeats are accepted. The six-byte distance/IR prefix
+still exists inside the current C frame; it is not a separately supported
+legacy transport. Malformed/obsolete messages are rejected clearly. A missing
+or faulted IMU does not invalidate otherwise valid distance/IR.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| S1 codec/parser + queue tests | 32 + 15 passed | [S1 log](logs/2026-11-10-s1-tests.txt) |
+| Actual S4 snapshot/owner-loop source, stub driver/kernel | 16 passed | [S4 log](logs/2026-11-10-s4-snapshot-tests.txt) |
+| Current dashboard protocol/MQTT/store | 26 passed | [Node log](logs/2026-11-10-dashboard-tests.txt) |
+| Actual C frames decoded by JS and MQTT-framed byte-for-byte | 23997 current-format telemetry cases + 3 heartbeats passed | [Wire log](logs/2026-11-10-wire-tests.txt) |
+| Pulled actual S3 barcode/line/capture/controller source | 16 host test groups passed | [S3 log](logs/2026-11-10-barcode-tests.txt) |
+| Full ARM WiFi/MQTT TEST build | Passed | [Build log](logs/2026-11-10-firmware-build.txt) |
+| Local dashboard assets | index.html, app.js and protocol.js served matching local files; JS syntax passed | HTTP check |
+| Visual browser inspection | Not available | Browser access host unavailable |
+
+Current single flash file: `build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2`
+(704000 bytes). Linked text/data/bss: 351748/100/82664 bytes;
+static data+bss = 82764 bytes. Runtime heap/stack peaks remain
+unmeasured. No additional UF2 variant was created.
+
+- Current UF2 SHA-256: `32e4fb5c6629c6a70a892a422ea078016799d09bc3e94d3c2d2a8c29a155945b`
+- Current dashboard protocol.js SHA-256: `2392f3df96c17e7f906a39cbbb6bb465b75a2b5a22d5595c876d534ed53518b6`
+
+Older fingerprints describe their capture-time images; the standard UF2 path
+now contains this rebuilt image. Refresh the dashboard and reconnect after
+flashing; there is no decoder setting. Expect 11-byte accepted telemetry,
+five-byte heartbeats and the same real measurements. S1 on-device summary
+is still expected to be 33/33; the new image's board output has not been captured.
+Physical sensor accuracy, repeated recovery timing and nominal-speed hump
+height accuracy remain separate pending checks. Review/commit the final
+working copy for submission; these are development results.

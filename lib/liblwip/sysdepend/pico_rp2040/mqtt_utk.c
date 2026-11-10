@@ -51,7 +51,7 @@ static void publish_done_cb(void *arg, err_t result);
 
 void mqtt_utk_poll(void)
 {
-    UB payload[S1_TELEMETRY_BYTES];
+    UB payload[S1_FRAME_BYTES];
     int len = s1_network_poll(payload, sizeof(payload));
     err_t err;
 

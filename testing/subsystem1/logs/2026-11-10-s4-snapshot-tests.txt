@@ -1,0 +1,17 @@
+[S4 SNAPSHOT] PASS getter rejects null and uninitialized access
+[S4 SNAPSHOT] PASS packed published snapshot starts explicitly initializing without a valid angle
+[S4 SNAPSHOT] PASS real owner loop publishes the live angle rather than the baseline
+[S4 SNAPSHOT] PASS publication and sensor timestamps are original source times
+[S4 SNAPSHOT] PASS getter invalidates an aged pitch without making its timestamp fresh
+[S4 SNAPSHOT] PASS busy snapshot returns immediately and leaves caller data unchanged
+[S4 SNAPSHOT] PASS fault status clears live pitch but preserves accepted heights and run maximum
+[S4 SNAPSHOT] PASS explicit reset is immediately visible without cross-task estimator writes
+[S4 SNAPSHOT] PASS owner applies the pending run reset under snapshot synchronization
+[S4 SNAPSHOT] PASS external speed update waits for the owning task
+[S4 SNAPSHOT] PASS zero measured speed is accepted and distinguished from nominal speed
+[S4 SNAPSHOT] PASS packed snapshot retains signed boundaries and full-width timestamp/duration values
+[S4 SNAPSHOT] PASS pitch freshness survives 32-bit uptime wrap
+[S4 SNAPSHOT] PASS real read failure publishes fault in the same loop
+[S4 SNAPSHOT] PASS recovery enters calibration while retaining run maximum
+[S4 SNAPSHOT] PASS 50 successful calibration samples enable a real live pitch
+[S4 SNAPSHOT] SUMMARY 16 checks, 0 failures

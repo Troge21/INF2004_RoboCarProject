@@ -13,7 +13,9 @@
 int main(void)
 {
     unsigned example_bytes;
-#ifdef S1_TELEMETRY_BYTES
+#ifdef S1_FRAME_BYTES
+    example_bytes = S1_FRAME_BYTES;
+#elif defined(S1_TELEMETRY_BYTES)
     example_bytes = S1_TELEMETRY_BYTES;
 #else
     S1_TELEMETRY sample = {12, 451, 1};

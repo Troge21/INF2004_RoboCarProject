@@ -1,0 +1,34 @@
+✔ packet reader reassembles fragmented and coalesced MQTT messages (1.1538ms)
+✔ packet reader bounds untrusted lengths and rejects malformed varints (0.591ms)
+✔ publish parser preserves binary bytes, retain flag and packet ID (0.8389ms)
+✔ live connection waits for both SUBACKs before declaring readiness (1.0303ms)
+✔ subscription failure never enables commands and disconnect cancels retries (0.3484ms)
+✔ unsafe or ambiguous broker/topic settings are rejected before opening a socket (0.1992ms)
+✔ a subscribed dashboard stays empty until fresh telemetry arrives (1.1694ms)
+✔ current 11-byte telemetry survives MQTT framing and reach the telemetry store (0.4486ms)
+✔ current C golden vector supplies distance, IR and live IMU without invented feeds (1.9602ms)
+✔ offset byte views decode without using unrelated backing bytes (0.2981ms)
+✔ obsolete formats are rejected with a clear current-firmware instruction (0.4775ms)
+✔ line readings preserve all patterns and unavailable independently of no echo (0.3683ms)
+✔ distance boundary and reserved codes cannot appear as plausible measurements (0.2842ms)
+✔ full signed pitch range and unavailable angle are distinct (0.1678ms)
+✔ accepted heights have a bounded range and no-event is not a measured zero (0.2943ms)
+✔ a missing IMU leaves real distance and IR usable (0.1762ms)
+✔ IMU fault invalidates angle while retaining accepted heights (0.2866ms)
+✔ calibration and speed-source flags are explicit (0.4071ms)
+✔ marker, padding and unavailable-state canonical bits are checked (1.2452ms)
+✔ binary heartbeats preserve full counters and reject old text (0.5077ms)
+✔ current values expire and disappear on disconnect without losing history (0.4705ms)
+✔ retained and rejected data never refresh live values (0.4045ms)
+✔ sequence wrap, gaps and replay checks apply to the single current format (0.4679ms)
+✔ a robot heartbeat restart resets the sequence baseline (0.3212ms)
+✔ inspector uses each packet decoded value and readable hex on rejection (0.5267ms)
+✔ browser history and diagnostics remain bounded (7.4221ms)
+ℹ tests 26
+ℹ suites 0
+ℹ pass 26
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 121.0147

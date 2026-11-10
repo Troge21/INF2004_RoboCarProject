@@ -1,0 +1,138 @@
+{
+  "date": "2026-11-06",
+  "timezone": "Asia/Kuala_Lumpur",
+  "base_commit": "0c2ff82555c9f76b751febccfaac3a9d431cdcb8",
+  "revision": "Uncommitted IMU integration; new image built, not flashed by agent",
+  "build_flags": "NET=lwip MQTT=1 TEST=1 SMP=1 CONSOLE=usb_cdc",
+  "layout_before": {
+    "sample_bytes": 6,
+    "line_snapshot_bytes": 5,
+    "input_record_bytes": 10,
+    "output_record_bytes": 14,
+    "input_buffer_bytes": 64,
+    "output_buffer_bytes": 80,
+    "example_telemetry_bytes": 6
+  },
+  "layout_after": {
+    "sample_bytes": 6,
+    "line_snapshot_bytes": 5,
+    "input_record_bytes": 10,
+    "output_record_bytes": 27,
+    "input_buffer_bytes": 64,
+    "output_buffer_bytes": 128,
+    "example_telemetry_bytes": 11
+  },
+  "s4_published_snapshot": {
+    "logical_bits": 141,
+    "bytes": 18,
+    "request_flags_bits": 2,
+    "request_storage_bytes": 1
+  },
+  "link_before": {
+    "text": 346532,
+    "data": 100,
+    "bss": 82640,
+    "static_ram": 82740
+  },
+  "link_after": {
+    "text": 351116,
+    "data": 100,
+    "bss": 82664,
+    "static_ram": 82764
+  },
+  "tests": {
+    "s1_codec": 32,
+    "s1_queue": 15,
+    "s4_snapshot": 16,
+    "dashboard": 32,
+    "v2_wire_vectors": 19914,
+    "v3_wire_vectors": 4083,
+    "heartbeats": 3
+  },
+  "bench_before": "User reports v2 distance, stale readings, normal laptop and power-bank restart checks passed",
+  "limits": [
+    "No physical IMU/v3 trial or 33-check board summary yet",
+    "No height accuracy validation with encoder speed; nominal speed used",
+    "No measured timing, recovery or runtime heap/stack peak",
+    "S4 snapshot/API changes require owner review before team merge",
+    "Browser visual QA unavailable; HTTP assets and JS syntax checked"
+  ],
+  "hashes": [
+    {
+      "path": "app_program/subsystem1/s1_protocol.c",
+      "sha256": "a24d4d1ff60e203e6dce10166638eaa06aeb2697d0c334ebc43cf2ddb12b434a"
+    },
+    {
+      "path": "app_program/subsystem1/s1_protocol.h",
+      "sha256": "52db550acd844520f6d21adf7973defd9d9bab6a825e6a325664c969b7b0fb88"
+    },
+    {
+      "path": "app_program/subsystem1/subsystem1.c",
+      "sha256": "ad9335905ef70e553b8af1bbab038763065d9c05127f168d42d0d38cde0b8dc3"
+    },
+    {
+      "path": "app_program/subsystem1/subsystem1.h",
+      "sha256": "3f649f1f2364e86b3a6552fe61ee767171a897018c9272a3efb1866063b2fe21"
+    },
+    {
+      "path": "app_program/subsystem1/subsystem1_test.c",
+      "sha256": "7cd260b266712bfce60bbd6862a68a29f7fcc6c7e1f7048ae5960f87c29b8af0"
+    },
+    {
+      "path": "app_program/subsystem4/subsystem4.c",
+      "sha256": "8daffb73aa163ae4b2c6e74d186de78d7348e768dac39de84fec29cf1e68de69"
+    },
+    {
+      "path": "app_program/subsystem4/subsystem4.h",
+      "sha256": "c90d9144efa1a05783ae25aeebb87ca0fe43c671d0d58da0d914a59b718624c2"
+    },
+    {
+      "path": "lib/liblwip/sysdepend/pico_rp2040/mqtt_utk.c",
+      "sha256": "75327dd7865e8a4aa21f47ee014817d343fd940f4e9d20e65a1f9ff960cddb64"
+    },
+    {
+      "path": "dashboard/dist/protocol.js",
+      "sha256": "a1b935d29d42350984ccee8c612efa9d49ec0e9849ede027d20b5fd76eb791f9"
+    },
+    {
+      "path": "dashboard/dist/app.js",
+      "sha256": "a1156f55b143fe85e57a60d91d7a3421bd8eae687790c89b5af566ecc3da936a"
+    },
+    {
+      "path": "dashboard/dist/index.html",
+      "sha256": "31b67bafbf359804f63bd03ce0c8ce92a3c27f5c3d79b23b340e9f19072f436f"
+    },
+    {
+      "path": "dashboard/tests/protocol.test.mjs",
+      "sha256": "67798ae9355fbc0487038db3ac4de8c48f98a54a4055b3478f4a7d76a1b12db1"
+    },
+    {
+      "path": "testing/subsystem1/host/test_telemetry.c",
+      "sha256": "74245bdf30ac2345b305390cc1f27c3728cd3ed320299f43082ad0182f45c7c9"
+    },
+    {
+      "path": "testing/subsystem1/host/test_imu_snapshot.c",
+      "sha256": "efa846eadf9606f9b3823e9dfe432196f4575dd2d56a81b176729cc805775a76"
+    },
+    {
+      "path": "testing/subsystem1/host/emit_frames.c",
+      "sha256": "f3bedb3478017f9db314e46eee4ed4873de05acbcd312b6c6ef6ae2f63c60c64"
+    },
+    {
+      "path": "testing/subsystem1/host/check_wire.mjs",
+      "sha256": "b0047e4307f52f937192d3d7cc5eb914e0fc4d48e91b449d617848534ab08b5c"
+    },
+    {
+      "path": "build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.elf",
+      "sha256": "9e3bec8f5763b302fd9b1fdd6905ab930542b9d8550f60904c4bfc815b8214cb"
+    },
+    {
+      "path": "build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test_imu.uf2",
+      "sha256": "027480a40e65d34f9653fd103cf5e841926bbe9b2fe2e5b9818d7b53a9b6ac39"
+    },
+    {
+      "path": "build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test_before_imu.uf2",
+      "sha256": "eea1968adc94381c34ca5ff060da077eed985dd3fb2f6192b26cef9b86a66d2a"
+    }
+  ]
+}

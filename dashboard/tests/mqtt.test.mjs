@@ -1,3 +1,4 @@
+import {telemetry} from './fixtures.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {PacketReader,packet,mqttString,parsePublish,concat,MqttConnection} from '../dist/mqtt.js';
@@ -49,36 +50,36 @@ test('unsafe or ambiguous broker/topic settings are rejected before opening a so
 
 test('a subscribed dashboard stays empty until fresh telemetry arrives',()=>{
   const store=new TelemetryStore();
-  const c=new MqttConnection(options,{WebSocketClass:FakeSocket,onMessage:message=>store.ingest(message.payload,'telemetry',1000,message.retained,'json',message.topic)});
+  const c=new MqttConnection(options,{WebSocketClass:FakeSocket,onMessage:message=>store.ingest(message.payload,'telemetry',1000,message.retained,message.topic)});
   try{
     c.connect();const ws=FakeSocket.instances.at(-1);ws.open();
     ws.receive(packet(0x20,new Uint8Array([0,0])));
     ws.receive(packet(0x90,new Uint8Array([0,1,0,0])));
     assert.equal(c.ready,true);assert.equal(store.sample,null);assert.equal(store.history.length,0);
-    const body=concat(mqttString('car/telemetry'),enc.encode(JSON.stringify({sequence:1,obstacle_mm:451,obstacle_valid:true,line_bits:6})));
+    const body=concat(mqttString('car/telemetry'),telemetry({sequence:1}));
     ws.receive(packet(0x31,body));
     assert.equal(store.sample,null);assert.equal(store.history.length,0);
     ws.receive(packet(0x30,body));
     assert.equal(store.sample.obstacle_mm,451);assert.equal(store.sample.left_mps,null);assert.equal(store.history.length,1);
     assert.deepEqual(store.sample.ir,[null,1,0]);
-    const unavailable=concat(mqttString('car/telemetry'),enc.encode(JSON.stringify({sequence:2,obstacle_mm:451,obstacle_valid:true,line_bits:0})));
+    const unavailable=concat(mqttString('car/telemetry'),telemetry({sequence:2,line:0}));
     ws.receive(packet(0x30,unavailable));assert.deepEqual(store.sample.ir,[null,null,null]);
     c.disconnect();ws.receive(packet(0x30,body));assert.equal(store.history.length,2);
   }finally{c.disconnect();}
 });
 
-test('actual packed v2 bytes survive MQTT framing and reach the telemetry store',()=>{
+test('current 11-byte telemetry survives MQTT framing and reach the telemetry store',()=>{
   const store=new TelemetryStore();
-  const c=new MqttConnection(options,{WebSocketClass:FakeSocket,onMessage:m=>store.ingest(m.payload,'telemetry',1000,m.retained,'auto',m.topic)});
+  const c=new MqttConnection(options,{WebSocketClass:FakeSocket,onMessage:m=>store.ingest(m.payload,'telemetry',1000,m.retained,m.topic)});
   try {
     c.connect();const ws=FakeSocket.instances.at(-1);ws.open();
     ws.receive(packet(0x20,new Uint8Array([0,0])));ws.receive(packet(0x90,new Uint8Array([0,1,0,0])));
-    const bytes=new Uint8Array([12,0,0,0,0xc3,0xe1]);
+    const bytes=telemetry();
     const frame=packet(0x30,concat(mqttString(options.telemetryTopic),bytes));
     ws.receive(frame.subarray(0,5));assert.equal(store.sample,null);
     ws.receive(frame.subarray(5));
     assert.equal(store.sample.sequence,12);assert.equal(store.sample.obstacle_mm,451);
-    assert.deepEqual(store.sample.ir,[null,1,0]);assert.equal(store.lastPayloadBytes,6);
+    assert.deepEqual(store.sample.ir,[null,1,0]);assert.equal(store.lastPayloadBytes,11);
     assert.deepEqual(store.packets[0].bytes,bytes);
   } finally { c.disconnect(); }
 });

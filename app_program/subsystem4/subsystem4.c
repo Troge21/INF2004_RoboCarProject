@@ -36,6 +36,33 @@ static uint32_t s_last_traversal_duration_ms = 0U;
 
 /* RTOS Synchronization: Semaphore protecting telemetry snapshot */
 static ID s_sem_telemetry;
+/* Published fields only: pitch:11, baseline:11, heights:7+7, state:3,
+ * flags:6, traversal:32, publication time:32, pitch sample time:32.
+ * 141 logical bits round up to 18 bytes. Runtime estimator state above
+ * remains private to the IMU task; readers never race its intermediate writes. */
+static uint8_t s_snapshot[18];
+/* Shared request bits: reset:1, speed update:1; semaphore-protected RMW. */
+static uint8_t s_requests;
+static uint16_t s_requested_speed;
+
+static void snapshot_put(unsigned bit, unsigned width, uint32_t value)
+{
+    unsigned i;
+    for (i = 0; i < width; ++i) {
+        unsigned at = bit + i;
+        uint8_t mask = (uint8_t)(1U << (at % 8U));
+        s_snapshot[at / 8U] = (uint8_t)((s_snapshot[at / 8U] & (uint8_t)~mask) |
+            (((value >> i) & 1U) ? mask : 0U));
+    }
+}
+static uint32_t snapshot_get(unsigned bit, unsigned width)
+{
+    uint32_t value = 0;
+    unsigned i;
+    for (i = 0; i < width; ++i)
+        value |= (uint32_t)((s_snapshot[(bit + i) / 8U] >> ((bit + i) % 8U)) & 1U) << i;
+    return value;
+}
 
 /*
  * Helper: Retrieve current kernel uptime in milliseconds.
@@ -45,6 +72,47 @@ static uint32_t get_time_ms(void)
     SYSTIM tim;
     (void)tk_get_tim(&tim);
     return (uint32_t)tim.lo;
+}
+
+/* Only the owner calls this. No sensor I/O or wait while holding the lock.
+ * If a reader owns the semaphore, retain the old snapshot and retry next loop. */
+static void publish_snapshot(int16_t pitch, uint32_t pitch_time, uint32_t now,
+                              BOOL have_pitch)
+{
+    unsigned compact_flags;
+    BOOL pitch_valid;
+    if (tk_wai_sem(s_sem_telemetry, 1, TMO_POL) != E_OK) return;
+    if (s_requests & 1U) {
+        s_current_hump_mm = s_max_hump_mm = 0U;
+        s_accumulated_height_um = 0U;
+        s_flags &= (uint8_t)~(S4_FLAG_MAX_UPDATED | S4_FLAG_NEW_HUMP_EVENT);
+        s_requests &= (uint8_t)~1U;
+    }
+    if (s_requests & 2U) {
+        s_vehicle_speed_mm_s = s_requested_speed;
+        s_flags |= S4_FLAG_SPEED_SUPPLIED;
+        s_requests &= (uint8_t)~2U;
+    }
+    if (s_state == S4_STATE_FAULT) {
+        s_flags |= S4_FLAG_FAULT;
+        s_flags &= (uint8_t)~(S4_FLAG_SENSOR_OK | S4_FLAG_HUMP_ACTIVE);
+    }
+    pitch_valid = have_pitch && (uint32_t)(now - pitch_time) <= 100U &&
+        s_state >= S4_STATE_MONITORING && s_state <= S4_STATE_HUMP_VALIDATE &&
+        (s_flags & S4_FLAG_SENSOR_OK) && !(s_flags & S4_FLAG_FAULT) &&
+        pitch >= -900 && pitch <= 900;
+    compact_flags = (s_flags & 15U) | ((s_flags & S4_FLAG_SPEED_SUPPLIED) >> 1) |
+                    ((s_flags & S4_FLAG_FAULT) >> 2);
+    snapshot_put(0, 11, pitch_valid ? (uint32_t)((int)pitch + 901) : 0U);
+    snapshot_put(11, 11, (uint32_t)((int)s_baseline_pitch_x10 + 900));
+    snapshot_put(22, 7, s_current_hump_mm);
+    snapshot_put(29, 7, s_max_hump_mm);
+    snapshot_put(36, 3, (uint32_t)s_state);
+    snapshot_put(39, 6, compact_flags);
+    snapshot_put(45, 32, s_last_traversal_duration_ms);
+    snapshot_put(77, 32, now);
+    snapshot_put(109, 32, pitch_time);
+    (void)tk_sig_sem(s_sem_telemetry, 1);
 }
 
 /* -------------------------------------------------------------------------
@@ -69,6 +137,8 @@ static void imu_hump_task(INT stacd, void *exinf)
 {
     GY511_ACCEL_DATA_T accel_data = {0};
     int16_t pitch_x10 = 0;
+    uint32_t pitch_sample_ms = 0U;
+    BOOL have_pitch = FALSE;
     int16_t delta_pitch_x10;
     uint32_t current_time_ms;
     uint32_t log_elapsed_ms = S4_LOG_PERIOD_MS;
@@ -85,6 +155,7 @@ static void imu_hump_task(INT stacd, void *exinf)
 
     while (1) {
         current_time_ms = get_time_ms();
+        publish_snapshot(pitch_x10, pitch_sample_ms, current_time_ms, have_pitch);
 
         switch (s_state) {
 
@@ -115,6 +186,8 @@ static void imu_hump_task(INT stacd, void *exinf)
             er = drv_gy511_read_accel(&accel_data);
             if (er == E_OK) {
                 pitch_x10 = subsystem4_calc_vehicle_pitch_x10(&accel_data);
+                pitch_sample_ms = get_time_ms();
+                have_pitch = TRUE;
                 calib_sum_x10 += (int32_t)pitch_x10;
                 calib_sample_counter++;
 
@@ -141,6 +214,8 @@ static void imu_hump_task(INT stacd, void *exinf)
             }
 
             pitch_x10 = subsystem4_calc_vehicle_pitch_x10(&accel_data);
+            pitch_sample_ms = get_time_ms();
+            have_pitch = TRUE;
             delta_pitch_x10 = (int16_t)(pitch_x10 - s_baseline_pitch_x10);
 
             /* Check for upward slope / hump ascent */
@@ -168,6 +243,8 @@ static void imu_hump_task(INT stacd, void *exinf)
             }
 
             pitch_x10 = subsystem4_calc_vehicle_pitch_x10(&accel_data);
+            pitch_sample_ms = get_time_ms();
+            have_pitch = TRUE;
             delta_pitch_x10 = (int16_t)(pitch_x10 - s_baseline_pitch_x10);
 
             /*
@@ -206,6 +283,8 @@ static void imu_hump_task(INT stacd, void *exinf)
             }
 
             pitch_x10 = subsystem4_calc_vehicle_pitch_x10(&accel_data);
+            pitch_sample_ms = get_time_ms();
+            have_pitch = TRUE;
             delta_pitch_x10 = (int16_t)(pitch_x10 - s_baseline_pitch_x10);
 
             /* When chassis settles back to level, transition to validate */
@@ -234,8 +313,6 @@ static void imu_hump_task(INT stacd, void *exinf)
                 (height_mm >= S4_MIN_VALID_HUMP_MM) &&
                 (height_mm <= S4_MAX_VALID_HUMP_MM)) {
 
-                (void)tk_wai_sem(s_sem_telemetry, 1, TMO_FEVR);
-
                 s_current_hump_mm = (uint16_t)height_mm;
                 s_flags |= S4_FLAG_NEW_HUMP_EVENT;
 
@@ -248,8 +325,6 @@ static void imu_hump_task(INT stacd, void *exinf)
                     s_max_hump_mm = s_current_hump_mm;
                     s_flags |= S4_FLAG_MAX_UPDATED;
                 }
-
-                (void)tk_sig_sem(s_sem_telemetry, 1);
 
                 tm_printf((UB*)"[S4] VALID HUMP: Height=%u mm (duration=%u ms) | Run Max=%u mm\n",
                           s_current_hump_mm, s_last_traversal_duration_ms, s_max_hump_mm);
@@ -270,7 +345,7 @@ static void imu_hump_task(INT stacd, void *exinf)
             s_flags &= ~S4_FLAG_HUMP_ACTIVE;
 
             /* Attempt sensor recovery */
-            WaitUsec(500000U); /* 500 ms backoff */
+            tk_dly_tsk(500); /* Sleep during retry backoff; do not busy-wait. */
             er = drv_gy511_init();
             if (er == E_OK) {
                 tm_printf((UB*)"[S4] SENSOR RECOVERED. Re-calibrating...\n");
@@ -286,6 +361,8 @@ static void imu_hump_task(INT stacd, void *exinf)
             s_state = S4_STATE_INITIALIZING;
             break;
         }
+
+        publish_snapshot(pitch_x10, pitch_sample_ms, get_time_ms(), have_pitch);
 
         /* Periodic diagnostic heartbeat */
         if (S4_STATUS_LOG_ENABLED && log_elapsed_ms >= S4_LOG_PERIOD_MS) {
@@ -332,6 +409,8 @@ EXPORT ER subsystem4_init(void)
         return s_sem_telemetry;
     }
 
+    publish_snapshot(0, 0, get_time_ms(), FALSE);
+
     return E_OK;
 }
 
@@ -352,20 +431,33 @@ EXPORT ER subsystem4_get_telemetry(HUMP_TELEMETRY_T *p_telemetry)
         return E_PAR;
     }
 
-    /* Thread-safe non-blocking read */
-    er = tk_wai_sem(s_sem_telemetry, 1, 5);
+    if (s_sem_telemetry <= 0) return E_OBJ;
+    /* Nonblocking coherent read; only this published buffer is shared. */
+    er = tk_wai_sem(s_sem_telemetry, 1, TMO_POL);
     if (er != E_OK) {
         return er;
     }
 
-    p_telemetry->pitch_deg_x10 = s_baseline_pitch_x10;
-    p_telemetry->baseline_pitch_x10 = s_baseline_pitch_x10;
-    p_telemetry->current_hump_mm = s_current_hump_mm;
-    p_telemetry->max_hump_mm = s_max_hump_mm;
-    p_telemetry->state = (uint8_t)s_state;
-    p_telemetry->flags = s_flags;
-    p_telemetry->traversal_time_ms = s_last_traversal_duration_ms;
-    p_telemetry->timestamp_ms = get_time_ms();
+    {
+        unsigned pitch = snapshot_get(0, 11);
+        unsigned flags = snapshot_get(39, 6);
+        p_telemetry->pitch_deg_x10 = pitch ? (int16_t)((int)pitch - 901) : 0;
+        p_telemetry->baseline_pitch_x10 = (int16_t)((int)snapshot_get(11, 11) - 900);
+        p_telemetry->current_hump_mm = (uint16_t)snapshot_get(22, 7);
+        p_telemetry->max_hump_mm = (uint16_t)snapshot_get(29, 7);
+        p_telemetry->state = (uint8_t)snapshot_get(36, 3);
+        p_telemetry->flags = (uint8_t)((flags & 15U) | ((flags & 16U) << 1) | ((flags & 32U) << 2));
+        if (pitch && (uint32_t)(get_time_ms() - snapshot_get(109, 32)) <= 100U)
+            p_telemetry->flags |= S4_FLAG_PITCH_VALID;
+        p_telemetry->traversal_time_ms = snapshot_get(45, 32);
+        p_telemetry->timestamp_ms = snapshot_get(77, 32);
+        p_telemetry->pitch_timestamp_ms = snapshot_get(109, 32);
+        /* A reset is visible immediately; the owner applies it next loop. */
+        if (s_requests & 1U) {
+            p_telemetry->current_hump_mm = p_telemetry->max_hump_mm = 0U;
+            p_telemetry->flags &= (uint8_t)~(S4_FLAG_MAX_UPDATED | S4_FLAG_NEW_HUMP_EVENT);
+        }
+    }
 
     (void)tk_sig_sem(s_sem_telemetry, 1);
     return E_OK;
@@ -377,13 +469,11 @@ EXPORT ER subsystem4_reset_run(void)
      * INTERFACE IF-08: Explicit new-run reset.
      * Complies with Decision NC3: clears the recorded maximum for a new trial.
      */
-    (void)tk_wai_sem(s_sem_telemetry, 1, TMO_FEVR);
-
-    s_max_hump_mm = 0U;
-    s_current_hump_mm = 0U;
-    s_accumulated_height_um = 0U;
-    s_flags &= ~S4_FLAG_MAX_UPDATED;
-    s_flags &= ~S4_FLAG_NEW_HUMP_EVENT;
+    ER er;
+    if (s_sem_telemetry <= 0) return E_OBJ;
+    er = tk_wai_sem(s_sem_telemetry, 1, TMO_FEVR);
+    if (er != E_OK) return er;
+    s_requests |= 1U;
 
     (void)tk_sig_sem(s_sem_telemetry, 1);
 
@@ -393,7 +483,8 @@ EXPORT ER subsystem4_reset_run(void)
 
 EXPORT void subsystem4_set_speed_mm_s(uint16_t speed_mm_s)
 {
-    if (speed_mm_s > 0U) {
-        s_vehicle_speed_mm_s = speed_mm_s;
-    }
+    if (s_sem_telemetry <= 0 || tk_wai_sem(s_sem_telemetry, 1, TMO_FEVR) != E_OK) return;
+    s_requested_speed = speed_mm_s;
+    s_requests |= 2U;
+    (void)tk_sig_sem(s_sem_telemetry, 1);
 }

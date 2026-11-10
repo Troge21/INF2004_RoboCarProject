@@ -1,0 +1,1 @@
+/* The host harness supplies the few definitions needed by the application. */

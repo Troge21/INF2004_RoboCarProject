@@ -1,143 +1,116 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {decodeTelemetry,decodeCompact,decodePackedV2,decodeHeartbeat,packetText,TelemetryStore,encoder} from '../dist/protocol.js';
-const payload=(overrides={})=>encoder.encode(JSON.stringify({sequence:12,obstacle_mm:451,obstacle_valid:true,...overrides}));
+import {decodeTelemetry,decodeHeartbeat,packetText,TelemetryStore} from '../dist/protocol.js';
+import {telemetry,heartbeat} from './fixtures.mjs';
 
-test('current S1 firmware JSON decodes without inventing other sensor feeds',()=>{
-  const {sample,format}=decodeTelemetry(payload());
-  assert.equal(sample.obstacle_mm,451);assert.equal(sample.left_mps,null);assert.equal(sample.state,null);assert.equal(sample.faults,null);assert.match(format,/legacy firmware/);
-});
-test('no echo stays null and never becomes zero or clear space',()=>{
-  assert.equal(decodeTelemetry(payload({obstacle_mm:null,obstacle_valid:false})).sample.obstacle_mm,null);
-  assert.throws(()=>decodeTelemetry(payload({obstacle_mm:4000,obstacle_valid:false})),/must be null/);
-});
-
-test('packed IR decodes all four centre/right patterns without a left line reading',()=>{
-  for (const [line_bits,expected] of [[4,[null,0,0]],[5,[null,0,1]],[6,[null,1,0]],[7,[null,1,1]]])
-    assert.deepEqual(decodeTelemetry(payload({line_bits})).sample.ir,expected);
-});
-
-test('unavailable IR stays distinct from valid background and overrides older array data',()=>{
-  const sample=decodeTelemetry(payload({line_bits:0,ir:[1,1,1]})).sample;
-  assert.deepEqual(sample.ir,[null,null,null]);assert.equal(sample.obstacle_mm,451);
-  assert.equal(decodeTelemetry(payload()).sample.ir,null);
-  assert.deepEqual(decodeTelemetry(payload({ir:[1,0,1]})).sample.ir,[null,0,1]);
-  assert.deepEqual(decodeTelemetry(payload({ir:[null,null,1]})).sample.ir,[null,null,1]);
-});
-
-test('reserved, noncanonical and nonnumeric IR fields are rejected',()=>{
-  for (const line_bits of [-1,1,2,3,8,256,4.5,'6',null,true])
-    assert.throws(()=>decodeTelemetry(payload({line_bits})),/line sensor bits/);
-});
-
-test('fresh IR disappears on expiry or disconnect while real history remains',()=>{
-  const s=new TelemetryStore();s.ingest(payload({line_bits:6}),'telemetry',1000);
-  assert.deepEqual(s.currentSample(3000,true).ir,[null,1,0]);
-  assert.equal(s.currentSample(3001,true),null);assert.equal(s.currentSample(1001,false),null);
-  assert.equal(s.currentSample(999,true),null);assert.equal(s.history.length,1);
-  s.ingest(payload({sequence:13,line_bits:0}),'telemetry',3500);
-  assert.deepEqual(s.currentSample(3500,true).ir,[null,null,null]);
-});
-test('malformed, out-of-range and ambiguous validity data are rejected',()=>{
-  for(const overrides of [{obstacle_mm:19},{obstacle_mm:4001},{obstacle_valid:1},{sequence:-1},{sequence:4294967296},{sequence:1.5}])assert.throws(()=>decodeTelemetry(payload(overrides)));
-  for(const data of [new Uint8Array(),encoder.encode('{bad'),encoder.encode('[]'),new Uint8Array([255,255])])assert.throws(()=>decodeTelemetry(data));
-});
-test('compact adapter matches documented six-byte golden vector',()=>{
-  const bytes=new Uint8Array([0x0c,0,0,0,0xc3,0x31]);
-  const sample=decodeCompact(bytes);assert.equal(sample.sequence,12);assert.equal(sample.obstacle_mm,451);assert.equal(sample.obstacle_valid,true);
-  assert.equal(decodeTelemetry(bytes).sample.obstacle_mm,451);
-  const subarray=new Uint8Array([99,...bytes,99]).subarray(1,7);assert.equal(decodeCompact(subarray).obstacle_mm,451);
-});
-test('compact adapter validates version, validity, length and maximum sequence',()=>{
-  assert.equal(decodeCompact(new Uint8Array([255,255,255,255,0,0x20])).sequence,0xffffffff);
-  assert.equal(decodeCompact(new Uint8Array([0,0,0,0,0,0x20])).obstacle_mm,null);
-  for(const bytes of [[0,0,0,0,0,0],[0,0,0,0,1,0x20],[0,0,0,0,255,0x3f],[0,0,0]])assert.throws(()=>decodeCompact(new Uint8Array(bytes)));
-});
-test('heartbeats match the existing firmware format exactly',()=>{
-  assert.equal(decodeHeartbeat(encoder.encode('hb 12')),12);
-  for(const text of ['hb -1','heartbeat','hb 12\n','hb 123456789012'])assert.throws(()=>decodeHeartbeat(encoder.encode(text)));
-});
-
-test('actual packed v2 golden vector preserves binary zeros and line readings',()=>{
-  const bytes=new Uint8Array([12,0,0,0,0xc3,0xe1]);
+test('current C golden vector supplies distance, IR and live IMU without invented feeds',()=>{
+  const bytes=new Uint8Array([12,0,0,0,0xc3,0xe1,0x1b,0x64,0x88,0x14,0]);
   const {sample,format}=decodeTelemetry(bytes);
-  assert.match(format,/Packed v2/);assert.equal(sample.sequence,12);
-  assert.equal(sample.line_bits,6);
+  assert.match(format,/Packed v3/);assert.equal(sample.sequence,12);assert.equal(sample.obstacle_mm,451);
+  assert.deepEqual(sample.ir,[null,1,0]);assert.equal(sample.pitch_deg,15);
+  assert.equal(sample.hump_mm,12);assert.equal(sample.max_hump_mm,34);assert.equal(sample.imu_state,'Monitoring');
+  assert.equal(sample.imu_speed_source,'nominal');assert.equal(sample.imu_flags,0x11);
+  for(const key of ['state','left_mps','right_mps','distance_m','barcode','faults','scan'])assert.equal(sample[key],null);
+});
+test('offset byte views decode without using unrelated backing bytes',()=>{
+  const bytes=telemetry(),offset=new Uint8Array([99,...bytes,99]).subarray(1,12);
+  assert.deepEqual(decodeTelemetry(offset),decodeTelemetry(bytes));
+});
+test('obsolete formats are rejected with a clear current-firmware instruction',()=>{
+  const enc=new TextEncoder();
+  for(const bytes of [enc.encode('{"sequence":12}'),new Uint8Array([12,0,0,0,0xc3,0xe1]),
+    new Uint8Array([12,0,0,0,0xc3,0x31]),new Uint8Array(),new Uint8Array(10),new Uint8Array(12)])
+    assert.throws(()=>decodeTelemetry(bytes),/11-byte telemetry/);
+});
+test('line readings preserve all patterns and unavailable independently of no echo',()=>{
+  for(const [line,expected] of [[0,[null,null,null]],[4,[null,0,0]],[5,[null,0,1]],[6,[null,1,0]],[7,[null,1,1]]]) {
+    const sample=decodeTelemetry(telemetry({line,distance:0})).sample;
+    assert.deepEqual(sample.ir,expected);assert.equal(sample.line_bits,line);
+    assert.equal(sample.obstacle_valid,false);assert.equal(sample.obstacle_mm,null);
+  }
+  for(const line of [1,2,3])assert.throws(()=>decodeTelemetry(telemetry({line})),/line sensor bits/);
+});
+test('distance boundary and reserved codes cannot appear as plausible measurements',()=>{
+  for(const distance of [20,4000])assert.equal(decodeTelemetry(telemetry({distance})).sample.obstacle_mm,distance);
+  for(const distance of [1,19,4001,4095])assert.throws(()=>decodeTelemetry(telemetry({distance})),/Obstacle distance/);
+});
+test('full signed pitch range and unavailable angle are distinct',()=>{
+  for(const [pitch,expected] of [[0,null],[1,-90],[901,0],[1801,90]])
+    assert.equal(decodeTelemetry(telemetry({pitch})).sample.pitch_deg,expected);
+  assert.throws(()=>decodeTelemetry(telemetry({pitch:1802})));
+});
+test('accepted heights have a bounded range and no-event is not a measured zero',()=>{
+  const empty=decodeTelemetry(telemetry({height:0,max:0})).sample;
+  assert.equal(empty.hump_mm,null);assert.equal(empty.max_hump_mm,null);
+  assert.equal(decodeTelemetry(telemetry({height:80,max:80})).sample.max_hump_mm,80);
+  for(const fields of [{height:5},{height:81,max:81},{height:35,max:34}])
+    assert.throws(()=>decodeTelemetry(telemetry(fields)));
+});
+test('a missing IMU leaves real distance and IR usable',()=>{
+  const sample=decodeTelemetry(telemetry({pitch:0,height:0,max:0,state:7,flags:0})).sample;
+  assert.equal(sample.imu_state,null);assert.equal(sample.pitch_deg,null);assert.equal(sample.max_hump_mm,null);
   assert.equal(sample.obstacle_mm,451);assert.deepEqual(sample.ir,[null,1,0]);
-  assert.equal(sample.left_mps,null);assert.equal(sample.state,null);
-  const offset=new Uint8Array([99,...bytes,99]).subarray(1,7);
-  assert.deepEqual(decodePackedV2(offset),sample);
 });
-
-test('packed v2 preserves no echo and all canonical line states independently',()=>{
-  for(const [bits,ir] of [[0,[null,null,null]],[4,[null,0,0]],[5,[null,0,1]],[6,[null,1,0]],[7,[null,1,1]]]) {
-    const bytes=new Uint8Array([255,255,255,255,0,0x80|(bits<<4)]);
-    const sample=decodePackedV2(bytes);
-    assert.equal(sample.sequence,0xffffffff);assert.equal(sample.obstacle_mm,null);
-    assert.equal(sample.obstacle_valid,false);assert.deepEqual(sample.ir,ir);
-  }
-  assert.equal(decodePackedV2(new Uint8Array([0,0,0,0,20,0x80])).obstacle_mm,20);
-  assert.equal(decodePackedV2(new Uint8Array([0,0,0,0,0xa0,0xff])).obstacle_mm,4000);
+test('IMU fault invalidates angle while retaining accepted heights',()=>{
+  const sample=decodeTelemetry(telemetry({pitch:0,state:6,flags:32})).sample;
+  assert.equal(sample.imu_state,'Sensor fault');assert.equal(sample.pitch_deg,null);
+  assert.equal(sample.max_hump_mm,34);assert.equal(sample.imu_flags,128);assert.equal(sample.obstacle_mm,451);
 });
-
-test('packed v2 rejects invalid lengths, tags, reserved ranges and line encodings',()=>{
-  for(const length of [0,5,7])assert.throws(()=>decodePackedV2(new Uint8Array(length)));
-  assert.throws(()=>decodePackedV2(new Uint8Array([0,0,0,0,20,0])),/marker/);
-  for(const distance of [1,19,4001,4095])
-    assert.throws(()=>decodePackedV2(new Uint8Array([0,0,0,0,distance&255,0x80|(distance>>>8)])));
-  for(const bits of [1,2,3])
-    assert.throws(()=>decodePackedV2(new Uint8Array([0,0,0,0,20,0x80|(bits<<4)])),/line sensor bits/);
+test('calibration and speed-source flags are explicit',()=>{
+  assert.equal(decodeTelemetry(telemetry({pitch:0,state:1})).sample.imu_state,'Calibrating');
+  assert.equal(decodeTelemetry(telemetry({flags:17})).sample.imu_speed_source,'supplied');
+  for(const fields of [{state:7},{state:1},{state:6,flags:33},{flags:0}])
+    assert.throws(()=>decodeTelemetry(telemetry(fields)));
 });
-
-test('packed heartbeats preserve full counter and remain unambiguous with legacy text',()=>{
-  for(const count of [0,12,0x30206268,0xffffffff]) {
-    const bytes=new Uint8Array(5);bytes[0]=0x80;new DataView(bytes.buffer).setUint32(1,count,true);
-    assert.equal(decodeHeartbeat(bytes),count);
-  }
-  assert.equal(decodeHeartbeat(encoder.encode('hb 0')),0);
-  assert.equal(decodeHeartbeat(encoder.encode('hb 4294967295')),0xffffffff);
-  for(const bytes of [new Uint8Array([0x80]),new Uint8Array([0x80,0,0,0]),new Uint8Array([0x80,0,0,0,0,0])])
-    assert.throws(()=>decodeHeartbeat(bytes),/5 bytes/);
-  assert.throws(()=>decodeHeartbeat(encoder.encode('hb 4294967296')),/uint32/);
+test('marker, padding and unavailable-state canonical bits are checked',()=>{
+  const wrong=telemetry();wrong[5]&=127;assert.throws(()=>decodeTelemetry(wrong),/marker/);
+  const reserved=telemetry();reserved[10]|=128;assert.throws(()=>decodeTelemetry(reserved),/reserved/);
+  assert.throws(()=>decodeTelemetry(telemetry({pitch:0,state:7})),/Unavailable/);
 });
-
-test('packed telemetry uses the same retention, freshness and sequence protections',()=>{
-  const s=new TelemetryStore(),bytes=new Uint8Array([12,0,0,0,0xc3,0xe1]);
-  assert.equal(s.ingest(bytes,'telemetry',1000,true),false);
-  assert.equal(s.ingest(bytes,'telemetry',1000,false,'packed-v2'),true);
-  assert.equal(s.lastPayloadBytes,6);assert.deepEqual(s.currentSample(2000).ir,[null,1,0]);
-  assert.equal(s.ingest(bytes,'telemetry',1500),false);
-  assert.equal(s.currentSample(3001),null);assert.equal(s.history.length,1);
+test('binary heartbeats preserve full counters and reject old text',()=>{
+  for(const count of [0,12,0x30206268,0xffffffff])assert.equal(decodeHeartbeat(heartbeat(count)),count);
+  for(const bytes of [new TextEncoder().encode('hb 0'),new TextEncoder().encode('hb 12'),new Uint8Array([128]),
+    new Uint8Array([128,0,0,0,0,0]),new Uint8Array([0,0,0,0,0])])
+    assert.throws(()=>decodeHeartbeat(bytes),/5-byte binary heartbeat/);
 });
-
-test('packet inspector shows decoded binary counters and preserves each packet value',()=>{
-  const s=new TelemetryStore();
-  s.ingest(new Uint8Array([12,0,0,0,0xc3,0xe1]),'telemetry',1000);
-  const first=s.packets[0];
-  s.ingest(new Uint8Array([0x80,0,0,0,0]),'heartbeat',1100);
-  assert.deepEqual(JSON.parse(packetText(s.packets[0])),{counter:0});
-  s.ingest(new Uint8Array([13,0,0,0,20,0xc0]),'telemetry',1500);
-  assert.equal(JSON.parse(packetText(first)).obstacle_mm,451);
-  s.ingest(new Uint8Array([0x80,0]),'heartbeat',2000);
-  assert.match(packetText(s.packets[0]),/Rejected/);assert.match(packetText(s.packets[0]),/80 00/);
-  assert.doesNotMatch(packetText(s.packets[0]),/\uFFFD/);
+test('current values expire and disappear on disconnect without losing history',()=>{
+  const store=new TelemetryStore();store.ingest(telemetry(),'telemetry',1000);
+  assert.equal(store.currentSample(3000,true).pitch_deg,15);
+  assert.equal(store.currentSample(3001,true),null);assert.equal(store.currentSample(1001,false),null);
+  assert.equal(store.currentSample(999,true),null);assert.equal(store.history[0].pitch_deg,15);
 });
-test('retained and rejected packets never refresh live telemetry or heartbeat',()=>{
-  const s=new TelemetryStore();s.ingest(payload(),'telemetry',1000);
-  assert.equal(s.ingest(payload({sequence:13}),'telemetry',2000,true),false);
-  assert.equal(s.lastTelemetry,1000);assert.equal(s.sample.sequence,12);
-  s.ingest(encoder.encode('hb 1'),'heartbeat',3000,true);assert.equal(s.lastHeartbeat,null);
-  assert.equal(s.rejected,2);assert.equal(s.packets[0].accepted,false);
+test('retained and rejected data never refresh live values',()=>{
+  const store=new TelemetryStore();store.ingest(telemetry(),'telemetry',1000);
+  assert.equal(store.ingest(telemetry({sequence:13}),'telemetry',2000,true),false);
+  assert.equal(store.ingest(new Uint8Array(6),'telemetry',2200),false);
+  assert.equal(store.lastTelemetry,1000);assert.equal(store.sample.sequence,12);
+  store.ingest(heartbeat(1),'heartbeat',3000,true);assert.equal(store.lastHeartbeat,null);
+  assert.equal(store.rejected,3);
 });
-test('sequence wrap, gaps, replay rejection and reboot observations',()=>{
-  const s=new TelemetryStore();s.ingest(payload({sequence:0xffffffff}),'telemetry',1000);
-  assert.equal(s.ingest(payload({sequence:0}),'telemetry',1500),true);
-  assert.equal(s.ingest(payload({sequence:3}),'telemetry',2000),true);assert.equal(s.sequenceGaps,2);
-  assert.equal(s.ingest(payload({sequence:3}),'telemetry',2500),false);assert.equal(s.ingest(payload({sequence:2}),'telemetry',3000),false);assert.equal(s.lastTelemetry,2000);
-  s.ingest(encoder.encode('hb 8'),'heartbeat',3500);s.ingest(encoder.encode('hb 0'),'heartbeat',4000);
-  assert.equal(s.ingest(payload({sequence:0}),'telemetry',4500),true);
+test('sequence wrap, gaps and replay checks apply to the single current format',()=>{
+  const store=new TelemetryStore();store.ingest(telemetry({sequence:0xffffffff}),'telemetry',1000);
+  assert.equal(store.ingest(telemetry({sequence:0}),'telemetry',1500),true);
+  assert.equal(store.ingest(telemetry({sequence:3}),'telemetry',2000),true);assert.equal(store.sequenceGaps,2);
+  assert.equal(store.ingest(telemetry({sequence:3}),'telemetry',2500),false);
+  assert.equal(store.ingest(telemetry({sequence:2}),'telemetry',3000),false);assert.equal(store.lastTelemetry,2000);
 });
-test('history, packet and event buffers remain bounded',()=>{
-  const s=new TelemetryStore();for(let i=0;i<1000;i++){s.ingest(payload({sequence:i}),'telemetry',i*500);s.event('test');}
-  assert.equal(s.history.length,600);assert.equal(s.packets.length,30);assert.equal(s.events.length,80);assert.equal(s.telemetryCount,1000);
+test('a robot heartbeat restart resets the sequence baseline',()=>{
+  const store=new TelemetryStore();store.ingest(telemetry({sequence:100}),'telemetry',1000);
+  store.ingest(heartbeat(8),'heartbeat',1500);store.ingest(heartbeat(0),'heartbeat',2000);
+  assert.equal(store.ingest(telemetry({sequence:0}),'telemetry',2500),true);
+});
+test('inspector uses each packet decoded value and readable hex on rejection',()=>{
+  const store=new TelemetryStore();store.ingest(telemetry(),'telemetry',1000,false,'car/telemetry');
+  const first=store.packets[0];store.ingest(heartbeat(0),'heartbeat',1100);
+  assert.deepEqual(JSON.parse(packetText(store.packets[0])),{counter:0});
+  store.ingest(telemetry({sequence:13,distance:20}),'telemetry',1500);
+  assert.equal(JSON.parse(packetText(first)).obstacle_mm,451);assert.equal(first.topic,'car/telemetry');
+  store.ingest(new Uint8Array([128,0]),'heartbeat',2000);
+  assert.match(packetText(store.packets[0]),/Rejected/);assert.match(packetText(store.packets[0]),/80 00/);
+});
+test('browser history and diagnostics remain bounded',()=>{
+  const store=new TelemetryStore();assert.equal(store.currentSample(1000),null);
+  for(let i=0;i<1000;i++){store.ingest(telemetry({sequence:i}),'telemetry',i*500);store.event('test');}
+  assert.equal(store.history.length,600);assert.equal(store.packets.length,30);assert.equal(store.events.length,80);
+  assert.equal(store.telemetryCount,1000);
 });

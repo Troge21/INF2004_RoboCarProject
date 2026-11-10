@@ -1,0 +1,2 @@
+PASS: 19914 distance/IR and 4083 IMU current-format C telemetry frames decoded and MQTT-framed byte-for-byte; 3 C heartbeats decoded.
+C constructor also rejected all 114 reserved distance codes. This is offline contract evidence, not a hardware timing trial.

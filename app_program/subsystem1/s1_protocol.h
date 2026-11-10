@@ -13,11 +13,19 @@
 #define S1_V2_TAG 0x8000U
 #define S1_DISTANCE_MASK 0x0fffU
 #define S1_LINE_MASK 0x7000U
+#define S1_FRAME_BYTES 11U
+#define S1_IMU_BYTES 5U
+#define S1_IMU_MAX_AGE_MS 1000U
+#define S1_IMU_PITCH_VALID 0x10U
+#define S1_IMU_SPEED_SUPPLIED 0x20U
+#define S1_IMU_FAULT 0x80U
 
 /* seq:32, distance:12 (zero=unavailable), line:3, format marker:1. */
 typedef struct { uint8_t bytes[S1_TELEMETRY_BYTES]; } S1_TELEMETRY;
 /* Local freshness metadata: source uptime:32, line state:3 in one byte. */
 typedef struct { uint8_t bytes[5]; } S1_LINE_TELEMETRY;
+/* Five field bytes + source publication uptime:32 + pitch sample uptime:32. */
+typedef struct { uint8_t bytes[13]; } S1_IMU_TELEMETRY;
 _Static_assert(sizeof(S1_TELEMETRY) == 6, "packed telemetry must be six bytes");
 _Static_assert(sizeof(S1_LINE_TELEMETRY) == 5, "packed line snapshot must be five bytes");
 
@@ -39,4 +47,15 @@ int s1_pack_telemetry(const S1_TELEMETRY *sample,
 /* One format-marker byte (0x80) followed by the full 32-bit counter LE.
  * The marker prevents ambiguity with legacy ASCII heartbeats. */
 int s1_pack_heartbeat(uint32_t counter, uint8_t *out, unsigned capacity);
+/* V3 appends an IMU block to the unchanged six-byte V2 prefix. Fields:
+ * pitch:11 (0 unavailable, 1..1801 = -900..900 tenths of a degree),
+ * last accepted height:7, run max:7, S4 state:3 (7 unavailable), flags:6.
+ * Flags carry sensor-ok/active/new-event/max-updated/speed-supplied/fault.
+ * The top six bits of the fifth byte are reserved zero. */
+int s1_make_imu(S1_IMU_TELEMETRY *out, int pitch_x10, unsigned current_mm,
+                unsigned max_mm, unsigned state, unsigned flags,
+                uint32_t sampled_ms, uint32_t pitch_sampled_ms);
+int s1_pack_frame(const S1_TELEMETRY *sample, const S1_LINE_TELEMETRY *line,
+                  const S1_IMU_TELEMETRY *imu, uint32_t now_ms,
+                  uint32_t max_line_age_ms, uint8_t *out, unsigned capacity);
 #endif

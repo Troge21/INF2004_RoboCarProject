@@ -26,3 +26,22 @@ Next bench steps: test a flat target at two known distances, cold-start normally
 on laptop USB and then on the power bank, and check that stale live readings
 become unavailable while the car is off. Record actual observations before
 marking these checks complete. The earlier JSON-image results remain separate.
+
+## Follow-up: four functional checks passed (user report)
+
+The user subsequently replied, "yes, all 4 check works. shall we move on?"
+to the following four checks. Record them as functional passes reported by
+the user; exact distance errors/recovery times and raw logs were not supplied.
+
+| Check | Reported outcome |
+| --- | --- |
+| Flat target at about 20 cm, then 40 cm | PASS; distance value/graph followed the target |
+| Unplug Pico while dashboard stays open | PASS; live readings became unavailable, history remained |
+| Reconnect to laptop normally, without BOOTSEL | PASS; fresh measurements returned without reflashing |
+| Move USB power to the power bank | PASS; fresh distance/IR returned after reconnection |
+
+This closes the requested initial functional distance/staleness/restart
+checks for packed v2. It does not establish measured sensor accuracy, the
+25-check board summary, packet intervals, repeated outage timing, no-echo
+handling or runtime heap/stack peaks. These results do not apply to the
+subsequently built IMU/v3 firmware until it is flashed and tested.
