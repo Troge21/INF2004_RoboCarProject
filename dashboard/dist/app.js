@@ -1,5 +1,5 @@
 import { TelemetryStore,hex,packetText } from './protocol.js';
-import { MqttConnection } from './mqtt.js';
+import { MqttConnection,validateTopics } from './mqtt.js';
 import { lineChart,sparkline,scanChart } from './charts.js';
 
 const $=id=>document.getElementById(id);
@@ -41,7 +41,7 @@ let tab='overview',paused=false,seconds=60,connection=null,status='disconnected'
 const vehicleSvg=`<svg viewBox="0 0 280 190" role="img" aria-label="Top view of the robot with ultrasonic field of view"><defs><linearGradient id="range-fade" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#b4cb94" stop-opacity=".2"/><stop offset="1" stop-color="#b4cb94" stop-opacity="0"/></linearGradient></defs><path d="M140 90 76 12Q140-18 204 12Z" fill="url(#range-fade)"/><path d="M91 26Q140 4 189 26M105 43Q140 26 175 43M119 59Q140 49 161 59" fill="none" stroke="#c6d6b3" stroke-width="1" stroke-dasharray="3 4"/><path d="M140 12v156" stroke="#d8ddcf" stroke-dasharray="3 5"/><ellipse cx="140" cy="132" rx="42" ry="10" fill="#3039480a"/><rect x="106" y="81" width="13" height="26" rx="4" fill="#343d47"/><rect x="161" y="81" width="13" height="26" rx="4" fill="#343d47"/><rect x="106" y="116" width="13" height="24" rx="4" fill="#343d47"/><rect x="161" y="116" width="13" height="24" rx="4" fill="#343d47"/><rect x="117" y="72" width="46" height="78" rx="13" fill="#c8d2ba" stroke="#acba9b"/><path d="M122 83q18-12 36 0v19h-36Z" fill="#e9eee2"/><rect x="123" y="110" width="34" height="27" rx="5" fill="#323d46"/><rect x="128" y="115" width="24" height="17" rx="2" fill="#546355"/><path d="M133 119h14m-14 4h14m-14 4h8" stroke="#97b274" stroke-width="1.2"/><rect x="127" y="67" width="26" height="10" rx="3" fill="#667560"/><circle cx="133" cy="72" r="3" fill="#dce6d1"/><circle cx="147" cy="72" r="3" fill="#dce6d1"/><circle cx="140" cy="140" r="2" fill="#a2c66c"/><path d="M98 94H87m96 0h10" stroke="#c5cdbd"/><text x="74" y="97" font-size="8" fill="#a5af9c" font-family="inherit">L</text><text x="200" y="97" font-size="8" fill="#a5af9c" font-family="inherit">R</text></svg>`;
 function overview(){
   return `<div class="metrics">${metric('speed','Average wheel speed','m/s','From encoder feedback','speed')}${metric('distance','Distance travelled','m','Current run','distance')}${metric('obstacle','Obstacle distance','mm','Latest valid range','radar')}${metric('hump','Highest hump estimate','mm','Maximum for this run','mountain')}</div>
-  <div class="main-grid">${chartCard('Wheel velocity','Left and right encoder feedback','speed-chart',speedLegend,speedFoot)}${card('Vehicle status','Current operating state',`<div class="vehicle-visual">${vehicleSvg}<span class="state-pill" data-value="state">Unavailable</span></div><div class="vehicle-details"><div class="vehicle-detail"><span>Line sensors · L / R</span><span class="ir-dots" id="overview-ir"><i></i><i></i></span></div><div class="vehicle-detail"><span>Latest barcode</span><strong data-value="barcode">Unavailable</strong></div><div class="vehicle-detail"><span>Fault status</span><strong data-value="faults">Unavailable</strong></div></div><div class="command-actions"><button class="button button-white" data-command="STATUS" disabled aria-describedby="command-integration-note">${icon('info')}Request status</button><button class="button button-stop" data-command="STOP" disabled aria-describedby="command-integration-note">${icon('stop')}Stop</button></div><p class="command-note" id="command-integration-note" data-value="command-note">Remote commands are pending firmware integration.</p>`,`<span class="card-label" data-value="vehicle-source">NO TELEMETRY</span>`,'vehicle-card')}</div>
+  <div class="main-grid">${chartCard('Wheel velocity','Left and right encoder feedback','speed-chart',speedLegend,speedFoot)}${card('Vehicle status','Current operating state',`<div class="vehicle-visual">${vehicleSvg}<span class="state-pill" data-value="state">Unavailable</span></div><div class="vehicle-details"><div class="vehicle-detail"><span>Line sensors · L / R</span><span class="ir-dots" id="overview-ir"><i></i><i></i></span></div><div class="vehicle-detail"><span>Latest barcode</span><strong data-value="barcode">Unavailable</strong></div><div class="vehicle-detail"><span>Fault status</span><strong data-value="faults">Unavailable</strong></div></div><div class="command-actions"><button class="button button-white" data-command="STATUS" disabled aria-describedby="command-integration-note">${icon('info')}Request status</button><button class="button button-stop" data-command="STOP" disabled aria-describedby="command-integration-note">${icon('stop')}Stop</button></div><p class="command-note" id="command-integration-note" data-value="command-note">STATUS is read-only. STOP awaits controller integration.</p><div class="card-bottom-note" data-value="status-result">No STATUS reply received yet.</div>`,`<span class="card-label" data-value="vehicle-source">NO TELEMETRY</span>`,'vehicle-card')}</div>
   <div class="main-grid">${chartCard('Obstacle proximity','Distance ahead of the ultrasonic sensor','obstacle-chart',obstacleLegend,obstacleFoot)}${card('Activity feed','The latest events from your vehicle','<div class="events" id="events"></div><div class="card-bottom-note" data-value="events-note">Showing the latest 4 events</div>','<span class="activity-count">RECENT</span>')}</div>
   <div class="health-strip"><div class="health-intro"><span>${icon('shield')}</span><div><strong data-value="health-title">Awaiting connection</strong><small data-value="health-description">Connect your RoboCar to receive live measurements</small></div></div><div class="health-facts"><div><strong data-value="heartbeat-age">—</strong>Heartbeat age</div><div><strong data-value="interval">—</strong>Telemetry interval</div><div><strong data-value="packet-size">—</strong>Last payload</div><div><strong data-value="sequence">—</strong>Sequence</div></div></div>`;
 }
@@ -56,7 +56,7 @@ function communications(){
   return `<div class="metrics">${metric('broker','Broker connection','','MQTT WebSocket session','radio')}${metric('messages','Received messages','','Includes rejected messages','packet')}${metric('interval-metric','Telemetry interval','ms','Target ≤ 2000 ms','clock')}${metric('payload','Latest payload','bytes','Application payload only','chip')}</div>
   <div class="two-columns">${chartCard('Telemetry delivery','Time between accepted telemetry messages','interval-chart','<div class="legend"><span><i class="teal"></i>Receive interval</span></div>','<span>Receiver timing <strong>· ms</strong></span><span>Not a round-trip latency measurement</span>')}${card('Communication checks','Live observations against your proposed targets','<div class="requirements" id="requirements"></div>','<span class="card-label" data-value="checks-source">OBSERVATIONS</span>')}</div>
   <div class="two-columns">${card('Message inspector','Most recent MQTT message','<div class="packet-toolbar"><button class="seg-button active" data-packet-view="decoded">Decoded</button><button class="seg-button" data-packet-view="hex">Raw bytes</button></div><pre id="packet-content">Waiting for a message…</pre><div class="card-bottom-note" data-value="packet-topic">No topic yet</div>')}${card('Session diagnostics','Bounded browser history · export the current session','<div class="stats-row"><div><strong data-value="accepted">0</strong>Telemetry accepted</div><div><strong data-value="rejected">0</strong>Messages rejected</div><div><strong data-value="gaps">0</strong>Sequence gaps</div></div><div class="requirements"><div class="requirement"><div>Received payload data<small>Excludes MQTT / TCP / WiFi overhead</small></div><span data-value="total-bytes">0 B</span></div><div class="requirement"><div>Last reconnection<small>Browser connection through subscription readiness</small></div><span data-value="reconnect-time">Not measured</span></div><div class="requirement"><div>Active decoder<small>Packed v3 adds pitch and hump estimates</small></div><span data-value="decoder">—</span></div></div>')}</div>
-  <div class="two-columns">${card('Change requirement evidence','Record measured firmware results for the final submission','<div class="measurement-grid"><div class="measurement">Runtime RAM · before<strong>Not measured</strong><small>Measure baseline heap and stack use</small></div><div class="measurement">Runtime RAM · after<strong>Not measured</strong><small>Measure packed heap and stack use</small></div><div class="measurement">Latest telemetry payload<strong data-value="observed-payload">Not received</strong><small>Size of an accepted MQTT telemetry message</small></div><div class="measurement">Average telemetry payload<strong data-value="average-payload">Not received</strong><small>Average across the collected telemetry history</small></div></div><div class="card-bottom-note">Payload sizes come from received telemetry. Runtime RAM comparisons require on-board heap and stack measurements.</div>')}${card('Supervisory commands','Requests go through the vehicle controller','<div class="command-actions"><button class="button button-white" data-command="STATUS" disabled aria-describedby="command-integration-note">'+icon('info')+'Request status</button><button class="button button-stop" data-command="STOP" disabled aria-describedby="command-integration-note">'+icon('stop')+'Stop</button></div><p class="command-note" id="command-integration-note" data-value="command-note">Remote commands are pending firmware integration.</p><div class="events" id="events"></div>')}</div>
+  <div class="two-columns">${card('Change requirement evidence','Record measured firmware results for the final submission','<div class="measurement-grid"><div class="measurement">Runtime RAM · before<strong>Not measured</strong><small>Measure baseline heap and stack use</small></div><div class="measurement">Runtime RAM · after<strong>Not measured</strong><small>Measure packed heap and stack use</small></div><div class="measurement">Latest telemetry payload<strong data-value="observed-payload">Not received</strong><small>Size of an accepted MQTT telemetry message</small></div><div class="measurement">Average telemetry payload<strong data-value="average-payload">Not received</strong><small>Average across the collected telemetry history</small></div></div><div class="card-bottom-note">Payload sizes come from received telemetry. Runtime RAM comparisons require on-board heap and stack measurements.</div>')}${card('Supervisory commands','Read-only communication status; STOP awaits controller integration','<div class="command-actions"><button class="button button-white" data-command="STATUS" disabled aria-describedby="command-integration-note">'+icon('info')+'Request status</button><button class="button button-stop" data-command="STOP" disabled aria-describedby="command-integration-note">'+icon('stop')+'Stop</button></div><p class="command-note" id="command-integration-note" data-value="command-note">STATUS is read-only. STOP awaits controller integration.</p><div class="card-bottom-note" data-value="status-result">No STATUS reply received yet.</div><div class="events" id="events"></div>')}</div>
   ${card('Recent messages','Latest six deliveries · rejected and retained messages remain visible','<div class="table-wrap"><table class="data-table"><thead><tr><th>RECEIVED</th><th>TOPIC</th><th>SIZE</th><th>RESULT</th></tr></thead><tbody id="packet-table"></tbody></table></div>')}`;
 }
 
@@ -99,7 +99,7 @@ function updateHeader(now){
   $('pause-button').innerHTML=icon(paused?'play':'pause');$('pause-button').setAttribute('aria-label',paused?'Resume chart display':'Pause chart display');$('pause-button').title=paused?'Resume chart display':'Pause chart display';
 }
 function update(force=false){
-  const now=Date.now();updateHeader(now);if(paused&&!force)return;
+  const now=Date.now();updateHeader(now);updateCommands(now);if(paused&&!force)return;
   const sample=store.sample,current=store.currentSample(now,status==='connected'),stale=current===null;
   const mean=current&&Number.isFinite(current.left_mps)&&Number.isFinite(current.right_mps)?(Math.abs(current.left_mps)+Math.abs(current.right_mps))/2:null;
   value('speed',format(mean));value('distance',format(current?.distance_m));value('obstacle',format(current?.obstacle_mm,0));value('hump',format(current?.max_hump_mm,0));
@@ -119,7 +119,7 @@ function update(force=false){
   value('health-description','Robot presence is inferred from fresh messages, not broker connection alone.');
   value('heartbeat-age',age(store.lastHeartbeat,now));value('interval',store.lastInterval===null?'—':`${Math.round(store.lastInterval)} ms`);value('packet-size',`${store.lastPayloadBytes||'—'} B`);value('sequence',sample?.sequence??'—');
   value('broker',status==='connected'?'Connected':status==='connecting'?'Connecting':status==='reconnecting'?'Reconnecting':'Offline');value('messages',store.messageCount.toLocaleString());value('interval-metric',store.lastInterval===null?'—':Math.round(store.lastInterval));value('payload',store.lastPayloadBytes||'—');
-  value('broker-note',status==='connected'?'Both subscriptions ready':'Awaiting MQTT subscriptions');
+  value('broker-note',status==='connected'?'All three subscriptions ready':'Awaiting MQTT subscriptions');
   value('messages-note','Includes rejected messages');value('payload-note',store.format);
   document.querySelector('[data-value="broker"]')?.classList.add('small');
   value('accepted',store.telemetryCount.toLocaleString());value('rejected',store.rejected.toLocaleString());value('gaps',store.sequenceGaps.toLocaleString());value('total-bytes',`${store.totalBytes.toLocaleString()} B`);value('reconnect-time',reconnects.length?`${(reconnects.at(-1)/1000).toFixed(2)} s`:'Not measured');value('decoder',store.format);value('checks-source','OBSERVATIONS');
@@ -129,7 +129,7 @@ function update(force=false){
   const lineState=i=>current?.ir?.[i]===1?'Black line':current?.ir?.[i]===0?'Background':'Unavailable';
   const ir=$('overview-ir');if(ir){ir.innerHTML=[1,2].map((i,j)=>`<i class="${current?.ir?.[i]===1?'on':current?.ir?.[i]===0?'':'unknown'}" title="${lineLabels[j]}: ${lineState(i)}" aria-label="${lineLabels[j]}: ${lineState(i)}">${lineState(i)==='Unavailable'?'?':''}</i>`).join('');ir.setAttribute('aria-label',`Line sensors: left ${lineState(1)}, right ${lineState(2)}. Barcode IR is a separate input.`);}
   if($('sensor-status'))$('sensor-status').innerHTML='<div class="sensor-tile"><span class="sensor-indicator reserved" aria-hidden="true">B</span><strong>Barcode IR</strong><small>Dedicated barcode input</small></div>'+[1,2].map((i,j)=>`<div class="sensor-tile"><span class="sensor-indicator ${current?.ir?.[i]===1?'on':current?.ir?.[i]===0?'':'unknown'}" aria-hidden="true">${lineState(i)==='Unavailable'?'?':''}</span><strong>${lineLabels[j]} IR</strong><small>${lineState(i)}</small></div>`).join('');
-  value('command-note','Remote commands are pending firmware integration. The current firmware logs inbound messages but does not execute them.');
+
   for(const [name,key,color]of [['speed','left_mps','#208f85'],['distance','distance_m','#8b78df'],['obstacle','obstacle_mm','#208f85'],['hump','max_hump_mm','#acbc89']])sparkline($(`spark-${name}`),store.history.map(d=>d[key]),color);
   const opts={seconds,now};
   lineChart($('speed-chart'),store.history,[{key:'left_mps',label:'Left wheel',color:'#208f85'},{key:'right_mps',label:'Right wheel',color:'#8b78df'}],{...opts,unit:'m/s',precision:2,empty:'Wheel speed requires the encoder telemetry feed.'});
@@ -146,6 +146,28 @@ function update(force=false){
   }
   updateInspector();
 }
+function updateCommands(now) {
+  store.expireStatus(now);
+  const cooling=store.statusLastSentAt!==null&&now-store.statusLastSentAt<250;
+  document.querySelectorAll('[data-command="STATUS"]').forEach(button=>{
+    button.disabled=status!=='connected'||Boolean(store.pendingStatus)||cooling;
+    button.title='Read-only status request; does not move the car';
+  });
+  value('command-note',status==='connected'?store.statusNotice:'Connect to the broker to request read-only STATUS. STOP awaits controller integration.');
+  const reply=store.statusReply;
+  value('status-result',reply?`Last reply: ${new Date(reply.received_at).toLocaleTimeString()} | Pico uptime ${(reply.uptime_ms/1000).toFixed(1)} s | ${reply.test_build?'Stationary test build':'Normal build'} | ${reply.sample_age_ms===null?'No fresh telemetry sample':`Sample age ${reply.sample_age_ms} ms`}`:'No STATUS reply received yet.');
+}
+function requestStatus(){
+  if(status!=='connected'||!connection?.ready)return;
+  try {
+    const nonce=new Uint32Array(1);
+    do { crypto.getRandomValues(nonce); } while(!nonce[0]||nonce[0]===store.lastStatusId);
+    const bytes=store.beginStatus(nonce[0]);
+    try { connection.publish(lastOptions.commandTopic,bytes); }
+    catch(error){store.cancelStatus(`STATUS send failed: ${error.message}`);throw error;}
+  } catch(error){toast(error.message);}
+  update(true);
+}
 function updateInspector(){
   if(!$('packet-content'))return;const p=store.packets[0];
   $('packet-content').textContent=p&&packetView==='hex'?hex(p.bytes):packetText(p);
@@ -154,7 +176,7 @@ function updateInspector(){
   if($('packet-table'))$('packet-table').innerHTML=store.packets.slice(0,6).map(p=>`<tr><td>${new Date(p.at).toLocaleTimeString([], {hour12:false})}</td><td title="${escape(p.topic)}">${escape(p.topic)}</td><td>${p.bytes.length} B</td><td class="${p.accepted?'accepted':'rejected'}" title="${escape(p.detail)}">${p.accepted?'Accepted':'Rejected'}</td></tr>`).join('')||'<tr><td colspan="4">No messages received yet.</td></tr>';
 }
 function openDialog(){
-  $('connection-error').textContent='';if(lastOptions)for(const key of ['url','telemetryTopic','heartbeatTopic'])$('connection-form').elements[key].value=lastOptions[key];$('connection-dialog').showModal();
+  $('connection-error').textContent='';if(lastOptions)for(const key of ['url','telemetryTopic','heartbeatTopic','statusTopic','commandTopic'])$('connection-form').elements[key].value=lastOptions[key];$('connection-dialog').showModal();
 }
 function closeDialog(){ $('connection-form').elements.password.value='';$('connection-form').elements.username.value='';$('connection-dialog').close(); }
 function connectLive(event){
@@ -165,22 +187,23 @@ function connectLive(event){
     const next=new MqttConnection(options,{
       onStatus:(nextStatus,detail)=>{
         if(connection!==next)return;
+        if(nextStatus!=='connected')store.cancelStatus();
         const previous=status;status=nextStatus;statusDetail=detail;
         if(nextStatus==='connecting'){if(lastConnectionStarted===null)lastConnectionStarted=Date.now();store.lastSequence=null;}
         if(nextStatus==='reconnecting'&&lastConnectionStarted===null)lastConnectionStarted=Date.now();
-        if(nextStatus==='connected'){if(hadConnection){store.event('Connection restored','Both MQTT subscriptions are ready','success');if(lastConnectionStarted!==null)reconnects.push(Date.now()-lastConnectionStarted);}else store.event('Broker connected','Both MQTT subscriptions are ready','success');hadConnection=true;lastConnectionStarted=null;}
+        if(nextStatus==='connected'){if(hadConnection){store.event('Connection restored','All three MQTT subscriptions are ready','success');if(lastConnectionStarted!==null)reconnects.push(Date.now()-lastConnectionStarted);}else store.event('Broker connected','All three MQTT subscriptions are ready','success');hadConnection=true;lastConnectionStarted=null;}
         else if(nextStatus==='error'||(nextStatus==='reconnecting'&&previous!=='reconnecting'))store.event('Connection update',detail,'warning');
         update(true);
       },
-      onMessage:msg=>{if(connection!==next)return;const kind=msg.topic===options.heartbeatTopic?'heartbeat':msg.topic===options.telemetryTopic?'telemetry':null;if(kind)store.ingest(msg.payload,kind,Date.now(),msg.retained,msg.topic);}
+      onMessage:msg=>{if(connection!==next)return;const kind=msg.topic===options.heartbeatTopic?'heartbeat':msg.topic===options.telemetryTopic?'telemetry':msg.topic===options.statusTopic?'status':null;if(kind)store.ingest(msg.payload,kind,Date.now(),msg.retained,msg.topic);}
     });
     // Validate settings before replacing the current connection.
     if(!['ws:','wss:'].includes(url.protocol)||url.username||url.password)throw new Error('Enter a ws:// or wss:// broker URL without embedded credentials.');
     if(options.password&&!options.username)throw new Error('Enter a username when using a password.');
-    if(!options.telemetryTopic||!options.heartbeatTopic||options.telemetryTopic===options.heartbeatTopic||[options.telemetryTopic,options.heartbeatTopic].some(t=>/[+#\0]/.test(t)))throw new Error('Enter two different exact MQTT topic names.');
+    validateTopics(options);
     if(connection)connection.disconnect();
     paused=false;store.reset();reconnects=[];hadConnection=false;lastConnectionStarted=Date.now();connection=next;
-    lastOptions={url:options.url,telemetryTopic:options.telemetryTopic,heartbeatTopic:options.heartbeatTopic};
+    lastOptions={url:options.url,telemetryTopic:options.telemetryTopic,heartbeatTopic:options.heartbeatTopic,statusTopic:options.statusTopic,commandTopic:options.commandTopic};
     next.connect();closeDialog();update(true);toast('Connecting to your RoboCar broker');
   }catch(error){$('connection-error').textContent=error.message;}
 }
@@ -190,6 +213,7 @@ function exportData(){
   const csv=columns.join(',')+'\r\n'+store.history.map(d=>[new Date(d.at).toISOString(),'mqtt',d.sequence,d.state,d.left_mps,d.right_mps,d.distance_m,d.obstacle_mm,d.obstacle_valid,d.hump_mm,d.max_hump_mm,d.ir?.[1],d.ir?.[2],d.pitch_deg,d.imu_state,d.imu_flags,d.imu_speed_source].map(v=>v??'').join(',')).join('\r\n');
   const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'})),link=document.createElement('a');link.href=url;link.download=`robocar-mqtt-${new Date().toISOString().replace(/[:.]/g,'-')}.csv`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast(`Exported ${store.history.length} received telemetry samples`);
 }
+document.addEventListener('click',event=>{const button=event.target.closest('[data-command="STATUS"]');if(button&&!button.disabled)requestStatus();});
 fillIcons();switchTab();
 window.addEventListener('hashchange',switchTab);
 $('time-range').addEventListener('change',event=>{seconds=Number(event.target.value);update(true);});

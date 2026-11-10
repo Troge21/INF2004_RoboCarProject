@@ -9,3 +9,9 @@ export function telemetry({sequence=12,distance=451,line=6,pitch=1051,height=12,
 export function heartbeat(counter=0) {
   const bytes=new Uint8Array([128,0,0,0,0]);new DataView(bytes.buffer).setUint32(1,counter,true);return bytes;
 }
+export function statusReply({id=12,uptime=1000,age=50,testBuild=true,frame=telemetry()}={}) {
+  const bytes=new Uint8Array(age===null?11:22),view=new DataView(bytes.buffer);
+  bytes[0]=0xa1;view.setUint32(1,id,true);view.setUint32(5,uptime,true);
+  view.setUint16(9,(age===null?2047:age)|(testBuild?2048:0),true);
+  if(age!==null)bytes.set(frame,11);return bytes;
+}

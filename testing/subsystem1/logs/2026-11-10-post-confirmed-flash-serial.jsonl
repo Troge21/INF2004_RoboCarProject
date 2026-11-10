@@ -1,0 +1,8 @@
+{"utc":"2026-11-10T10:07:42.2599749Z","note":"User confirmed current flash; initial serial drain may be buffered.","event":"capture_started"}
+{"message":"[TEST] subsystem1 SUMMARY 33 passed, 0 failed","utc":"2026-11-10T10:07:42.3125883Z","event":"pico_serial"}
+{"message":"wifi: link status -\u003e joined AP, waiting for IP (1)","utc":"2026-11-10T10:07:42.3125883Z","event":"pico_serial"}
+{"message":"wifi: link status -\u003e joined AP, no IP yet (2)","utc":"2026-11-10T10:07:42.3135891Z","event":"pico_serial"}
+{"message":"wifi: link up, ip=172.20.10.14","utc":"2026-11-10T10:07:42.3135891Z","event":"pico_serial"}
+{"message":"mqtt: connected to 172.20.10.2","utc":"2026-11-10T10:07:42.3142105Z","event":"pico_serial"}
+{"message":"mqtt: TX [mtk3smp-pico/heartbeat] 5 binary bytes","utc":"2026-11-10T10:07:44.1407539Z","event":"pico_serial"}
+{"event":"capture_ended","utc":"2026-11-10T10:07:47.2963379Z"}

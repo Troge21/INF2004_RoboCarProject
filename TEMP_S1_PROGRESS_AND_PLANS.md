@@ -34,8 +34,17 @@ ordered plan, not promised calendar deadlines.
 | 6 Nov 2026 | Observe packed v2 telemetry in the dashboard | User-reported functional passes | Working line_bits and six-/five-byte messages; user confirms distance, stale readings, normal laptop restart and power-bank restart; timing/accuracy not measured |
 | 10 Nov 2026 | Pull barcode/line progress, rebuild and simplify decoder | Software/build checks passed | Latest S3 changes retained; current-format decoder only; user confirms earlier apparent failure was setup, not a reproduced IMU regression |
 | Following | Complete group-wide packed-data requirement | Pending | Other subsystem/controller/fault/command conversions and physical correctness/performance evidence remain |
-| Following | Implement permitted supervisory commands | Pending | Validated, bounded command routing to controller, acknowledgements, expiry/replay handling and controller-owned execution |
-| Following | Test WiFi/MQTT loss and recovery | Pending | Record distinct car-side recovery and browser-side recovery; five timed trials |
+| 10 Nov 2026 | Implement read-only STATUS request/reply | Implemented and real-Pico/browser functional checks passed | Packed five-byte request, correlated reply with uptime/source age; one pending request, timeout/disconnect handling; final captured round trip 29 ms |
+| Following | Integrate permitted actuator/supervisory requests through controller | Pending | STATUS is read-only. STOP remains disabled; agree controller handoff, safety/expiry/replay semantics before actuator commands |
+| 10 Nov 2026 | Prepare WiFi/MQTT recovery corrections and repeatable trials | Offline checks/build passed; live trials deferred by user | DOWN/failure rejoin, bounded MQTT retry, clean session/timer cancellation; direct-TCP recorder and separate five-trial procedures; car unavailable |
+| 10 Nov 2026 | Flash recovery UF2 and run five broker restarts | User reports flash; five actual interruptions recovered | Telemetry, heartbeat and STATUS returned; uptime continuity verified using both request/reply windows; conservative bounds 3.318..5.811 s; interval targets not all met |
+| 10 Nov 2026 | Run five hotspot loss/recovery trials | Recorded; earlier 15 s design target not met | Three correlated recoveries at 15.572, 18.015 and 20.484 s; two incomplete within 30 s. All original results preserved |
+| 10 Nov 2026 | Bound MQTT liveness/connection timeouts after hotspot trial | Code/build/36 host checks passed; user reports flashing | MQTT keepalive 60 -> 5 s; pending TCP/MQTT connect deadline 5 s reuses retry timer. No sensor/schema changes |
+| 10 Nov 2026 | Observe replacement's normal operation before retest | 60-second live baseline observed | 118 telemetry, 13 heartbeats, three matched STATUS replies; k5 confirmed in broker; no rejected packets; interval targets still not all met |
+| 10 Nov 2026 | Review follow-up hotspot captures | Results recorded; running-image identity later unconfirmed | Partial run: 2/3 under 15 s. Later complete run after laptop restart: 4/5 at 6.668..9.096 s, fifth timeout. User later clarified intended UF2 had not been flashed; do not accept these as corrected-image validation |
+| 10 Nov 2026 | Verify communication after explicitly confirmed flash | Normal telemetry/STATUS/USB restored | 37 telemetry, three heartbeats, matching STATUS in 81 ms; USB summary 33 passed/0 failed (may be buffered startup output) |
+| Next physical follow-up | Repeat one clean hotspot series after confirmed flash | Pending | Same 9c5ac8f0... UF2; no source/rebuild change. Earlier captures preserved with image-identity caveat; no laptop/Pico restart within the new five-trial series |
+| Following validation | Resolve delivery-interval misses and finish acceptance evidence | Open | One observed telemetry interval 2.111 s; heartbeat intervals up to 6.393 s. Do not mark all earlier 2 s/5 s targets passed |
 | Final | Collect submission evidence and documentation | Pending | Commit identity, logs, timing results, protocol/representation tables, memory/message comparison and group demo evidence |
 
 ## Change Requirement 1 in plain language
@@ -71,7 +80,8 @@ for the field table, exact format, measurements and remaining coverage.
 - The local website is served at `http://127.0.0.1:4173`.
 - Real ultrasonic distance and heartbeats were observed end to end. The user
   confirms the packed-v2 distance, stale-data, normal laptop restart and
-  power-bank restart checks passed. These results do not validate v3 yet.
+  power-bank restart checks passed. Current v3 telemetry and STATUS delivery
+  have also been observed; controlled accuracy and recovery timing remain separate.
 - The dashboard rejects retained/invalid/replayed telemetry, tracks freshness,
   preserves bounded received history and exports real data.
 - The user reports that line bits work as intended and recent messages have
@@ -91,18 +101,28 @@ for the field table, exact format, measurements and remaining coverage.
   silent; association/recovery timing and repeated cold boots still need
   controlled trials.
 
-Current IMU/v3 build, rebuilt 10 November; not flashed by the agent:
+Current v3/STATUS/recovery build, **user reports flashing after hotspot correction**:
 `build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2`.
-The identical `_imu` alias, older UF2 variants and obsolete baseline ELF/map
-copies were removed on 6 November at the user's request. Historical hashes,
-measurements and logs remain. The single current UF2 contains v3, and its
-hash was verified against the IMU build record. Refresh the dashboard after flashing; only Packed v3 is now supported.
-Expect 33 S1 checks
-on-device, including the hardware clock check. The new board summary has not been captured; the user reports the earlier
-apparent IMU failure was a setup issue and it now works as intended. The dashboard no longer accepts earlier formats. The 10 November UF2
-was rebuilt from the latest pulled barcode/line source; the user reports
-the previous apparent failure was a setup issue. The rebuilt image still
-needs flashing before its physical behavior can be assessed.
+Only this UF2 is kept. Older aliases/baselines were removed at the user's
+request; their historical measurements remain. The recovery build supersedes
+the earlier recovery image at this filename. Five broker and five hotspot
+trials exercised the previous aaf0e39836b759904add31509ca4fef3a06a6892f6e58589b3cbf4342226fa77
+image. The current
+replacement hash is **9c5ac8f0876055939f2cc4049a22e3ca9285b38ccccd889096bd801dafc2a7a0**.
+The broker now advertises k5, and a one-minute normal-operation capture
+received telemetry, heartbeat and STATUS. Hotspot recovery retesting remains
+pending; no flash readback was performed.
+Later clarification: the user said the intended UF2 had not been flashed for
+the preceding follow-up runs, then explicitly reported flashing it. Their
+local-file hashes and k5 observation do not establish exact earlier on-device
+image identity. The latest confirmed-flash check is described below.
+
+For the preceding STATUS image, the user refreshed/reconnected and confirmed its Request
+status button works. A separate real-Pico capture matched the reply in
+29 ms and continued receiving five telemetry samples plus a heartbeat.
+Expected on-device S1 summary remains 33 checks; serial output for this
+image has not been captured. This does not establish height accuracy,
+repeated recovery performance or exact physical IR patterns.
 Build flags: `NET=lwip MQTT=1 TEST=1`. With the current configuration,
 TEST disables normal driving and encoder calibration remains off.
 
@@ -206,18 +226,18 @@ robot demonstration and measured hardware acceptance.
 | --- | --- | --- |
 | Establish WiFi connectivity | Implemented; bench operation reported | Pico joins the configured hotspot; laptop/power-bank operation observed |
 | Implement MQTT communication | Implemented | Radio owner publishes to Mosquitto; dashboard subscribes over WebSocket |
-| Design communication topics | Telemetry/heartbeat topics implemented | Agree and document the actual command topic when adding that path |
+| Design communication topics | Implemented for current S1 scope | Telemetry, heartbeat, command and status-reply topics documented; no duplicate legacy formats |
 | Define telemetry message structures | Implemented for current data | One 11-byte packed frame and five-byte binary heartbeat; range/validity checks in C and JavaScript |
 | Implement telemetry publishing | Implemented; real bench readings reported | Distance, line IR and IMU/height-estimator fields; final integrated-run evidence still needed |
-| Implement command subscription | Not implemented as a live command path | MQTT currently subscribes to its heartbeat for loopback diagnostics. STOP/STATUS parser has local tests only; dashboard buttons remain disabled. Agree allowed requests, subscribe and validate, then route through the controller |
-| Implement connection recovery | Mechanisms implemented; acceptance testing incomplete | WiFi rejoin and MQTT retry exist. Record controlled AP/broker outage and restoration trials; browser recovery is a separate measurement |
-| Implement heartbeat/status reporting | Heartbeat implemented; vehicle status partial | Five-second heartbeat and IMU status exist. Overall robot/controller state is not yet in the frame |
+| Implement command subscription | Read-only STATUS implemented and functionally tested | Real command subscription replaces heartbeat loopback. Binary validation, correlated reply, bounded processing and browser timeout work. Controller-owned STOP/other permitted actions remain separate pending integration |
+| Implement connection recovery | Communication restored after confirmed flash; recovery acceptance open | Earlier hotspot runs retained, but latest user clarification leaves their running-image identity uncertain. Confirmed-flash telemetry/STATUS/USB work; a clean hotspot series and strict interval evidence remain open |
+| Implement heartbeat/status reporting | Heartbeat and read-only communication status implemented | Reply reports actual boot uptime, build mode and fresh available sensor snapshot. Overall controller state still awaits its interface |
 
 The four listed deliverables are communication API, telemetry framework,
 MQTT documentation and a telemetry demonstration. The public S1 API,
-packed telemetry framework, dashboard README and bench observations cover
-their foundations. Command/controller integration and the final integrated
-demonstration remain to complete them.
+packed telemetry framework, dashboard README and real STATUS/telemetry
+checks cover their foundations. Controller-action integration and the final
+integrated demonstration remain to complete them.
 
 The PDF labels robot state, speed, encoder counts, line status, barcode,
 hump, obstacle scans and travelled distance as **Telemetry Examples**.
@@ -232,10 +252,191 @@ design/test-plan targets and must not be attributed to this PDF. Change
 Requirement 1 is an additional source: its packed-data and evidence work
 still applies, including outstanding physical performance/RAM evidence.
 
-Next priorities: agree and implement the permitted command/controller
-handoff, publish useful controller status, then complete outage/recovery
-and integrated demonstration evidence. Add other real measurements when
+Read-only STATUS is now implemented. Next priorities: agree and implement
+the permitted actuator/controller handoff and publish useful controller status.
+While that interface remains undefined, recovery code/tests have been prepared
+and five broker plus five hotspot trials recorded. Broker recovery passed its
+earlier design target; hotspot timing did not. Retest the now-flashed MQTT
+timeout correction and complete integrated evidence. Add other real measurements when
 their owning subsystems provide valid snapshots; avoid fabricated values.
+
+## Current STATUS milestone and deferred IMU case
+
+Read-only request/reply works from the website through MQTT to the real
+Pico. Normal telemetry stays at 11 bytes and heartbeats at five bytes. A
+STATUS request is five bytes; its response is 22 bytes with a fresh snapshot
+or 11 bytes without one. The final captured matching reply took 29 ms;
+the user also confirmed the website's Request status button shows success.
+This is not a repeated performance/recovery acceptance pass.
+
+An initial live check exposed calendar time being labelled as uptime. Only
+S1 reporting was corrected to `tk_get_otm`; sensor age comparisons retain
+the existing producer clock domain. The first capture is preserved as the
+transport check with the incorrect uptime; the final capture verifies the
+corrected operating-time field. No IMU algorithm was changed in this stage.
+
+The old unconnected ASCII STOP/STATUS parser was removed. STOP remains
+unimplemented and disabled. Current communication status does not claim
+that an unknown vehicle/controller state is Ready, stopped or fault-free.
+
+The user wants to finish Buddy 1 first. Defer the professor's reported
+one-wheel/curb-like IMU test case to Buddy 4's algorithm review. S1 continues
+transporting actual provided values, validity and status. Do not infer height
+accuracy from a hand tilt or the nominal-speed estimate.
+
+## Recovery preparation - 10 November 2026
+
+See [the recovery test guide](testing/subsystem1/RECOVERY_TESTS.md) for the
+exact later procedure. No broker or hotspot was stopped, no UF2 was flashed
+and no live recovery pass was recorded in this stage. The initial baseline
+subscriber connected to the broker but saw no telemetry; the user confirmed
+the car was unavailable, so this is not evidence of a firmware failure.
+
+WiFi DOWN (0) and failure states now retry after five seconds without needing
+a status change. Initial join-request rejection no longer parks a healthy
+driver. MQTT closes stale TCP and cancels pending requests/timers on WiFi/IP
+loss; immediate connect/allocation/address errors back off three seconds
+instead of retrying every network poll. Positive JOIN/DHCP progress is left
+to the driver. Wire formats and IMU/controller behavior are unchanged.
+
+Offline checks passed: 13 retry-policy checks, 30 actual MQTT-port checks,
+six recorder checks, 32 S1 codec checks plus 20 queue/cache checks, 35 dashboard
+tests and cross-language golden-frame checks. ARM build passed. These do not
+prove radio recovery, sensor accuracy or the 15-second design target.
+
+STOP still needs a latched controller-owned interface: the controller updates
+motor duties continuously, so a one-time zero-duty call would be overwritten.
+No actuator path was enabled while the team interface remains undefined.
+
+Initial recovery UF2 used in the broker/hotspot trials: **707584 bytes**, SHA-256
+`aaf0e39836b759904add31509ca4fef3a06a6892f6e58589b3cbf4342226fa77`.
+Linked static RAM is **82612 bytes** (eight more than the preceding STATUS
+build); requested S1 queue storage remains 192 bytes. Physical trials were
+pending at preparation; the later broker results below supersede that status.
+The [S1 test log](testing/subsystem1/TEST_LOG.md) has current evidence.
+
+## Live broker follow-up - 10 November 2026
+
+The user connected the car and reported flashing the current recovery UF2.
+Fresh telemetry and a real correlated stationary-test STATUS reply were
+observed before any interruption. Only the verified custom Mosquitto process
+was restarted; the default Windows service, Pico power and hotspot stayed on.
+The custom broker and local dashboard were left running afterward.
+
+Five actual restarts recovered with bounds **4.415, 3.552, 3.318, 5.641 and
+5.811 seconds** from a marker before broker restoration. All five returned
+fresh telemetry, two heartbeats and STATUS with compatible Pico uptime.
+This meets the earlier 15-second recovery design target for these broker
+trials. It does not establish hotspot/AP recovery or exact Pico-only timing.
+
+Observed post-recovery intervals were not all within the separate targets:
+telemetry reached **2.111 s** in one trial; heartbeat reached **6.393 s**.
+Only four/five short telemetry windows and two/five heartbeat windows met
+the strict earlier 2 s/5 s targets. Keep those acceptance items open.
+
+The recorder initially omitted baseline request/reply latency from uptime
+continuity and could miss outbound MQTT keepalives while receiving telemetry.
+Both recorder issues were corrected; eight offline tests passed. Original
+captures/results are preserved. Trial 2's apparent uptime failure was
+reassessed using both request/reply windows; no firmware change was involved.
+One prepared baseline with no actual interruption is explicitly recorded
+separately, rather than counted as a physical restart.
+
+See [the five-trial summary](testing/subsystem1/logs/2026-11-10-broker-recovery-summary.json).
+The later hotspot results below supersede the earlier pending status.
+
+## Hotspot results and MQTT timeout correction - 10 November 2026
+
+The user completed all five local-terminal trials. Three returned a matching
+fresh STATUS without an indicated reboot, at **15.572, 18.015 and 20.484 s**
+from the restoration marker. Trials 3 and 5 did not complete within the
+30-second window. **None met the earlier 15-second design target.** These
+are end-to-end observations, not isolated Pico/AP timing failures.
+
+Broker logs later show telemetry for the two timed-out trials at roughly
+32..33 s and 74..75 s after their markers. Keep those trials incomplete;
+later receipt does not replace the missing within-window STATUS evidence.
+Some heartbeats arrived together in a burst. Their tiny arrival intervals
+do not prove the normal heartbeat cadence or freshness of queued telemetry.
+
+The old Pico TCP session persisted during the outages, and the broker finally
+expired it before accepting a new session. Firmware advertised a 60-second
+MQTT keepalive. AP-on time, laptop association time and a Pico serial trace
+were not captured, so the entire delay cannot be assigned to one component.
+
+A focused port correction is now built: MQTT keepalive **5 s**, pending
+TCP/MQTT connection deadline **5 s**, existing error backoff **3 s**. The
+deadline reuses the existing retry timer and never closes a healthy accepted
+session. Thirty-six actual-port host checks and the ARM build passed. This
+does not prove the new image meets the physical timing target yet.
+
+Current replacement UF2 remains the same filename and **707584 bytes**,
+SHA-256 **9c5ac8f0876055939f2cc4049a22e3ca9285b38ccccd889096bd801dafc2a7a0**.
+Linked static RAM remains **82612 bytes**, with no new task/queue/state flag;
+code grew 64 bytes. Sensor logic, binary schema and dashboard decoder are
+unchanged. At preparation it was not flashed; the following baseline now
+supersedes that status.
+
+See [the hotspot summary](testing/subsystem1/logs/2026-11-10-hotspot-recovery-summary.json)
+and [S1 test log](testing/subsystem1/TEST_LOG.md).
+
+### Replacement live baseline before hotspot retest
+
+The user reported ready after the requested flash. Broker logs show a new
+Pico MQTT session with **k5**, consistent with the replacement configuration.
+A 60-second capture through the actual dashboard WebSocket adapter received
+**118 telemetry messages, 13 heartbeats and three matching STATUS replies**
+(103, 207 and 1505 ms). All replies reported TEST mode and a fresh snapshot;
+zero packets were rejected, with one sequence gap observed. The Pico MQTT
+session did not restart during the capture.
+
+Maximum arrival intervals were **2.007 s telemetry and 6.362 s heartbeat**.
+Normal communication is established, but strict earlier interval targets
+remain open. This is a baseline check, not a hotspot recovery pass.
+
+An allowlisted USB serial/laptop-interface capture was started for up to
+20 minutes for the next retest. It records link/MQTT events and laptop
+interface changes without SSIDs/passwords, and performs no reset/network
+changes. Its timestamps remain observation proxies, not AP-beacon times.
+The initial serial drain included **subsystem1 SUMMARY 33 passed, 0 failed**;
+it can be buffered boot output, so this is not a new controlled cold-boot test.
+Next: repeat the five local-terminal hotspot trials with this image.
+
+### Follow-up review and firmware-identity correction
+
+Three additional recorder files were found. An earlier partial run recorded
+two passes and one timeout; one startup-only file has no saved trials. A
+complete series after the user's laptop restart recorded **four of five**
+under 15 s: **7.532, 6.668, 7.170 and 9.096 s**, with trial 5 incomplete at
+30 s. All eight recorded trials are retained (six passes, two timeouts),
+across different/restarted conditions. Do not present only the better run
+as proof of uniform reliability.
+
+The laptop restart terminated the extra diagnostic capture. It contains
+laptop-interface transitions for the earlier partial run, but no Pico serial
+events during those outages and no trace for the latest complete series.
+Its missing end marker/coverage is documented, not treated as a full trace.
+
+After the final timeout, a read-only check reached the broker but received
+no car messages; COM5 was present/OK in Windows yet could not be opened.
+The user confirmed laptop USB power and hotspot connectivity. Before any
+new code change, the user clarified that the intended UF2 had not been
+flashed, then explicitly reported flashing it. Therefore the exact running
+image in the preceding tests is **unconfirmed**, despite local-file hashes
+and the previously observed k5 configuration. Raw results are unchanged.
+
+After that confirmed flash/restart, a new 20-second check observed **37
+telemetry messages, three heartbeats and matching STATUS in 81 ms**. The USB
+console opened again and yielded **33 passed, 0 failed**, plus WiFi/MQTT-up
+messages. Initial console output can be buffered; this is not independent
+flash readback or a controlled cold-boot timing test. Recovery after flashing
+cannot distinguish a firmware effect from the reset itself.
+
+No firmware/source change or new UF2 was made during this review. Current
+file is still **9c5ac8f0876055939f2cc4049a22e3ca9285b38ccccd889096bd801dafc2a7a0**.
+Normal communication now works; one clean hotspot series after this confirmed
+flash is still required. See [the follow-up summary](testing/subsystem1/logs/2026-11-10-hotspot-corrected-retest-summary.json)
+and [post-flash check](testing/subsystem1/logs/2026-11-10-hotspot-post-confirmed-flash-check.json).
 
 ## Dependencies and decisions before later milestones
 
@@ -257,7 +458,8 @@ agreed group requirements and measure them under the intended conditions.
 Browser reconnection timing is **not** a measurement of Pico WiFi recovery.
 Record AP loss, broker loss, invalid commands, malformed/stale packets and
 recovery separately. Agree permitted command vocabulary with the controller;
-the existing STOP/STATUS parser alone does not execute commands.
+the implemented STATUS path is read-only; controller-owned actuator commands
+remain to be agreed and integrated.
 
 For the change requirement, record the field/bit/units/validity table,
 boundary and wrap tests, equivalent JSON/binary application payload bytes,

@@ -1,0 +1,26 @@
+{
+  "date_local": "2026-11-10",
+  "timezone": "Asia/Kuala_Lumpur",
+  "git_base": "d3cdd0893e5b6c97fe847f86f280e3283163beb5",
+  "build_flags": "NET=lwip MQTT=1 TEST=1",
+  "uf2_bytes": 707584,
+  "uf2_sha256": "9c5ac8f0876055939f2cc4049a22e3ca9285b38ccccd889096bd801dafc2a7a0",
+  "tested_previous_uf2_sha256": "aaf0e39836b759904add31509ca4fef3a06a6892f6e58589b3cbf4342226fa77",
+  "new_image_hardware_status": "NOT FLASHED / NOT VALIDATED",
+  "previous_hotspot_trials": 5,
+  "previous_within_15s": 0,
+  "previous_functional_within_30s": 3,
+  "actual_mqtt_port_host_checks": 36,
+  "linked_text": 353644,
+  "linked_data": 104,
+  "linked_bss": 82508,
+  "linked_static_ram": 82612,
+  "sha256": {
+    "lib/liblwip/sysdepend/pico_rp2040/mqtt_utk.c": "28f7880911fe8d140a174f83b4a6ef77535aee0b8e82020e1c94605a8fe59371",
+    "testing/subsystem1/host/test_status_mqtt.c": "451d07cc567c2e3c60366db093130af7756356ba47de78e3299d890566054032",
+    "testing/subsystem1/recovery_probe.mjs": "0ba128ad62de87c65b5dc100f6f065f6371c07bf4acd49e3e5fd0aaedfb194ff",
+    "testing/subsystem1/logs/2026-11-10T08-59-05-093Z-wifi-recovery.json": "de694b5e5e7c0734fa079fbe924683267b5545f1dee5c9b15fd41fc3fa0b0514",
+    "testing/subsystem1/logs/2026-11-10-hotspot-recovery-summary.json": "5a15f86ffe385218fa6551873d69716349eeaaf77a51078fc1a790d7ebe95f6c",
+    "testing/subsystem1/logs/2026-11-10-hotspot-broker-events.txt": "9a22dc3dde3fcf1ad72f7785821fb904a358d2a38fc45ef1bc7e149b083de62d"
+  }
+}

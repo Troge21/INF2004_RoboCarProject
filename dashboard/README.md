@@ -73,7 +73,7 @@ Pulling Git source alone does not update the Pico or the existing UF2.
 - Sensors & motion: wheel speed, ultrasonic distance, live IMU pitch/status, hump estimates and their speed assumption, run maximum, cumulative distance, IR readings and a servo scan profile.
 - Communications: delivery intervals, heartbeat age, subscriptions, payload sizes, sequence gaps, rejected messages, decoded/raw packet inspector and recent messages.
 - Last 30 / 60 / 120 seconds, chart hover values, pause display while continuing collection, and CSV export of received telemetry with `source=mqtt`.
-- **Command buttons stay disabled** until firmware integration: the current firmware does not route received commands to the controller. The dashboard sends no motor commands.
+- **Request status** sends a read-only binary request to the Pico and confirms its matching reply. **Stop stays disabled** pending controller integration. STATUS does not control motors or change sensor algorithms.
 - Missing fields show unavailable. Invalid ultrasonic readings produce gaps, rather than zero or clear space. Live current values become unavailable after 2 seconds without telemetry; historical charts remain visible.
 - Memory is bounded to 600 telemetry samples, 30 packets and 80 events. Nothing is saved to browser storage. Exports contain telemetry, not broker credentials.
 
@@ -103,6 +103,8 @@ Use the locally served dashboard, click **Connect robot**, and enter:
 | Broker URL | `ws://localhost:9001` |
 | Telemetry topic | `mtk3smp-pico/telemetry` |
 | Heartbeat topic | `mtk3smp-pico/heartbeat` |
+| STATUS command topic | `mtk3smp-pico/command` |
+| STATUS reply topic | `mtk3smp-pico/status` |
 | Telemetry format | Packed v3, fixed automatically (11 bytes) |
 
 These topics match `config/wifi_secrets.example.h`. Change them if your firmware overrides the client ID/topics. The dashboard does not read your secrets file. Username/password, if supplied, are held only in tab memory for reconnects; input fields are cleared when the settings close. Disconnect using **Disconnect** in the connection settings.
@@ -137,7 +139,7 @@ is independent. Wheel speed and other future measurements remain unavailable.
 Obsolete v1/v2/JSON telemetry and text heartbeats are rejected with a clear
 current-firmware message; no compatibility decoder remains.
 
-Only a successful MQTT connection **and both accepted subscriptions** count
+Only a successful MQTT connection **and all three accepted subscriptions** count
 as broker connected. Robot presence is inferred separately from fresh
 messages. Retained packets are rejected. Duplicate/backward sequences are
 rejected, wraparound is supported, and a decreasing heartbeat counter resets
@@ -241,11 +243,120 @@ bytes, queue storage 192 to 144 bytes). The added IMU fields/source timestamps
 bring the current queue request to 192 bytes and linked static RAM to 82764
 bytes. These are feature costs; peak heap/stack use is still unmeasured.
 
-Other subsystem/controller data, binary commands and physical timing evidence
+Other subsystem/controller data, actuator commands and physical timing evidence
 remain group work. S4 retains sensor ownership; the new snapshot handoff and
 API changes need S4 owner review before team merge.
 
+## Request STATUS
+
+After flashing the current UF2, refresh this page, reconnect and click
+**Request status** in Overview or Communications. The note should say
+**Pico STATUS reply confirmed** with a measured request/reply time. Below it,
+the last reply shows Pico boot uptime, normal/stationary-test build mode and
+sensor sample age. It remains a last-response record, not a live controller state.
+
+The Pico subscribes to `/command`; the browser subscribes to telemetry,
+heartbeat and `/status`. All four configured topic names must be distinct.
+A broker connection alone does not prove that the Pico accepted a request;
+only its matching reply confirms that path.
+
+| Packet | Binary contract |
+| --- | --- |
+| STATUS request, 5 bytes | `a0` + nonzero uint32 request ID, little endian |
+| Reply header, 11 bytes | `a1` + echoed ID:32 + boot uptime milliseconds:32 + source age:11 / test-build:1 / reserved-zero:4 |
+| Optional reply snapshot, 11 bytes | Current telemetry frame appended when source age is 0..2000 ms; total reply length 22 bytes |
+| No recent telemetry | Age code 2047 and header only (11 bytes); measurements unavailable |
+
+IDs and uptime retain their full 32-bit ranges. Source age plus unavailable
+has 2002 possible states and uses 11 bits; build mode uses one bit. Snapshot
+presence is derived from age without an extra boolean. Fixed framing markers
+are metadata; no ASCII command names or JSON are transmitted.
+
+The network task alone receives/dispatches STATUS and publishes its reply.
+It holds one five-byte request slot, rate limits accepted requests to one per
+250 ms and retries command subscriptions after failure. It queries the existing
+network-owned sensor cache, rechecking all source freshness. No driver reads,
+new task, kernel queue or actuator interface is introduced. Cache presence is
+derived from its existing frame marker. Receive length/flags share one byte.
+Boot uptime uses `tk_get_otm`; existing sensor timestamps remain in their
+shared `tk_get_tim` time domain for valid age differences.
+
+The browser permits one pending request, uses a fresh correlation ID and
+waits three seconds. Unmatched, late or retained replies are ignored; a
+connection change cancels the request and does not resend it. A STATUS
+snapshot never replaces the live stream or resets its sequence/history.
+The browser's measured round trip is not a WiFi-recovery measurement.
+
+Publish requests with QoS 0 and retain off. STATUS is intentionally read-only
+and repeatable: the stock Pico lwIP incoming callback does not expose the
+retained flag, so firmware does not claim retained-command rejection. An old
+request can only produce an unmatched read-only reply. Actuator commands
+require a separate controller-owned design before enabling STOP.
+
+The user confirmed the website button works. The final real-Pico check
+returned its matching reply in 29 ms while five telemetry samples and a
+heartbeat arrived. This is one functional check, not a worst-case timing or
+recovery guarantee. See the [S1 test log](../testing/subsystem1/TEST_LOG.md).
+
 ## Validation
+
+### WiFi and broker recovery bench
+
+The earlier recovery UF2 included WiFi DOWN/failure retries and MQTT
+backoff/session cleanup. On 10 November the user reported flashing it; five actual broker
+restarts then restored telemetry, heartbeat and STATUS without a detected
+Pico reboot. Recovery bounds were 3.318..5.811 s, measured from a marker
+before broker restart. Some post-recovery delivery intervals exceeded the
+earlier 2 s/5 s targets. Five later hotspot trials did not meet the 15 s
+design target: three correlated recoveries at 15.572, 18.015 and 20.484 s;
+two incomplete within 30 s. See the S1 test log for exact results.
+
+The current replacement UF2 adds a five-second MQTT keepalive (previously
+60 s) and a five-second pending connection deadline using the existing
+retry timer. **The user reports flashing it; a one-minute normal baseline is
+observed. Later hotspot captures included four recoveries in a complete
+five-trial run, but the user then clarified that the intended UF2 had not
+been flashed. Their earlier running-image identity is unconfirmed.**
+SHA-256: `9c5ac8f0876055939f2cc4049a22e3ca9285b38ccccd889096bd801dafc2a7a0`.
+The five-second application heartbeat and all packet formats are unchanged.
+The baseline received 118 telemetry messages, 13 heartbeats and three matching
+STATUS replies without a Pico MQTT restart. It still observed maximum intervals
+of 2.007 s telemetry and 6.362 s heartbeat, so the earlier strict interval
+targets remain open. No new flash is needed before the next hotspot retest.
+The user has now explicitly confirmed flashing the current file. A new
+20-second check received 37 telemetry messages, three heartbeats and STATUS
+in 81 ms; USB communication also returned. No source change/new image was
+needed in that review. A clean hotspot series after this confirmed flash
+remains required; earlier local-file hashes are not flash readback.
+Current linked static RAM is 82612 bytes, versus 82604 for STATUS alone;
+S1 queue requests remain 192 bytes. Runtime heap/stack peaks are unmeasured.
+
+Follow [the recovery test guide](../testing/subsystem1/RECOVERY_TESTS.md)
+when the car is available. It covers five broker trials and five separate
+hotspot trials, a real-data baseline, JSON evidence and timing limitations.
+The recorder uses direct TCP independently of browser WebSocket recovery;
+it sends only read-only STATUS requests and never changes services itself.
+
+From the repository root, after flashing and starting the real bench:
+
+```powershell
+node testing/subsystem1/recovery_probe.mjs --kind broker
+# Run separately after the broker series:
+node testing/subsystem1/recovery_probe.mjs --kind wifi
+```
+
+Read the guide before using `loss` / `restore`. No live test starts without
+fresh telemetry, heartbeat and a matching Pico STATUS reply. The restoration
+marker must be entered before restoring the service; its timing is a
+conservative end-to-end bound, not isolated Pico association time.
+
+Firmware checks source freshness before serialization. Browser current-value
+expiry is based on receipt time; v3 carries no sample-generation timestamp.
+It cannot independently detect delay already spent inside TCP/radio buffers.
+Post-outage bursts of old queued packets do not demonstrate normal sensor
+cadence; use a new matching STATUS and sustained delivery when checking recovery.
+
+### Software checks
 
 ```powershell
 npm test

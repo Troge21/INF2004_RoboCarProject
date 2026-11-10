@@ -1,0 +1,14 @@
+[WiFi recovery] PASS DOWN arms five-second delay
+[WiFi recovery] PASS DOWN does not retry early
+[WiFi recovery] PASS DOWN retries at exact boundary
+[WiFi recovery] PASS unchanged DOWN retries again without a state transition
+[WiFi recovery] PASS each failed-link status retries after backoff
+[WiFi recovery] PASS each failed-link status retries after backoff
+[WiFi recovery] PASS each failed-link status retries after backoff
+[WiFi recovery] PASS JOIN, DHCP and UP cancel retry without interrupting progress
+[WiFi recovery] PASS JOIN, DHCP and UP cancel retry without interrupting progress
+[WiFi recovery] PASS JOIN, DHCP and UP cancel retry without interrupting progress
+[WiFi recovery] PASS a new loss after UP gets a new full delay
+[WiFi recovery] PASS deadline comparison survives uint64 clock wrap
+[WiFi recovery] PASS wrapped zero deadline cannot collide with unarmed sentinel
+[WiFi recovery] SUMMARY 13 checks, 0 failures

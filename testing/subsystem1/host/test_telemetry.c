@@ -42,11 +42,13 @@ typedef struct { UW tskatr; FP task; INT itskpri, stksz; } T_CTSK;
 
 static int failures, checks;
 static UW clock_ms;
+static UW operating_ms;
 static jmp_buf idle;
 static int running;
 static struct { unsigned head, count, size, capacity; unsigned char data[4][256]; INT lengths[4]; } queues[3];
 static int queue_count;
 static ER tk_get_tim(SYSTIM *now) { now->lo = clock_ms; now->hi = 0; return E_OK; }
+static ER tk_get_otm(SYSTIM *now) { now->lo = operating_ms; now->hi = 0; return E_OK; }
 static ID tk_cre_mbf(const T_CMBF *config) {
     if (++queue_count > 2 || config->maxmsz > 256) abort();
     queues[queue_count].size = (unsigned)config->maxmsz;
@@ -121,6 +123,7 @@ static void pump(void) {
 }
 static void reset_at(UW now, UINT pattern) {
     memset(queues, 0, sizeof(queues)); queue_count = 0; clock_ms = now;
+    operating_ms = 25; /* Separate clock domains; never mistake calendar time for uptime. */
     source_line.pattern = pattern; source_line.timestamp_ms = now;
     source_line.valid = TRUE; source_result = E_OK;
     memset(&source_imu, 0, sizeof(source_imu)); imu_result = E_OBJ;
@@ -248,6 +251,33 @@ int main(void) {
     expect("S1-U61", length == 11 && s1_read_u32(payload + 6) == (7U << 25),
         "invalid S4 values cannot leak or truncate into plausible telemetry");
 
+    {
+        UB request[5] = {0xa0,12,0,0,0}, reply[S1_STATUS_MAX_BYTES];
+        reset_at(1000,2);
+        length = s1_network_status(request,5,reply,sizeof(reply));
+        expect("S1-U74",length==11 && s1_read_u32(reply+1)==12 && s1_read_u32(reply+5)==25 &&
+            reply[9]==255 && reply[10]==15,"STATUS works before any telemetry sample exists");
+        (void)s1_make_telemetry(&sample,42,451,1);
+        (void)s1_submit_telemetry(&sample);pump();(void)s1_network_poll(payload,sizeof(payload));
+        clock_ms=1010;length=s1_network_status(request,5,reply,sizeof(reply));
+        expect("S1-U75",length==22 && reply[9]==10 && reply[10]==8 &&
+            packet_is(reply+11,11,42,451,6),"STATUS returns cached real sample with source age");
+        clock_ms=1101;length=s1_network_status(request,5,reply,sizeof(reply));
+        full = length==22 && packet_is(reply+11,11,42,451,0);
+        clock_ms=3001;length=s1_network_status(request,5,reply,sizeof(reply));
+        expect("S1-U76",full && length==11 && reply[9]==255 && reply[10]==15,
+            "STATUS independently expires queued IR then whole cached telemetry");
+        (void)s1_submit_telemetry(&sample);full=(int)queues[1].count;reply[0]=0xa5;
+        expect("S1-U77",s1_network_status((const UB *)"STOP",4,reply,sizeof(reply))==E_PAR &&
+            reply[0]==0xa5 && queues[1].count==(unsigned)full,
+            "unsupported commands leave queues and output untouched");
+        reset_at(0xfffffff0U,2);(void)s1_submit_telemetry(&sample);pump();
+        (void)s1_network_poll(payload,sizeof(payload));clock_ms=16;
+        length=s1_network_status(request,5,reply,sizeof(reply));
+        full=length==22 && reply[9]==32;
+        reset_at(16,2);length=s1_network_status(request,5,reply,sizeof(reply));
+        expect("S1-U78",full && length==11,"STATUS age survives uptime wrap and reinitialization clears cache");
+    }
     printf("[HOST] queue SUMMARY %d checks, %d total failures\n", checks, failures);
     printf("Queue storage: input=%u bytes; output=%u bytes (four messages plus length headers each)\n",
            (unsigned)S1_MBF_STORAGE(sizeof(S1_INPUT)),

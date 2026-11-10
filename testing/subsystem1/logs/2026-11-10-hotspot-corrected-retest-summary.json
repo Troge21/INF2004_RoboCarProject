@@ -1,0 +1,394 @@
+{
+  "date_local": "2026-11-10",
+  "timezone": "Asia/Kuala_Lumpur",
+  "operator_confirmation": "User confirmed laptop restart between partial and latest complete run. Pico remains powered, hotspot on and laptop connected after final trial.",
+  "latest_complete_series": {
+    "file": "2026-11-10T09-47-05-672Z-wifi-recovery.json",
+    "recorded": 5,
+    "within_15s": 4,
+    "bounds_ms": [
+      7532,
+      6668,
+      7170,
+      9096
+    ],
+    "incomplete": [
+      5
+    ]
+  },
+  "result": "Latest preceding complete series recorded four of five under 15 s; earlier partial series two of three. These are not accepted verification of the intended corrected firmware after the user clarification. A powered-silent state was observed afterward; communication resumed following the newly confirmed flash/restart.",
+  "diagnostics": {
+    "file": "2026-11-10-hotspot-retest-diagnostics.jsonl",
+    "note": "Partial: laptop restart terminated helper. Last serial event 09:30:55Z, last laptop-interface change 09:41:32Z. Does not cover latest 09:47 series."
+  },
+  "timing_note": "Operator marker before service restoration; includes human, laptop and observation delays. Not isolated Pico/AP timing.",
+  "post_run_check": {
+    "file": "2026-11-10-hotspot-retest-current-check.json",
+    "broker_reachable": true,
+    "telemetry": 0,
+    "heartbeats": 0,
+    "status_reply": false,
+    "pico_power_state": "User confirms powered; hotspot and laptop connected"
+  },
+  "captures": [
+    {
+      "file": "2026-11-10T09-35-42-751Z-wifi-recovery.json",
+      "sha256": "6fdabfb7f5b6ffec83e131c7f5fd41dfd4acc806ff5aa1368e70c98a87d82d11",
+      "started_utc": "2026-11-10T09:35:42.752Z",
+      "finished_utc": "2026-11-10T09:39:46.863Z",
+      "requested_trials": 5,
+      "recorded_trials": 3,
+      "probe_sha256": "0ba128ad62de87c65b5dc100f6f065f6371c07bf4acd49e3e5fd0aaedfb194ff",
+      "trials": [
+        {
+          "number": 1,
+          "reason": null,
+          "baseline": {
+            "at_ms": 32570,
+            "round_trip_ms": 121,
+            "uptime_ms": 804040,
+            "sample_age_ms": 40,
+            "test_build": true
+          },
+          "status": {
+            "at_ms": 65354,
+            "round_trip_ms": 2760,
+            "uptime_ms": 836680,
+            "sample_age_ms": 40,
+            "test_build": true
+          },
+          "result": {
+            "functional_recovery": true,
+            "uptime_continuous": true,
+            "uptime_delta_ms": 32640,
+            "expected_uptime_delta_ms": {
+              "min": 28024,
+              "max": 34905
+            },
+            "recovery_upper_bound_ms": 10220,
+            "telemetry_intervals": {
+              "count": 22,
+              "min_ms": 0,
+              "max_ms": 2251
+            },
+            "heartbeat_intervals": {
+              "count": 1,
+              "min_ms": 6865,
+              "max_ms": 6865
+            },
+            "within_conservative_15s_target": true,
+            "timing_anchor": "Operator marker BEFORE restoring service; includes human, service-start and observer delays. Not isolated Pico WiFi time."
+          }
+        },
+        {
+          "number": 2,
+          "reason": null,
+          "baseline": {
+            "at_ms": 80693,
+            "round_trip_ms": 52,
+            "uptime_ms": 852240,
+            "sample_age_ms": 300,
+            "test_build": true
+          },
+          "status": {
+            "at_ms": 146079,
+            "round_trip_ms": 117,
+            "uptime_ms": 917580,
+            "sample_age_ms": 360,
+            "test_build": true
+          },
+          "result": {
+            "functional_recovery": true,
+            "uptime_continuous": true,
+            "uptime_delta_ms": 65340,
+            "expected_uptime_delta_ms": {
+              "min": 63269,
+              "max": 67438
+            },
+            "recovery_upper_bound_ms": 9877,
+            "telemetry_intervals": {
+              "count": 19,
+              "min_ms": 0,
+              "max_ms": 1841
+            },
+            "heartbeat_intervals": {
+              "count": 1,
+              "min_ms": 3878,
+              "max_ms": 3878
+            },
+            "within_conservative_15s_target": true,
+            "timing_anchor": "Operator marker BEFORE restoring service; includes human, service-start and observer delays. Not isolated Pico WiFi time."
+          }
+        },
+        {
+          "number": 3,
+          "reason": "Incomplete within 30 s observation window",
+          "baseline": {
+            "at_ms": 164060,
+            "round_trip_ms": 296,
+            "uptime_ms": 935520,
+            "sample_age_ms": 450,
+            "test_build": true
+          },
+          "status": null,
+          "result": {
+            "functional_recovery": false,
+            "uptime_continuous": false,
+            "uptime_delta_ms": null,
+            "expected_uptime_delta_ms": {
+              "min": null,
+              "max": null
+            },
+            "recovery_upper_bound_ms": null,
+            "telemetry_intervals": {
+              "count": 0,
+              "min_ms": null,
+              "max_ms": null
+            },
+            "heartbeat_intervals": {
+              "count": 0,
+              "min_ms": null,
+              "max_ms": null
+            },
+            "within_conservative_15s_target": false,
+            "timing_anchor": "Operator marker BEFORE restoring service; includes human, service-start and observer delays. Not isolated Pico WiFi time."
+          }
+        }
+      ],
+      "local_uf2_sha256": "9c5ac8f0876055939f2cc4049a22e3ca9285b38ccccd889096bd801dafc2a7a0"
+    },
+    {
+      "file": "2026-11-10T09-39-53-541Z-wifi-recovery.json",
+      "sha256": "93d07077e5ae21e2215750f1b1aa654425dba7d9f0ab5297edf9005e32a3366e",
+      "started_utc": "2026-11-10T09:39:53.542Z",
+      "finished_utc": null,
+      "requested_trials": 5,
+      "recorded_trials": 0,
+      "probe_sha256": "0ba128ad62de87c65b5dc100f6f065f6371c07bf4acd49e3e5fd0aaedfb194ff",
+      "trials": [],
+      "local_uf2_sha256": "9c5ac8f0876055939f2cc4049a22e3ca9285b38ccccd889096bd801dafc2a7a0"
+    },
+    {
+      "file": "2026-11-10T09-47-05-672Z-wifi-recovery.json",
+      "sha256": "54ac9a11b92ee2e0934ad51fcc881d268e6956552cd349a51b03ecb5c9856c72",
+      "started_utc": "2026-11-10T09:47:05.673Z",
+      "finished_utc": "2026-11-10T09:51:26.946Z",
+      "requested_trials": 5,
+      "recorded_trials": 5,
+      "probe_sha256": "0ba128ad62de87c65b5dc100f6f065f6371c07bf4acd49e3e5fd0aaedfb194ff",
+      "trials": [
+        {
+          "number": 1,
+          "reason": null,
+          "baseline": {
+            "at_ms": 18797,
+            "round_trip_ms": 120,
+            "uptime_ms": 50150,
+            "sample_age_ms": 60,
+            "test_build": true
+          },
+          "status": {
+            "at_ms": 59620,
+            "round_trip_ms": 61,
+            "uptime_ms": 91010,
+            "sample_age_ms": 120,
+            "test_build": true
+          },
+          "result": {
+            "functional_recovery": true,
+            "uptime_continuous": true,
+            "uptime_delta_ms": 40860,
+            "expected_uptime_delta_ms": {
+              "min": 38762,
+              "max": 42943
+            },
+            "recovery_upper_bound_ms": 7532,
+            "telemetry_intervals": {
+              "count": 19,
+              "min_ms": 479,
+              "max_ms": 557
+            },
+            "heartbeat_intervals": {
+              "count": 1,
+              "min_ms": 5001,
+              "max_ms": 5001
+            },
+            "within_conservative_15s_target": true,
+            "timing_anchor": "Operator marker BEFORE restoring service; includes human, service-start and observer delays. Not isolated Pico WiFi time."
+          }
+        },
+        {
+          "number": 2,
+          "reason": null,
+          "baseline": {
+            "at_ms": 72828,
+            "round_trip_ms": 25,
+            "uptime_ms": 104230,
+            "sample_age_ms": 80,
+            "test_build": true
+          },
+          "status": {
+            "at_ms": 102968,
+            "round_trip_ms": 19,
+            "uptime_ms": 134370,
+            "sample_age_ms": 130,
+            "test_build": true
+          },
+          "result": {
+            "functional_recovery": true,
+            "uptime_continuous": true,
+            "uptime_delta_ms": 30140,
+            "expected_uptime_delta_ms": {
+              "min": 28121,
+              "max": 32165
+            },
+            "recovery_upper_bound_ms": 6668,
+            "telemetry_intervals": {
+              "count": 18,
+              "min_ms": 431,
+              "max_ms": 612
+            },
+            "heartbeat_intervals": {
+              "count": 1,
+              "min_ms": 5024,
+              "max_ms": 5024
+            },
+            "within_conservative_15s_target": true,
+            "timing_anchor": "Operator marker BEFORE restoring service; includes human, service-start and observer delays. Not isolated Pico WiFi time."
+          }
+        },
+        {
+          "number": 3,
+          "reason": null,
+          "baseline": {
+            "at_ms": 115503,
+            "round_trip_ms": 67,
+            "uptime_ms": 146890,
+            "sample_age_ms": 410,
+            "test_build": true
+          },
+          "status": {
+            "at_ms": 155975,
+            "round_trip_ms": 50,
+            "uptime_ms": 187370,
+            "sample_age_ms": 90,
+            "test_build": true
+          },
+          "result": {
+            "functional_recovery": true,
+            "uptime_continuous": true,
+            "uptime_delta_ms": 40480,
+            "expected_uptime_delta_ms": {
+              "min": 38422,
+              "max": 42539
+            },
+            "recovery_upper_bound_ms": 7170,
+            "telemetry_intervals": {
+              "count": 19,
+              "min_ms": 0,
+              "max_ms": 1820
+            },
+            "heartbeat_intervals": {
+              "count": 1,
+              "min_ms": 4977,
+              "max_ms": 4977
+            },
+            "within_conservative_15s_target": true,
+            "timing_anchor": "Operator marker BEFORE restoring service; includes human, service-start and observer delays. Not isolated Pico WiFi time."
+          }
+        },
+        {
+          "number": 4,
+          "reason": null,
+          "baseline": {
+            "at_ms": 169203,
+            "round_trip_ms": 58,
+            "uptime_ms": 200570,
+            "sample_age_ms": 30,
+            "test_build": true
+          },
+          "status": {
+            "at_ms": 198344,
+            "round_trip_ms": 14,
+            "uptime_ms": 229750,
+            "sample_age_ms": 90,
+            "test_build": true
+          },
+          "result": {
+            "functional_recovery": true,
+            "uptime_continuous": true,
+            "uptime_delta_ms": 29180,
+            "expected_uptime_delta_ms": {
+              "min": 27127,
+              "max": 31199
+            },
+            "recovery_upper_bound_ms": 9096,
+            "telemetry_intervals": {
+              "count": 18,
+              "min_ms": 440,
+              "max_ms": 584
+            },
+            "heartbeat_intervals": {
+              "count": 1,
+              "min_ms": 4994,
+              "max_ms": 4994
+            },
+            "within_conservative_15s_target": true,
+            "timing_anchor": "Operator marker BEFORE restoring service; includes human, service-start and observer delays. Not isolated Pico WiFi time."
+          }
+        },
+        {
+          "number": 5,
+          "reason": "Incomplete within 30 s observation window",
+          "baseline": {
+            "at_ms": 212289,
+            "round_trip_ms": 75,
+            "uptime_ms": 243690,
+            "sample_age_ms": 220,
+            "test_build": true
+          },
+          "status": null,
+          "result": {
+            "functional_recovery": false,
+            "uptime_continuous": false,
+            "uptime_delta_ms": null,
+            "expected_uptime_delta_ms": {
+              "min": null,
+              "max": null
+            },
+            "recovery_upper_bound_ms": null,
+            "telemetry_intervals": {
+              "count": 0,
+              "min_ms": null,
+              "max_ms": null
+            },
+            "heartbeat_intervals": {
+              "count": 0,
+              "min_ms": null,
+              "max_ms": null
+            },
+            "within_conservative_15s_target": false,
+            "timing_anchor": "Operator marker BEFORE restoring service; includes human, service-start and observer delays. Not isolated Pico WiFi time."
+          }
+        }
+      ],
+      "local_uf2_sha256": "9c5ac8f0876055939f2cc4049a22e3ca9285b38ccccd889096bd801dafc2a7a0"
+    }
+  ],
+  "firmware_identity_clarification": "After this review the user clarified that the intended UF2 had not been flashed for the preceding runs, then explicitly reported flashing it. Stored UF2 hashes identify local files only. Preserve earlier measurements, but treat their running-image identity as unconfirmed.",
+  "post_confirmed_flash_check": {
+    "file": "2026-11-10-hotspot-post-confirmed-flash-check.json",
+    "communicating": true,
+    "telemetry": 37,
+    "heartbeats": 3,
+    "status_rtt_ms": 81,
+    "hotspot_recovery_after_confirmed_flash": "NOT TESTED"
+  },
+  "local_uf2_sha256": "9c5ac8f0876055939f2cc4049a22e3ca9285b38ccccd889096bd801dafc2a7a0",
+  "all_followup_recorded_trials": {
+    "recorded": 8,
+    "within_15s": 6,
+    "incomplete": 2,
+    "note": "Descriptive count across restarted conditions, not a uniform-condition reliability estimate. Earlier failed/partial runs retained."
+  }
+}

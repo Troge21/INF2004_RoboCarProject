@@ -1,0 +1,37 @@
+{
+  "date_local": "2026-11-10",
+  "timezone": "Asia/Kuala_Lumpur",
+  "capture": "2026-11-10-hotspot-fix-live-baseline.json",
+  "capture_sha256": "d2959f6a8d5783634f8a17ee3089c9d5367850f6c71296af4718d718756f65ac",
+  "uf2_sha256_local": "9c5ac8f0876055939f2cc4049a22e3ca9285b38ccccd889096bd801dafc2a7a0",
+  "flash_note": "User reports ready after requested flash; no independent flash readback.",
+  "last_pico_connect_before_baseline": "1794302575: New client connected from 172.20.10.14:54591 as mtk3smp-pico (p4, c1, k5).",
+  "pico_session_events_during_baseline": [],
+  "pico_ping_requests_during_baseline": 12,
+  "telemetry": {
+    "count": 118,
+    "max_interval_ms": 2007
+  },
+  "heartbeat": {
+    "count": 13,
+    "max_interval_ms": 6362
+  },
+  "status_round_trip_ms": [
+    103,
+    207,
+    1505
+  ],
+  "rejected": 0,
+  "sequence_gaps": 1,
+  "result": "Normal baseline observed; strict interval targets not met; corrected hotspot recovery NOT TESTED yet.",
+  "diagnostic_session_note": "Separate allowlisted serial/laptop-interface capture started for up to 20 minutes; file is still open and not fingerprinted until closed.",
+  "serial_startup_summary_observation": {
+    "record": {
+      "message": "[TEST] subsystem1 SUMMARY 33 passed, 0 failed",
+      "utc": "2026-11-10T09:30:22.9372147Z",
+      "at_ms": 64,
+      "event": "pico_serial"
+    },
+    "note": "Initial serial drain can contain buffered boot output. This observes the 33/0 summary, not a fresh controlled normal-power-on test or exact boot-time timestamp."
+  }
+}

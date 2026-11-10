@@ -1,0 +1,473 @@
+{
+  "started_utc": "2026-11-10T08:40:46.701Z",
+  "kind": "broker",
+  "host": "172.20.10.2",
+  "port": 1883,
+  "requested_trials": 5,
+  "topics": {
+    "telemetry": "mtk3smp-pico/telemetry",
+    "heartbeat": "mtk3smp-pico/heartbeat",
+    "command": "mtk3smp-pico/command",
+    "status": "mtk3smp-pico/status"
+  },
+  "local_uf2_sha256": "aaf0e39836b759904add31509ca4fef3a06a6892f6e58589b3cbf4342226fa77",
+  "image_note": "Local file fingerprint only; operator must verify the flashed image.",
+  "trials": [
+    {
+      "number": 1,
+      "baseline": {
+        "at_ms": 21933,
+        "round_trip_ms": 121,
+        "uptime_ms": 118130,
+        "sample_age_ms": 40,
+        "test_build": true
+      },
+      "loss_marker_ms": 21933,
+      "outage_observed_ms": 146974,
+      "restore_marker_ms": 188727,
+      "broker_observer_ready_ms": 191053,
+      "telemetry": [
+        {
+          "at_ms": 193142,
+          "sequence": 559
+        },
+        {
+          "at_ms": 193727,
+          "sequence": 560
+        },
+        {
+          "at_ms": 194827,
+          "sequence": 561
+        },
+        {
+          "at_ms": 194827,
+          "sequence": 562
+        },
+        {
+          "at_ms": 195201,
+          "sequence": 563
+        },
+        {
+          "at_ms": 195753,
+          "sequence": 564
+        },
+        {
+          "at_ms": 196269,
+          "sequence": 565
+        },
+        {
+          "at_ms": 197924,
+          "sequence": 566
+        },
+        {
+          "at_ms": 197999,
+          "sequence": 567
+        },
+        {
+          "at_ms": 198000,
+          "sequence": 568
+        },
+        {
+          "at_ms": 198266,
+          "sequence": 569
+        },
+        {
+          "at_ms": 198817,
+          "sequence": 570
+        },
+        {
+          "at_ms": 199296,
+          "sequence": 571
+        },
+        {
+          "at_ms": 199815,
+          "sequence": 572
+        },
+        {
+          "at_ms": 200316,
+          "sequence": 573
+        },
+        {
+          "at_ms": 200797,
+          "sequence": 574
+        },
+        {
+          "at_ms": 201298,
+          "sequence": 575
+        },
+        {
+          "at_ms": 201821,
+          "sequence": 576
+        },
+        {
+          "at_ms": 202329,
+          "sequence": 577
+        }
+      ],
+      "heartbeats": [
+        {
+          "at_ms": 198000,
+          "counter": 47
+        },
+        {
+          "at_ms": 202846,
+          "counter": 48
+        }
+      ],
+      "status": {
+        "at_ms": 193270,
+        "round_trip_ms": 46,
+        "uptime_ms": 289550,
+        "sample_age_ms": 130,
+        "test_build": true
+      },
+      "broker_was_ready_at_marker": false,
+      "end_ms": 202918,
+      "reason": null,
+      "result": {
+        "functional_recovery": true,
+        "uptime_continuous": true,
+        "recovery_upper_bound_ms": 4415,
+        "telemetry_intervals": {
+          "count": 18,
+          "min_ms": 0,
+          "max_ms": 1655
+        },
+        "heartbeat_intervals": {
+          "count": 1,
+          "min_ms": 4846,
+          "max_ms": 4846
+        },
+        "within_conservative_15s_target": true,
+        "timing_anchor": "Operator marker BEFORE restoring service; includes human, service-start and observer delays. Not isolated Pico WiFi time."
+      }
+    },
+    {
+      "number": 2,
+      "baseline": {
+        "at_ms": 300366,
+        "round_trip_ms": 2348,
+        "uptime_ms": 394450,
+        "sample_age_ms": 380,
+        "test_build": true
+      },
+      "loss_marker_ms": 300366,
+      "outage_observed_ms": 328571,
+      "restore_marker_ms": 342336,
+      "broker_observer_ready_ms": 345066,
+      "telemetry": [
+        {
+          "at_ms": 345888,
+          "sequence": 858
+        },
+        {
+          "at_ms": 346376,
+          "sequence": 859
+        },
+        {
+          "at_ms": 346897,
+          "sequence": 860
+        },
+        {
+          "at_ms": 347397,
+          "sequence": 861
+        },
+        {
+          "at_ms": 347919,
+          "sequence": 862
+        },
+        {
+          "at_ms": 348421,
+          "sequence": 863
+        },
+        {
+          "at_ms": 348937,
+          "sequence": 864
+        },
+        {
+          "at_ms": 349445,
+          "sequence": 865
+        },
+        {
+          "at_ms": 350023,
+          "sequence": 866
+        },
+        {
+          "at_ms": 350576,
+          "sequence": 867
+        },
+        {
+          "at_ms": 350983,
+          "sequence": 868
+        },
+        {
+          "at_ms": 351489,
+          "sequence": 869
+        },
+        {
+          "at_ms": 352003,
+          "sequence": 870
+        },
+        {
+          "at_ms": 352514,
+          "sequence": 871
+        },
+        {
+          "at_ms": 353030,
+          "sequence": 872
+        },
+        {
+          "at_ms": 353541,
+          "sequence": 873
+        },
+        {
+          "at_ms": 354067,
+          "sequence": 874
+        },
+        {
+          "at_ms": 354539,
+          "sequence": 875
+        },
+        {
+          "at_ms": 356306,
+          "sequence": 876
+        },
+        {
+          "at_ms": 356378,
+          "sequence": 877
+        },
+        {
+          "at_ms": 356378,
+          "sequence": 878
+        }
+      ],
+      "heartbeats": [
+        {
+          "at_ms": 350469,
+          "counter": 73
+        },
+        {
+          "at_ms": 356377,
+          "counter": 74
+        }
+      ],
+      "status": {
+        "at_ms": 345961,
+        "round_trip_ms": 57,
+        "uptime_ms": 442230,
+        "sample_age_ms": 80,
+        "test_build": true
+      },
+      "broker_was_ready_at_marker": false,
+      "end_ms": 356453,
+      "reason": null,
+      "result": {
+        "functional_recovery": false,
+        "uptime_continuous": false,
+        "recovery_upper_bound_ms": 3552,
+        "telemetry_intervals": {
+          "count": 20,
+          "min_ms": 0,
+          "max_ms": 1767
+        },
+        "heartbeat_intervals": {
+          "count": 1,
+          "min_ms": 5908,
+          "max_ms": 5908
+        },
+        "within_conservative_15s_target": false,
+        "timing_anchor": "Operator marker BEFORE restoring service; includes human, service-start and observer delays. Not isolated Pico WiFi time."
+      }
+    },
+    {
+      "number": 3,
+      "baseline": {
+        "at_ms": 384259,
+        "round_trip_ms": 201,
+        "uptime_ms": 480470,
+        "sample_age_ms": 30,
+        "test_build": true
+      },
+      "loss_marker_ms": 384259,
+      "outage_observed_ms": null,
+      "restore_marker_ms": null,
+      "broker_observer_ready_ms": null,
+      "telemetry": [],
+      "heartbeats": [],
+      "status": null,
+      "end_ms": 485054,
+      "reason": "Interrupted/incomplete; no acceptance pass",
+      "result": {
+        "functional_recovery": false,
+        "uptime_continuous": false,
+        "recovery_upper_bound_ms": null,
+        "telemetry_intervals": {
+          "count": 0,
+          "min_ms": null,
+          "max_ms": null
+        },
+        "heartbeat_intervals": {
+          "count": 0,
+          "min_ms": null,
+          "max_ms": null
+        },
+        "within_conservative_15s_target": false,
+        "timing_anchor": "Operator marker BEFORE restoring service; includes human, service-start and observer delays. Not isolated Pico WiFi time."
+      }
+    }
+  ],
+  "events": [
+    {
+      "at_ms": 6,
+      "message": "Observe broker recovery; 5 trials. No service changes are automated. Type loss only when the car is ready."
+    },
+    {
+      "at_ms": 11,
+      "message": "TCP observer subscribed. This is broker readiness, not Pico recovery."
+    },
+    {
+      "at_ms": 21812,
+      "message": "Checking correlated Pico STATUS before allowing the outage..."
+    },
+    {
+      "at_ms": 21933,
+      "message": "Baseline confirmed. NOW stop the custom broker or turn off hotspot, keeping Pico powered."
+    },
+    {
+      "at_ms": 67130,
+      "message": "TCP observer disconnected"
+    },
+    {
+      "at_ms": 67387,
+      "message": "TCP observer subscribed. This is broker readiness, not Pico recovery."
+    },
+    {
+      "at_ms": 113121,
+      "message": "TCP observer disconnected"
+    },
+    {
+      "at_ms": 113387,
+      "message": "TCP observer subscribed. This is broker readiness, not Pico recovery."
+    },
+    {
+      "at_ms": 145225,
+      "message": "TCP observer disconnected"
+    },
+    {
+      "at_ms": 146974,
+      "message": "Outage observed. Keep service off at least 10 s; then type restore immediately BEFORE restoring it."
+    },
+    {
+      "at_ms": 160837,
+      "message": "phase=outage, broker=false, telemetry age=15956 ms"
+    },
+    {
+      "at_ms": 188727,
+      "message": "Restoration marker set. NOW restart the custom broker or enable hotspot. Do not reboot Pico."
+    },
+    {
+      "at_ms": 191053,
+      "message": "TCP observer subscribed. This is broker readiness, not Pico recovery."
+    },
+    {
+      "at_ms": 202920,
+      "message": "Trial 1: {\"functional_recovery\":true,\"uptime_continuous\":true,\"recovery_upper_bound_ms\":4415,\"telemetry_intervals\":{\"count\":18,\"min_ms\":0,\"max_ms\":1655},\"heartbeat_intervals\":{\"count\":1,\"min_ms\":4846,\"max_ms\":4846},\"within_conservative_15s_target\":true,\"timing_anchor\":\"Operator marker BEFORE restoring service; includes human, service-start and observer delays. Not isolated Pico WiFi time.\"}"
+    },
+    {
+      "at_ms": 202921,
+      "message": "Next trial: wait for fresh telemetry/heartbeat, then type loss."
+    },
+    {
+      "at_ms": 214510,
+      "message": "phase=idle, broker=true, telemetry age=409 ms"
+    },
+    {
+      "at_ms": 239128,
+      "message": "TCP observer disconnected"
+    },
+    {
+      "at_ms": 239386,
+      "message": "TCP observer subscribed. This is broker readiness, not Pico recovery."
+    },
+    {
+      "at_ms": 285142,
+      "message": "TCP observer disconnected"
+    },
+    {
+      "at_ms": 285400,
+      "message": "TCP observer subscribed. This is broker readiness, not Pico recovery."
+    },
+    {
+      "at_ms": 298018,
+      "message": "Checking correlated Pico STATUS before allowing the outage..."
+    },
+    {
+      "at_ms": 300367,
+      "message": "Baseline confirmed. NOW stop the custom broker or turn off hotspot, keeping Pico powered."
+    },
+    {
+      "at_ms": 326897,
+      "message": "TCP observer disconnected"
+    },
+    {
+      "at_ms": 328571,
+      "message": "Outage observed. Keep service off at least 10 s; then type restore immediately BEFORE restoring it."
+    },
+    {
+      "at_ms": 338928,
+      "message": "phase=outage, broker=false, telemetry age=12422 ms"
+    },
+    {
+      "at_ms": 342336,
+      "message": "Restoration marker set. NOW restart the custom broker or enable hotspot. Do not reboot Pico."
+    },
+    {
+      "at_ms": 345066,
+      "message": "TCP observer subscribed. This is broker readiness, not Pico recovery."
+    },
+    {
+      "at_ms": 356453,
+      "message": "Trial 2: {\"functional_recovery\":false,\"uptime_continuous\":false,\"recovery_upper_bound_ms\":3552,\"telemetry_intervals\":{\"count\":20,\"min_ms\":0,\"max_ms\":1767},\"heartbeat_intervals\":{\"count\":1,\"min_ms\":5908,\"max_ms\":5908},\"within_conservative_15s_target\":false,\"timing_anchor\":\"Operator marker BEFORE restoring service; includes human, service-start and observer delays. Not isolated Pico WiFi time.\"}"
+    },
+    {
+      "at_ms": 356454,
+      "message": "Next trial: wait for fresh telemetry/heartbeat, then type loss."
+    },
+    {
+      "at_ms": 384058,
+      "message": "Checking correlated Pico STATUS before allowing the outage..."
+    },
+    {
+      "at_ms": 384259,
+      "message": "Baseline confirmed. NOW stop the custom broker or turn off hotspot, keeping Pico powered."
+    },
+    {
+      "at_ms": 429169,
+      "message": "TCP observer disconnected"
+    },
+    {
+      "at_ms": 429427,
+      "message": "TCP observer subscribed. This is broker readiness, not Pico recovery."
+    },
+    {
+      "at_ms": 475162,
+      "message": "TCP observer disconnected"
+    },
+    {
+      "at_ms": 475421,
+      "message": "TCP observer subscribed. This is broker readiness, not Pico recovery."
+    },
+    {
+      "at_ms": 485054,
+      "message": "Trial 3: Interrupted/incomplete; no acceptance pass"
+    },
+    {
+      "at_ms": 485055,
+      "message": "Next trial: wait for fresh telemetry/heartbeat, then type loss."
+    }
+  ],
+  "finished_utc": "2026-11-10T08:48:51.753Z",
+  "recorded_attempts": 3,
+  "complete_functional_trials": 1,
+  "within_conservative_target": 1
+}

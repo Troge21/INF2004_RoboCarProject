@@ -43,6 +43,32 @@ static int emit_imu(int pitch, unsigned height, unsigned max, unsigned state,
     puts("\"}");
     return 0;
 }
+static int emit_status(void)
+{
+    const uint32_t ids[] = {1,12,0xffffffffU};
+    const unsigned ages[] = {0,100,2000,S1_STATUS_NO_SAMPLE};
+    S1_TELEMETRY sample;
+    uint8_t request[5],frame[S1_FRAME_BYTES],reply[S1_STATUS_MAX_BYTES];
+    unsigned i,j,mode,k;int length;uint32_t parsed;
+    (void)s1_make_telemetry(&sample,12,451,1);
+    (void)s1_pack_frame(&sample,NULL,NULL,1000,100,frame,sizeof(frame));
+    for(i=0;i<3;++i) {
+        request[0]=0xa0;s1_write_u32(request+1,ids[i]);
+        if(s1_parse_status_request(request,5,&parsed)||parsed!=ids[i])return 4;
+        printf("{\"kind\":\"status_request\",\"id\":%u,\"hex\":\"",(unsigned)ids[i]);
+        for(k=0;k<5;++k)printf("%02x",request[k]);
+        puts("\"}");
+        for(j=0;j<4;++j)for(mode=0;mode<2;++mode) {
+            length=s1_pack_status_reply(ids[i],ids[i],ages[j],mode,
+                ages[j]==S1_STATUS_NO_SAMPLE?NULL:frame,reply,sizeof(reply));
+            if(length<0)return 4;
+            printf("{\"kind\":\"status\",\"id\":%u,\"age\":%u,\"test\":%u,\"hex\":\"",(unsigned)ids[i],ages[j],mode);
+            for(k=0;k<(unsigned)length;++k)printf("%02x",reply[k]);
+            puts("\"}");
+        }
+    }
+    return 0;
+}
 int main(void)
 {
     const unsigned states[] = {0, 4, 5, 6, 7};
@@ -83,5 +109,5 @@ int main(void)
     if(emit_imu(150,12,34,2,0x11,100) || emit_imu(150,12,34,2,0x11,101) ||
         emit_imu(150,12,34,2,0x11,1000) || emit_imu(150,12,34,2,0x11,1001) ||
         emit_imu(0,0,0,7,0,0)) return 3;
-    return 0;
+    return emit_status();
 }

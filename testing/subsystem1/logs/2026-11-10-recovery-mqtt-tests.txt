@@ -1,0 +1,31 @@
+[MQTT STATUS] PASS firmware subscribes to real command topic, replacing heartbeat loopback
+[MQTT STATUS] PASS partial command cannot trigger a reply
+[MQTT STATUS] PASS fragmented STATUS completes once and echoes exact correlation ID
+[MQTT STATUS] PASS completed request is consumed exactly once
+[MQTT STATUS] PASS heartbeat and unrelated topics cannot dispatch commands
+[MQTT STATUS] PASS ASCII and oversized declared requests are ignored
+[MQTT STATUS] PASS early LAST fragment cannot execute a partial request
+[MQTT STATUS] PASS extra fragment bytes invalidate the whole request
+[MQTT STATUS] PASS single occupied slot drops new requests without overwriting pending ID
+[MQTT STATUS] PASS firmware limits accepted STATUS requests to one per 250 ms
+[MQTT STATUS] PASS rate limit accepts exact boundary with fresh ID
+[MQTT STATUS] PASS rate limiting remains correct over uint32 uptime wrap
+[MQTT STATUS] PASS disconnect cancels pending requests instead of replaying after reconnect
+[MQTT STATUS] PASS command handling waits for its subscription acknowledgment
+[MQTT STATUS] PASS failed command subscription can retry and recover
+[MQTT STATUS] PASS normal telemetry is still published independently
+[MQTT STATUS] PASS five-byte heartbeat is unchanged
+[MQTT STATUS] PASS WiFi loss cancels pending work and all port timers, closes TCP once
+[MQTT STATUS] PASS offline polling and late callbacks cannot publish, reconnect or rearm heartbeat
+[MQTT STATUS] PASS late MQTT acceptance while WiFi is down closes the stale session
+[MQTT STATUS] PASS restored WiFi creates a clean command subscription without replaying old requests
+[MQTT STATUS] PASS fresh STATUS works after WiFi recovery
+[MQTT STATUS] PASS synchronous connect error backs off instead of retrying every poll
+[MQTT STATUS] PASS failed timer retry schedules exactly one further retry
+[MQTT STATUS] PASS repeated failure callbacks do not accumulate retry timers
+[MQTT STATUS] PASS successful recovery removes stale retry and arms one heartbeat
+[MQTT STATUS] PASS twenty MQTT reconnects retain one heartbeat chain and no stale retry
+[MQTT STATUS] PASS client allocation failure also uses bounded backoff
+[MQTT STATUS] PASS allocation retry can resume normal connection setup
+[MQTT STATUS] PASS invalid broker address does not hammer the poll loop
+[MQTT STATUS] SUMMARY 30 checks, 0 failures

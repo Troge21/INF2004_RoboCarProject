@@ -1,0 +1,18 @@
+{
+  "date_local": "2026-11-10",
+  "timezone": "Asia/Kuala_Lumpur",
+  "local_uf2_sha256": "9c5ac8f0876055939f2cc4049a22e3ca9285b38ccccd889096bd801dafc2a7a0",
+  "identity_note": "After this review the user clarified that the intended UF2 had not been flashed for the preceding runs, then explicitly reported flashing it. Stored UF2 hashes identify local files only. Preserve earlier measurements, but treat their running-image identity as unconfirmed.",
+  "no_firmware_source_change_this_review": true,
+  "sha256": {
+    "2026-11-10T09-35-42-751Z-wifi-recovery.json": "6fdabfb7f5b6ffec83e131c7f5fd41dfd4acc806ff5aa1368e70c98a87d82d11",
+    "2026-11-10T09-39-53-541Z-wifi-recovery.json": "93d07077e5ae21e2215750f1b1aa654425dba7d9f0ab5297edf9005e32a3366e",
+    "2026-11-10T09-47-05-672Z-wifi-recovery.json": "54ac9a11b92ee2e0934ad51fcc881d268e6956552cd349a51b03ecb5c9856c72",
+    "2026-11-10-hotspot-retest-diagnostics.jsonl": "7d05bd523c3eee94e88ad5255a5c2aa43d43b6f04772424e919b0dff644a76e5",
+    "2026-11-10-hotspot-corrected-retest-summary.json": "0786bc2b6ae11bd9fa36dbf34e8f45c68be22d97776f799f9821762d9e1cabb5",
+    "2026-11-10-hotspot-retest-current-check.json": "95e83777dda6bb5c25945080a3bb6169ee9afb5db30f819a278149fe2508d1f9",
+    "2026-11-10-hotspot-retest-fault-observation.json": "edcd1f3f7d325af4f34aabf4aa6f7f781ee8c0e11dca9e5e424e33e76b809efa",
+    "2026-11-10-hotspot-post-confirmed-flash-check.json": "715782ebd2c3bee5dff55a524b3c85ca943f410b1b1d6e254674aeee3a85658f",
+    "2026-11-10-post-confirmed-flash-serial.jsonl": "f0f4114b615592c1dc86f782581b32123b3427d559c717e6c9d0c4fb27999e59"
+  }
+}

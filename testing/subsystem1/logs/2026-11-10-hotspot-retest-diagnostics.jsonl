@@ -1,0 +1,23 @@
+{"event":"capture_started","at_ms":0,"maximum_seconds":1200,"note":"Serial arrival times and laptop interface state are proxies, not AP-beacon timestamps. Only allowlisted serial lines; no SSID/password logging.","baud":115200,"port":"COM5","utc":"2026-11-10T09:30:22.8997106Z"}
+{"message":"[TEST] subsystem1 SUMMARY 33 passed, 0 failed","utc":"2026-11-10T09:30:22.9372147Z","at_ms":64,"event":"pico_serial"}
+{"message":"wifi: link status -\u003e joined AP, waiting for IP (1)","utc":"2026-11-10T09:30:22.9372147Z","at_ms":67,"event":"pico_serial"}
+{"message":"wifi: link status -\u003e joined AP, no IP yet (2)","utc":"2026-11-10T09:30:22.9521493Z","at_ms":68,"event":"pico_serial"}
+{"message":"wifi: link up, ip=172.20.10.14","utc":"2026-11-10T09:30:22.9521493Z","at_ms":68,"event":"pico_serial"}
+{"message":"mqtt: connected to 172.20.10.2","utc":"2026-11-10T09:30:22.9521493Z","at_ms":68,"event":"pico_serial"}
+{"interfaces":[{"status":"Down","ipv4":["169.254.244.255"]},{"status":"Down","ipv4":["169.254.57.8"]},{"status":"Up","ipv4":["172.20.10.2"]}],"utc":"2026-11-10T09:30:23.0343974Z","at_ms":158,"event":"laptop_wifi_interface"}
+{"message":"mqtt: TX [mtk3smp-pico/heartbeat] 5 binary bytes","utc":"2026-11-10T09:30:30.9234104Z","at_ms":8039,"event":"pico_serial"}
+{"message":"mqtt: TX [mtk3smp-pico/heartbeat] 5 binary bytes","utc":"2026-11-10T09:30:35.9234721Z","at_ms":13039,"event":"pico_serial"}
+{"message":"mqtt: TX [mtk3smp-pico/heartbeat] 5 binary bytes","utc":"2026-11-10T09:30:40.9532626Z","at_ms":18069,"event":"pico_serial"}
+{"message":"mqtt: TX [mtk3smp-pico/heartbeat] 5 binary bytes","utc":"2026-11-10T09:30:45.9722490Z","at_ms":23088,"event":"pico_serial"}
+{"message":"mqtt: TX [mtk3smp-pico/heartbeat] 5 binary bytes","utc":"2026-11-10T09:30:50.9524722Z","at_ms":28068,"event":"pico_serial"}
+{"message":"mqtt: TX [mtk3smp-pico/heartbeat] 5 binary bytes","utc":"2026-11-10T09:30:55.9233275Z","at_ms":33039,"event":"pico_serial"}
+{"interfaces":[{"status":"Down","ipv4":["169.254.244.255"]},{"status":"Down","ipv4":["169.254.57.8"]},{"status":"Down","ipv4":["172.20.10.2"]}],"utc":"2026-11-10T09:36:21.5065089Z","at_ms":358625,"event":"laptop_wifi_interface"}
+{"interfaces":[{"status":"Down","ipv4":["169.254.244.255"]},{"status":"Down","ipv4":["169.254.57.8"]},{"status":"Up","ipv4":["172.20.10.2"]}],"utc":"2026-11-10T09:36:42.5090264Z","at_ms":379625,"event":"laptop_wifi_interface"}
+{"interfaces":[{"status":"Down","ipv4":["169.254.244.255"]},{"status":"Down","ipv4":["169.254.57.8"]},{"status":"Down","ipv4":["172.20.10.2"]}],"utc":"2026-11-10T09:37:09.6861343Z","at_ms":406806,"event":"laptop_wifi_interface"}
+{"interfaces":[{"status":"Down","ipv4":["169.254.244.255"]},{"status":"Down","ipv4":["169.254.57.8"]},{"status":"Up","ipv4":["172.20.10.2"]}],"utc":"2026-11-10T09:37:29.6098596Z","at_ms":426726,"event":"laptop_wifi_interface"}
+{"interfaces":[{"status":"Down","ipv4":["169.254.244.255"]},{"status":"Down","ipv4":["169.254.57.8"]},{"status":"Down","ipv4":["172.20.10.2"]}],"utc":"2026-11-10T09:37:45.5114130Z","at_ms":442628,"event":"laptop_wifi_interface"}
+{"interfaces":[{"status":"Down","ipv4":["169.254.244.255"]},{"status":"Down","ipv4":["169.254.57.8"]},{"status":"Up","ipv4":["172.20.10.2"]}],"utc":"2026-11-10T09:38:06.0362626Z","at_ms":463152,"event":"laptop_wifi_interface"}
+{"interfaces":[{"status":"Down","ipv4":["169.254.244.255"]},{"status":"Down","ipv4":["169.254.57.8"]},{"status":"Down","ipv4":["172.20.10.2"]}],"utc":"2026-11-10T09:38:32.0749181Z","at_ms":489195,"event":"laptop_wifi_interface"}
+{"interfaces":[{"status":"Down","ipv4":["169.254.244.255"]},{"status":"Down","ipv4":["169.254.57.8"]},{"status":"Up","ipv4":["172.20.10.2"]}],"utc":"2026-11-10T09:38:57.3009048Z","at_ms":514423,"event":"laptop_wifi_interface"}
+{"interfaces":[{"status":"Down","ipv4":["169.254.244.255"]},{"status":"Down","ipv4":["169.254.57.8"]},{"status":"Down","ipv4":["172.20.10.2"]}],"utc":"2026-11-10T09:41:27.3813865Z","at_ms":664501,"event":"laptop_wifi_interface"}
+{"interfaces":[{"status":"Down","ipv4":["169.254.244.255"]},{"status":"Down","ipv4":["169.254.57.8"]},{"status":"Up","ipv4":["172.20.10.2"]}],"utc":"2026-11-10T09:41:32.6917558Z","at_ms":669816,"event":"laptop_wifi_interface"}

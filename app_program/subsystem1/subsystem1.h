@@ -22,16 +22,9 @@ IMPORT INT s1_encode_telemetry(const S1_TELEMETRY *sample,
  * E_TMOUT means no fresh payload. Buffer must hold S1_PAYLOAD_CAPACITY bytes. */
 IMPORT INT s1_network_poll(unsigned char *out, unsigned int capacity);
 
-/* Proposed vocabulary for local tests, not an agreed wire protocol.
- * Parsing does not execute commands or establish freshness/authorization. */
-typedef enum {
-    S1_COMMAND_INVALID = 0,
-    S1_COMMAND_STOP,
-    S1_COMMAND_STATUS
-} S1_COMMAND;
-
-/* Exact case-sensitive byte span; no NUL terminator required.
- * Rejects extra bytes, whitespace, embedded NULs and incomplete payloads. */
-S1_COMMAND s1_parse_command(const unsigned char *payload, unsigned int length);
+/* Network task only: read-only STATUS request -> current snapshot reply.
+ * Does not call a sensor driver or control actuators; no waiting/queue send. */
+IMPORT INT s1_network_status(const unsigned char *request, unsigned int length,
+                            unsigned char *out, unsigned int capacity);
 
 #endif /* SUBSYSTEM1_H */

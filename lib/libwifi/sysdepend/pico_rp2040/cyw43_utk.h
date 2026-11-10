@@ -6,7 +6,7 @@
 typedef struct {
     volatile int32_t init_result;
     volatile uint32_t init_complete;
-    volatile uint32_t ready;
+    volatile uint32_t ready; /* Driver/interface ready; association is separate. */
     volatile uint32_t scan_active;
     volatile uint32_t scan_complete;
     volatile uint32_t scan_count;
@@ -16,7 +16,8 @@ typedef struct {
     uint8_t mac[6];
     /* Only meaningful on a NET=lwip build -- see cyw43_utk_task(). link_status
      * mirrors cyw43_tcpip_link_status()'s CYW43_LINK_* values (cyw43.h):
-     * negative = down/join failed, 1 = joined, 2 = joined + got an IP. */
+     * 0 = down, negatives = failed, 1 = joining/joined, 2 = no IP,
+     * 3 = link up with an IP. */
     volatile int32_t link_status;
     volatile uint32_t ip_addr;
 } T_CYW43_UTK_STATUS;

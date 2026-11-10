@@ -17,7 +17,6 @@ static INT same_bytes(const UB *a, const UB *b, UINT count)
 
 EXPORT void subsystem1_test(void)
 {
-    static const unsigned char stop[] = {'S', 'T', 'O', 'P'};
     S1_TELEMETRY sample = {{0}}, bad;
     S1_LINE_TELEMETRY line = {{0}};
     UB payload[S1_PAYLOAD_CAPACITY];
@@ -33,26 +32,6 @@ EXPORT void subsystem1_test(void)
     INT len;
     TEST_INIT();
 
-    TEST_CHECK("S1-U14", s1_parse_command(stop, sizeof(stop)) == S1_COMMAND_STOP,
-               "STOP accepted without NUL terminator");
-    TEST_CHECK("S1-U15", s1_parse_command((const unsigned char *)"STATUS", 6) == S1_COMMAND_STATUS,
-               "STATUS accepted");
-    TEST_CHECK("S1-U16", s1_parse_command(0, 4) == S1_COMMAND_INVALID &&
-               s1_parse_command(stop, 0) == S1_COMMAND_INVALID,
-               "null and empty inputs rejected");
-    TEST_CHECK("S1-U17", s1_parse_command((const unsigned char *)"GO", 2) == S1_COMMAND_INVALID &&
-               s1_parse_command((const unsigned char *)"stop", 4) == S1_COMMAND_INVALID,
-               "unknown and lowercase commands rejected");
-    TEST_CHECK("S1-U18", s1_parse_command(stop, 3) == S1_COMMAND_INVALID,
-               "incomplete command rejected");
-    TEST_CHECK("S1-U19", s1_parse_command((const unsigned char *)"STOP NOW", 8) == S1_COMMAND_INVALID &&
-               s1_parse_command((const unsigned char *)"STOP\n", 5) == S1_COMMAND_INVALID,
-               "extra bytes and whitespace rejected");
-    TEST_CHECK("S1-U20", s1_parse_command((const unsigned char *)"ST\0P", 4) == S1_COMMAND_INVALID &&
-               s1_parse_command((const unsigned char *)"STOP", 5) == S1_COMMAND_INVALID,
-               "embedded and trailing NUL rejected");
-    TEST_CHECK("S1-U21", s1_parse_command(stop, 0xffffffffu) == S1_COMMAND_INVALID,
-               "oversized length rejected before reading payload");
     (void)s1_make_telemetry(&sample, 1, 451, 1);
     len = s1_encode_telemetry(&sample, NULL, 0, payload, sizeof(payload));
     TEST_CHECK("S1-U22", len == 6 && same_bytes(payload, plain, 6),
@@ -158,6 +137,47 @@ EXPORT void subsystem1_test(void)
             s1_make_imu(&imu, 0, 0, 0, 7, 1, 0, 0) < 0 &&
             s1_make_imu(&imu, 0, 0, 0, 1, 0x11, 0, 0) < 0,
             "contradictory validity, unavailable fields and height ordering rejected");
+    }
+    {
+        const UB request[5] = {0xa0,12,0,0,0};
+        const UB empty_reply[11] = {0xa1,12,0,0,0,4,3,2,1,0xff,0x0f};
+        UB reply[S1_STATUS_MAX_BYTES], frame[S1_FRAME_BYTES], invalid[5] = {0xa0,0,0,0,0};
+        uint32_t id = 123;
+        TEST_CHECK("S1-U62", s1_parse_status_request(request,5,&id)==0 && id==12,
+            "binary STATUS request preserves its correlation ID");
+        TEST_CHECK("S1-U63", s1_parse_status_request(NULL,5,&id)<0 &&
+            s1_parse_status_request(request,0xffffffffU,&id)<0 &&
+            s1_parse_status_request((const UB *)"STATUS",6,&id)<0 &&
+            s1_parse_status_request((const UB *)"STOP",4,&id)<0,
+            "null, malformed, oversized and obsolete commands rejected");
+        id = 123;
+        TEST_CHECK("S1-U64", s1_parse_status_request(invalid,5,&id)<0 && id==123 &&
+            s1_parse_status_request(request,5,NULL)<0,
+            "zero request ID rejected without changing caller data");
+        TEST_CHECK("S1-U65", s1_pack_status_reply(12,0x01020304U,S1_STATUS_NO_SAMPLE,1,NULL,
+            reply,sizeof(reply))==11 && same_bytes(reply,empty_reply,11),
+            "no-sample STATUS reply matches independent binary golden vector");
+        (void)s1_make_telemetry(&sample,1,451,1);
+        (void)s1_pack_frame(&sample,NULL,NULL,1000,100,frame,sizeof(frame));
+        TEST_CHECK("S1-U66", s1_pack_status_reply(12,1000,100,1,frame,reply,sizeof(reply))==22 &&
+            reply[9]==100 && reply[10]==8 && same_bytes(reply+11,frame,11),
+            "STATUS includes current telemetry and original source age");
+        reply[0] = 0xa5;
+        TEST_CHECK("S1-U67", s1_pack_status_reply(12,0,0,1,frame,reply,21)<0 && reply[0]==0xa5 &&
+            s1_pack_status_reply(12,0,S1_STATUS_NO_SAMPLE,1,NULL,reply,10)<0 && reply[0]==0xa5,
+            "STATUS small-buffer failures leave output unchanged");
+        frame[10] |= 0x80U;
+        TEST_CHECK("S1-U68", s1_pack_status_reply(12,0,0,1,frame,reply,sizeof(reply))<0 &&
+            s1_pack_status_reply(0,0,S1_STATUS_NO_SAMPLE,1,NULL,reply,sizeof(reply))<0 &&
+            s1_pack_status_reply(12,0,2001,1,NULL,reply,sizeof(reply))<0 &&
+            s1_pack_status_reply(12,0,S1_STATUS_NO_SAMPLE,2,NULL,reply,sizeof(reply))<0 && reply[0]==0xa5,
+            "STATUS validates snapshot, IDs, age and one-bit build mode before writing");
+        (void)s1_pack_frame(&sample,NULL,NULL,1000,100,frame,sizeof(frame));
+        TEST_CHECK("S1-U69", s1_pack_status_reply(0xffffffffU,0xffffffffU,2000,0,frame,reply,sizeof(reply))==22 &&
+            s1_read_u32(reply+1)==0xffffffffU && s1_read_u32(reply+5)==0xffffffffU &&
+            s1_pack_status_reply(12,0,0,0,NULL,reply,sizeof(reply))<0 &&
+            s1_pack_status_reply(12,0,S1_STATUS_NO_SAMPLE,0,frame,reply,sizeof(reply))<0,
+            "STATUS preserves full counters and canonical presence/age boundaries");
     }
 #ifdef PICO_RP2040
     {

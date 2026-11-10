@@ -1,0 +1,25 @@
+{
+  "started_utc": "2026-11-10T09:57:28.566Z",
+  "telemetry": 0,
+  "heartbeats": 0,
+  "status_reply": null,
+  "connections": [
+    {
+      "utc": "2026-11-10T09:57:28.584Z",
+      "status": "connecting",
+      "detail": "Opening MQTT WebSocket"
+    },
+    {
+      "utc": "2026-11-10T09:57:28.608Z",
+      "status": "connected",
+      "detail": "Subscribed to telemetry, heartbeat and STATUS replies"
+    },
+    {
+      "utc": "2026-11-10T09:57:40.592Z",
+      "status": "disconnected",
+      "detail": "Disconnected"
+    }
+  ],
+  "finished_utc": "2026-11-10T09:57:40.592Z",
+  "recovered_now": false
+}

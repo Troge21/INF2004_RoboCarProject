@@ -28,8 +28,14 @@ _Static_assert(sizeof(S1_INPUT) == 10, "input queue must not add padding");
 _Static_assert(sizeof(S1_OUTPUT) == 27, "output queue must not add padding");
 static ID telemetry_mbf;
 static ID network_tx_mbf;
+/* Private to the one network task: cache raw source timestamps so STATUS
+ * rechecks freshness instead of replaying a previously serialized frame. */
+static S1_OUTPUT status_latest;
+/* The cached frame marker also indicates presence: no extra boolean field. */
 
-static UW uptime_ms(void)
+/* Existing producer timestamps use tk_get_tim (TRON calendar time). Keep
+ * this time domain for differences against S3/S4; it is not boot uptime. */
+static UW snapshot_time_ms(void)
 {
     SYSTIM now;
     tk_get_tim(&now);
@@ -57,7 +63,7 @@ EXPORT ER s1_submit_telemetry(const S1_TELEMETRY *sample)
     if (er != E_OK) return er;
     if (telemetry_mbf <= 0) return E_OBJ;
     msg.sample = *sample;
-    s1_write_u32(msg.sampled_ms, uptime_ms());
+    s1_write_u32(msg.sampled_ms, snapshot_time_ms());
     return tk_snd_mbf(telemetry_mbf, &msg, sizeof(msg), TMO_POL);
 }
 
@@ -75,33 +81,44 @@ EXPORT INT s1_network_poll(unsigned char *out, unsigned int capacity)
         if (size == E_TMOUT) break;
         if (size < 0) return size;
         if (size != (INT)sizeof(msg)) continue;
-        if ((UW)(uptime_ms() - s1_read_u32(msg.sampled_ms)) > S1_FRESH_MS) continue;
+        if ((UW)(snapshot_time_ms() - s1_read_u32(msg.sampled_ms)) > S1_FRESH_MS) continue;
         latest = msg;
         have_latest = TRUE;
     }
     if (!have_latest) return E_TMOUT;
     s1_write_u32(line.bytes, s1_read_u32(latest.line_sampled_ms));
     line.bytes[4] = (UB)s1_line_bits(&latest.sample);
-    size = s1_pack_frame(&latest.sample, &line, &latest.imu, uptime_ms(),
+    size = s1_pack_frame(&latest.sample, &line, &latest.imu, snapshot_time_ms(),
                           APP_IR_MAX_AGE_MS, out, capacity);
+    if (size > 0) { status_latest = latest; }
     return size < 0 ? E_PAR : size;
 }
 
-S1_COMMAND s1_parse_command(const unsigned char *payload, unsigned int length)
+EXPORT INT s1_network_status(const unsigned char *request, unsigned int length,
+                            unsigned char *out, unsigned int capacity)
 {
-    if (payload == 0) {
-        return S1_COMMAND_INVALID;
+    uint32_t id;
+    UW now = snapshot_time_ms(), age = S1_STATUS_NO_SAMPLE;
+    SYSTIM operating_time = {0};
+    UB frame[S1_FRAME_BYTES];
+    S1_LINE_TELEMETRY line = {{0}};
+    const UB *sample = NULL;
+    INT result;
+    if (s1_parse_status_request(request, length, &id) != S1_CODEC_OK) return E_PAR;
+    if (status_latest.sample.bytes[5] & 0x80U) {
+        age = (UW)(now - s1_read_u32(status_latest.sampled_ms));
+        if (age <= S1_FRESH_MS) {
+            s1_write_u32(line.bytes, s1_read_u32(status_latest.line_sampled_ms));
+            line.bytes[4] = (UB)s1_line_bits(&status_latest.sample);
+            if (s1_pack_frame(&status_latest.sample, &line, &status_latest.imu,
+                    now, APP_IR_MAX_AGE_MS, frame, sizeof(frame)) > 0)
+                sample = frame;
+        }
     }
-    if (length == 4 && payload[0] == 'S' && payload[1] == 'T' &&
-        payload[2] == 'O' && payload[3] == 'P') {
-        return S1_COMMAND_STOP;
-    }
-    if (length == 6 && payload[0] == 'S' && payload[1] == 'T' &&
-        payload[2] == 'A' && payload[3] == 'T' &&
-        payload[4] == 'U' && payload[5] == 'S') {
-        return S1_COMMAND_STATUS;
-    }
-    return S1_COMMAND_INVALID;
+    if (sample == NULL) age = S1_STATUS_NO_SAMPLE;
+    if (tk_get_otm(&operating_time) != E_OK) return E_OBJ;
+    result = s1_pack_status_reply(id, operating_time.lo, age, APP_TEST != 0, sample, out, capacity);
+    return result < 0 ? E_PAR : result;
 }
 
 #if TM_WIFI_CYW43
@@ -112,7 +129,7 @@ static ID wifi_status_tid;
 
 static void wifi_status_task(INT stacd, void *exinf)
 {
-    UW last_status_ms = uptime_ms();
+    UW last_status_ms = snapshot_time_ms();
     (void)stacd;
     (void)exinf;
 
@@ -120,7 +137,7 @@ static void wifi_status_task(INT stacd, void *exinf)
         S1_INPUT input;
         INT size = tk_rcv_mbf(telemetry_mbf, &input, 100);
         if (size == (INT)sizeof(input) &&
-            (UW)(uptime_ms() - s1_read_u32(input.sampled_ms)) <= S1_FRESH_MS) {
+            (UW)(snapshot_time_ms() - s1_read_u32(input.sampled_ms)) <= S1_FRESH_MS) {
             S1_OUTPUT output = {0};
             S3_LINE_DATA line = {0};
             S1_LINE_TELEMETRY packed_line = {{0}};
@@ -135,11 +152,11 @@ static void wifi_status_task(INT stacd, void *exinf)
             /* S3 retains GPIO ownership. Its snapshot read never waits. */
             if (subsystem3_get_line(&line) == E_OK && line.valid &&
                 line.pattern <= 3U &&
-                (UW)(uptime_ms() - line.timestamp_ms) <= APP_IR_MAX_AGE_MS) {
+                (UW)(snapshot_time_ms() - line.timestamp_ms) <= APP_IR_MAX_AGE_MS) {
                 (void)s1_make_line(&packed_line, line.pattern, 1,
                                    line.timestamp_ms);
             }
-            if (s1_encode_telemetry(&input.sample, &packed_line, uptime_ms(),
+            if (s1_encode_telemetry(&input.sample, &packed_line, snapshot_time_ms(),
                                     output.sample.bytes, sizeof(output.sample.bytes)) < 0)
                 continue;
             s1_write_u32(output.line_sampled_ms, s1_read_u32(packed_line.bytes));
@@ -150,8 +167,8 @@ static void wifi_status_task(INT stacd, void *exinf)
             CHECK(size, "S1 telemetry receive");
             tk_dly_tsk(100);
         }
-        if ((UW)(uptime_ms() - last_status_ms) < 2000U) continue;
-        last_status_ms = uptime_ms();
+        if ((UW)(snapshot_time_ms() - last_status_ms) < 2000U) continue;
+        last_status_ms = snapshot_time_ms();
 #if TM_WIFI_CYW43 && S1_WIFI_LOG_ENABLED
         T_CYW43_UTK_STATUS st = {0};
 
@@ -189,6 +206,7 @@ EXPORT ER subsystem1_init(void)
 {
     T_CTSK task = {0};
     T_CMBF mbf = {0};
+    status_latest.sample.bytes[5] = 0;
 
     mbf.mbfatr = TA_TFIFO;
     mbf.maxmsz = sizeof(S1_INPUT);

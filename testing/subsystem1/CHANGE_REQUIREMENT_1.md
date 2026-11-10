@@ -4,6 +4,9 @@
 The subsequent v3 extension and current build are documented in
 [IMU telemetry](IMU_TELEMETRY.md); its new fields, RAM costs and pending
 hardware tests are separate from the before/after figures below.
+The current read-only STATUS contract is documented in the
+[dashboard README](../../dashboard/README.md#request-status) and latest S1
+test log. The later table at the end of this report covers its packed fields.
 
 Recorded 6 November 2026. Source: the professor-provided **Change Requirement
 1.docx**, titled "Minimum-Bit Data Representation". This is an implementation
@@ -264,12 +267,12 @@ use the dashboard's decoded/hex inspector rather than expecting JSON text.
 
 | Area | Status / next work |
 | --- | --- |
-| Current S1 telemetry fields, snapshots and queues | Packed; user reports functional IR and six-byte delivery. Distance, detailed hardware and timing trials pending |
+| Current S1 telemetry fields, snapshots and queues | Packed; initial v2 evidence above is historical. Current v3 adds IMU and uses 11 bytes; STATUS has separate packed messages. Physical recovery/timing trials remain pending |
 | Current MQTT heartbeat application field | Packed; user reports five-byte messages. Counter continuity and interval evidence pending |
-| Actual supervisory commands | Still disabled/unintegrated. Existing ASCII STOP/STATUS parser is only a local proposed vocabulary; command representation and controller delivery are not complete. Agree fields, validity, expiry/replay and acknowledgements before implementing binary commands. |
+| Actual supervisory commands | Read-only binary STATUS request/reply implemented and observed end to end; obsolete ASCII parser removed. STOP/actuator commands still need agreed controller ownership, validity, expiry/replay and acknowledgements. |
 | S2 motion/encoder fields | Owner must audit ranges, packed state and ISR/task synchronization; measured speed interface still needed |
 | S3 internal IR/barcode fields | Existing reader reused; internal state/decoder/queues still need owner audit and minimum-bit conversion |
-| S4 IMU/hump fields | Not converted here; review live-pitch getter, synchronization, validity and speed dependency before integrating |
+| S4 IMU/hump fields | S1's current IMU snapshot/wire handoff is packed; internal S4 state audit, physical height accuracy and speed dependency remain owner work. See IMU_TELEMETRY.md |
 | S5 acquisition/servo state | Only its S1 handoff changed; internal pulse/state/scan data need owner audit |
 | Vehicle/controller states and shared fault bitmask | Need team-agreed ranges, meanings and synchronized updates |
 | Week 13 evidence | This is working-copy development evidence. Commit/review, then rerun required checks and hardware trials with the exact revision. |
@@ -279,3 +282,67 @@ their ranges/bit widths and update the versioned wire contract when adding
 them. Completing every teammate's conversion is not a prerequisite for doing
 useful S1 integration, but the whole project must meet the requirement for
 final submission.
+
+## Current STATUS field additions - 10 November 2026
+
+The telemetry frame remains 11 bytes; STATUS uses separate request/reply
+messages on the command/status topics. Current implementation/evidence is
+in the [S1 test log](TEST_LOG.md) and [dashboard protocol documentation](../../dashboard/README.md#request-status).
+
+| Field | Range / information | Logical bits | Representation |
+| --- | --- | ---: | --- |
+| Request/reply marker | Fixed a0/a1 framing metadata | Fixed metadata | One framing byte; ASCII command names omitted |
+| Request ID / echoed ID | 1..4294967295 | 32 | Four LE bytes |
+| Boot uptime milliseconds | Full uint32 modulo range | 32 | Four LE bytes, tk_get_otm |
+| Source sample age | 0..2000 ms plus unavailable | 11 | 2047 unavailable; other unused codes rejected |
+| Stationary TEST build | No / yes | 1 | Bit 11 of the age/mode word |
+| Snapshot presence | Derived from age | 0 extra | No extra validity flag; optional current 11-byte frame |
+| Receive length / WiFi unavailable | 0..5 / 7 | 3 | Low three bits in shared control byte; 6 unused |
+| Collecting/pending/subscribed/rate-seen/connecting | Five independent booleans | 1 each | High five bits of that byte; single network owner |
+| Rate-limit timestamp | Full uint32 tick range | 32 | Private to network task |
+| Cached-sample presence | Existing frame marker | 0 extra | Derived, no separate boolean |
+
+The reply age/mode word has four zero padding bits. Request/reply lengths
+are 5 and 11/22 bytes. Static RAM changed 82764 -> 82604 bytes under matching
+TEST=1 flags, while adding the real request path; runtime queue requests
+remain 192 bytes. Peak heap/stack usage and repeated performance remain
+unmeasured. The fresh physical STATUS check passed; it does not complete
+the other subsystems' application-data conversions or controller actions.
+
+## Recovery bookkeeping update - 10 November 2026
+
+WiFi availability reuses reserved receive-length code 7 in the existing
+three-bit field; it adds no independent boolean. The radio's retry deadline
+reuses its existing private uint64 timestamp, with wrap-aware comparisons.
+Retry scheduling and TCP cancellation stay on the existing network owner;
+there is no new task, queue or kernel object. Wire formats remain unchanged.
+
+Matched stationary TEST=1 linked sizes after recovery: text 353580, data 104,
+bss 82508; **82612 bytes static RAM**, eight above the preceding STATUS
+image's 82604. The field reuse does not imply identical linked section sizes.
+S1 queue-buffer requests remain 192 bytes. Peak heap/stack usage remains
+unmeasured. See [the test log](TEST_LOG.md) for build/hash/offline checks and
+[the later physical procedure](RECOVERY_TESTS.md). The car was unavailable;
+no recovery timing pass was claimed at preparation. The later five actual
+broker restarts recovered within conservative 3.318..5.811 s bounds; see the
+live section in TEST_LOG.md. Hotspot trials, strict delivery-interval targets
+and whole-device peak RAM evidence remain open.
+
+After the hotspot trials failed the earlier timing target, the MQTT port
+now reuses its existing retry timer for a 5 s pending connection deadline
+and advertises a 5 s keepalive. No new state field, task or queue is added.
+Linked RAM remains 82612 bytes (data 104 + bss 82508); text is 353644 bytes,
+64 above the preceding build. The new image is not flashed/physically
+validated yet. Original failed hotspot evidence is retained in TEST_LOG.md.
+
+Subsequent status: the user reports flashing the replacement, and a real
+one-minute telemetry/heartbeat/STATUS baseline was observed without a Pico
+MQTT restart. Static sizes are unchanged. Corrected-image hotspot recovery,
+strict interval targets and peak runtime RAM evidence remain open.
+
+Follow-up evidence caveat: the user later clarified that the intended UF2
+had not been flashed for preceding recovery runs, then confirmed flashing it.
+Those raw runs remain preserved with unconfirmed running-image identity.
+Normal telemetry/heartbeat/STATUS/USB were observed after the confirmed flash;
+a clean recovery series for that image is still required. No representation
+or firmware source change was made in that review.

@@ -19,6 +19,20 @@
 #define S1_IMU_PITCH_VALID 0x10U
 #define S1_IMU_SPEED_SUPPLIED 0x20U
 #define S1_IMU_FAULT 0x80U
+#define S1_STATUS_REQUEST_BYTES 5U
+#define S1_STATUS_HEADER_BYTES 11U
+#define S1_STATUS_MAX_BYTES (S1_STATUS_HEADER_BYTES + S1_FRAME_BYTES)
+#define S1_STATUS_NO_SAMPLE 2047U
+/* STATUS is the only permitted request. Byte 0 is fixed 0xa0; the remaining
+ * four bytes hold a nonzero uint32 correlation ID, little endian. */
+int s1_parse_status_request(const uint8_t *bytes, unsigned length, uint32_t *id);
+/* Reply: 0xa1, ID:32, uptime:32, age:11 + TEST-build:1 + reserved:4.
+ * Age 2047 means no fresh sample and reply length 11. Otherwise age 0..2000
+ * requires an appended current 11-byte frame, making the reply 22 bytes.
+ * Invalid arguments leave out unchanged. */
+int s1_pack_status_reply(uint32_t id, uint32_t uptime_ms, unsigned sample_age_ms,
+                         unsigned test_build, const uint8_t *frame,
+                         uint8_t *out, unsigned capacity);
 
 /* seq:32, distance:12 (zero=unavailable), line:3, format marker:1. */
 typedef struct { uint8_t bytes[S1_TELEMETRY_BYTES]; } S1_TELEMETRY;

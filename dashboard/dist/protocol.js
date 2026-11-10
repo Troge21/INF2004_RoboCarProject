@@ -36,6 +36,21 @@ export function decodeHeartbeat(payload) {
   if(bytes.length!==5||bytes[0]!==0x80) throw new Error('Expected 5-byte binary heartbeat');
   return new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength).getUint32(1,true);
 }
+export function encodeStatusRequest(id) {
+  if(!Number.isInteger(id)||id<1||id>0xffffffff)throw new Error('Invalid STATUS request ID');
+  const bytes=new Uint8Array([0xa0,0,0,0,0]);
+  new DataView(bytes.buffer).setUint32(1,id,true);return bytes;
+}
+export function decodeStatusReply(payload) {
+  const bytes=payload instanceof Uint8Array?payload:new Uint8Array(payload);
+  if(![11,22].includes(bytes.length)||bytes[0]!==0xa1)throw new Error('Invalid STATUS reply header/length');
+  const view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength),id=view.getUint32(1,true);
+  const word=view.getUint16(9,true),age=word&2047;
+  if(!id||(word&0xf000)||(age>2000&&age!==2047))throw new Error('Invalid STATUS reply fields');
+  if(bytes.length!==(age===2047?11:22))throw new Error('STATUS sample presence/age mismatch');
+  return {request_id:id,uptime_ms:view.getUint32(5,true),test_build:Boolean(word&2048),
+    sample_age_ms:age===2047?null:age,snapshot:age===2047?null:decodeTelemetry(bytes.subarray(11)).sample};
+}
 export function hex(bytes) { return [...bytes].map(x => x.toString(16).padStart(2,'0')).join(' '); }
 export function packetText(packet) {
   if (!packet) return 'Waiting for a message…';
@@ -55,6 +70,24 @@ export class TelemetryStore {
     this.lastTelemetry=null; this.lastHeartbeat=null; this.lastSequence=null; this.lastHeartbeatCounter=null;
     this.messageCount=0; this.telemetryCount=0; this.rejected=0; this.sequenceGaps=0;
     this.totalBytes=0; this.lastPayloadBytes=0; this.lastInterval=null; this.format='—';
+    this.pendingStatus=null;this.statusReply=null;this.lastStatusId=0;this.statusLastSentAt=null;
+    this.statusNotice='STATUS is read-only. STOP awaits controller integration.';
+  }
+  beginStatus(id,at=Date.now()) {
+    if(this.pendingStatus)throw new Error('A STATUS request is already pending');
+    if(this.statusLastSentAt!==null&&at-this.statusLastSentAt<250)throw new Error('Wait briefly before requesting STATUS again');
+    const bytes=encodeStatusRequest(id);
+    if(id===this.lastStatusId)throw new Error('Use a fresh STATUS request ID');
+    this.pendingStatus={id,at,deadline:at+3000};this.lastStatusId=id;this.statusLastSentAt=at;
+    this.statusNotice='Waiting for the Pico STATUS reply...';return bytes;
+  }
+  cancelStatus(reason='Connection changed; STATUS request cancelled.') {
+    if(this.pendingStatus){this.pendingStatus=null;this.statusNotice=reason;}
+  }
+  expireStatus(at=Date.now()) {
+    if(!this.pendingStatus||at<this.pendingStatus.deadline)return false;
+    this.pendingStatus=null;this.statusNotice='No STATUS reply within 3 seconds. Check Pico firmware and command/status topics.';
+    this.event('STATUS timed out','No automatic retry; request again after checking the robot','warning',at);return true;
   }
   event(title, detail='', tone='neutral', at=Date.now()) {
     this.events.unshift({title,detail,tone,at}); this.events.length=Math.min(this.events.length,80);
@@ -65,6 +98,17 @@ export class TelemetryStore {
     this.packets.unshift(packet); this.packets.length=Math.min(this.packets.length,30);
     try {
       if (retained) throw new Error('Retained message ignored; waiting for a fresh sample');
+      if(kind==='status') {
+        const reply=decodeStatusReply(bytes);
+        this.expireStatus(at);
+        if(!this.pendingStatus||reply.request_id!==this.pendingStatus.id||at<this.pendingStatus.at)
+          throw new Error('Unmatched or expired STATUS reply ignored');
+        const elapsed=at-this.pendingStatus.at;
+        this.pendingStatus=null;this.statusReply={...reply,received_at:at,round_trip_ms:elapsed};
+        this.statusNotice=`Pico STATUS reply confirmed in ${elapsed} ms. STOP awaits controller integration.`;
+        this.event('STATUS reply confirmed',`Pico uptime ${Math.floor(reply.uptime_ms/1000)} s`,'success',at);
+        packet.accepted=true;packet.decoded=reply;packet.detail='STATUS reply';return true;
+      }
       if (kind==='heartbeat') {
         const count=decodeHeartbeat(bytes);
         if(this.lastHeartbeatCounter!==null && count<this.lastHeartbeatCounter) {

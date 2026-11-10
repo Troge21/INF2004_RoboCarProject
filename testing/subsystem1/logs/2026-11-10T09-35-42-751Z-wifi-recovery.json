@@ -1,0 +1,446 @@
+{
+  "started_utc": "2026-11-10T09:35:42.752Z",
+  "kind": "wifi",
+  "host": "172.20.10.2",
+  "port": 1883,
+  "requested_trials": 5,
+  "topics": {
+    "telemetry": "mtk3smp-pico/telemetry",
+    "heartbeat": "mtk3smp-pico/heartbeat",
+    "command": "mtk3smp-pico/command",
+    "status": "mtk3smp-pico/status"
+  },
+  "local_uf2_sha256": "9c5ac8f0876055939f2cc4049a22e3ca9285b38ccccd889096bd801dafc2a7a0",
+  "probe_sha256": "0ba128ad62de87c65b5dc100f6f065f6371c07bf4acd49e3e5fd0aaedfb194ff",
+  "image_note": "Local file fingerprint only; operator must verify the flashed image.",
+  "trials": [
+    {
+      "number": 1,
+      "baseline": {
+        "at_ms": 32570,
+        "round_trip_ms": 121,
+        "uptime_ms": 804040,
+        "sample_age_ms": 40,
+        "test_build": true
+      },
+      "loss_marker_ms": 32570,
+      "outage_observed_ms": 39756,
+      "restore_marker_ms": 52350,
+      "broker_observer_ready_ms": null,
+      "telemetry": [
+        {
+          "at_ms": 62570,
+          "sequence": 1632
+        },
+        {
+          "at_ms": 64313,
+          "sequence": 1633
+        },
+        {
+          "at_ms": 64314,
+          "sequence": 1634
+        },
+        {
+          "at_ms": 64315,
+          "sequence": 1635
+        },
+        {
+          "at_ms": 64589,
+          "sequence": 1636
+        },
+        {
+          "at_ms": 65095,
+          "sequence": 1637
+        },
+        {
+          "at_ms": 65609,
+          "sequence": 1638
+        },
+        {
+          "at_ms": 66158,
+          "sequence": 1639
+        },
+        {
+          "at_ms": 66631,
+          "sequence": 1640
+        },
+        {
+          "at_ms": 67173,
+          "sequence": 1641
+        },
+        {
+          "at_ms": 68951,
+          "sequence": 1642
+        },
+        {
+          "at_ms": 69053,
+          "sequence": 1643
+        },
+        {
+          "at_ms": 69054,
+          "sequence": 1644
+        },
+        {
+          "at_ms": 69189,
+          "sequence": 1645
+        },
+        {
+          "at_ms": 69686,
+          "sequence": 1646
+        },
+        {
+          "at_ms": 70319,
+          "sequence": 1647
+        },
+        {
+          "at_ms": 72570,
+          "sequence": 1648
+        },
+        {
+          "at_ms": 74137,
+          "sequence": 1649
+        },
+        {
+          "at_ms": 74137,
+          "sequence": 1650
+        },
+        {
+          "at_ms": 74138,
+          "sequence": 1651
+        },
+        {
+          "at_ms": 74152,
+          "sequence": 1652
+        },
+        {
+          "at_ms": 74152,
+          "sequence": 1653
+        },
+        {
+          "at_ms": 74152,
+          "sequence": 1654
+        }
+      ],
+      "heartbeats": [
+        {
+          "at_ms": 67274,
+          "counter": 156
+        },
+        {
+          "at_ms": 74139,
+          "counter": 157
+        }
+      ],
+      "status": {
+        "at_ms": 65354,
+        "round_trip_ms": 2760,
+        "uptime_ms": 836680,
+        "sample_age_ms": 40,
+        "test_build": true
+      },
+      "broker_was_ready_at_marker": true,
+      "end_ms": 74202,
+      "reason": null,
+      "result": {
+        "functional_recovery": true,
+        "uptime_continuous": true,
+        "uptime_delta_ms": 32640,
+        "expected_uptime_delta_ms": {
+          "min": 28024,
+          "max": 34905
+        },
+        "recovery_upper_bound_ms": 10220,
+        "telemetry_intervals": {
+          "count": 22,
+          "min_ms": 0,
+          "max_ms": 2251
+        },
+        "heartbeat_intervals": {
+          "count": 1,
+          "min_ms": 6865,
+          "max_ms": 6865
+        },
+        "within_conservative_15s_target": true,
+        "timing_anchor": "Operator marker BEFORE restoring service; includes human, service-start and observer delays. Not isolated Pico WiFi time."
+      }
+    },
+    {
+      "number": 2,
+      "baseline": {
+        "at_ms": 80693,
+        "round_trip_ms": 52,
+        "uptime_ms": 852240,
+        "sample_age_ms": 300,
+        "test_build": true
+      },
+      "loss_marker_ms": 80693,
+      "outage_observed_ms": 82962,
+      "restore_marker_ms": 136015,
+      "broker_observer_ready_ms": null,
+      "telemetry": [
+        {
+          "at_ms": 145892,
+          "sequence": 1792
+        },
+        {
+          "at_ms": 145992,
+          "sequence": 1793
+        },
+        {
+          "at_ms": 145992,
+          "sequence": 1794
+        },
+        {
+          "at_ms": 145993,
+          "sequence": 1795
+        },
+        {
+          "at_ms": 146196,
+          "sequence": 1796
+        },
+        {
+          "at_ms": 146711,
+          "sequence": 1797
+        },
+        {
+          "at_ms": 147245,
+          "sequence": 1798
+        },
+        {
+          "at_ms": 147734,
+          "sequence": 1799
+        },
+        {
+          "at_ms": 148210,
+          "sequence": 1800
+        },
+        {
+          "at_ms": 150051,
+          "sequence": 1801
+        },
+        {
+          "at_ms": 150133,
+          "sequence": 1802
+        },
+        {
+          "at_ms": 150134,
+          "sequence": 1803
+        },
+        {
+          "at_ms": 150276,
+          "sequence": 1804
+        },
+        {
+          "at_ms": 150803,
+          "sequence": 1805
+        },
+        {
+          "at_ms": 151315,
+          "sequence": 1806
+        },
+        {
+          "at_ms": 151792,
+          "sequence": 1807
+        },
+        {
+          "at_ms": 152302,
+          "sequence": 1808
+        },
+        {
+          "at_ms": 152862,
+          "sequence": 1809
+        },
+        {
+          "at_ms": 153329,
+          "sequence": 1810
+        },
+        {
+          "at_ms": 153838,
+          "sequence": 1811
+        }
+      ],
+      "heartbeats": [
+        {
+          "at_ms": 150133,
+          "counter": 164
+        },
+        {
+          "at_ms": 154011,
+          "counter": 165
+        }
+      ],
+      "status": {
+        "at_ms": 146079,
+        "round_trip_ms": 117,
+        "uptime_ms": 917580,
+        "sample_age_ms": 360,
+        "test_build": true
+      },
+      "broker_was_ready_at_marker": true,
+      "end_ms": 154079,
+      "reason": null,
+      "result": {
+        "functional_recovery": true,
+        "uptime_continuous": true,
+        "uptime_delta_ms": 65340,
+        "expected_uptime_delta_ms": {
+          "min": 63269,
+          "max": 67438
+        },
+        "recovery_upper_bound_ms": 9877,
+        "telemetry_intervals": {
+          "count": 19,
+          "min_ms": 0,
+          "max_ms": 1841
+        },
+        "heartbeat_intervals": {
+          "count": 1,
+          "min_ms": 3878,
+          "max_ms": 3878
+        },
+        "within_conservative_15s_target": true,
+        "timing_anchor": "Operator marker BEFORE restoring service; includes human, service-start and observer delays. Not isolated Pico WiFi time."
+      }
+    },
+    {
+      "number": 3,
+      "baseline": {
+        "at_ms": 164060,
+        "round_trip_ms": 296,
+        "uptime_ms": 935520,
+        "sample_age_ms": 450,
+        "test_build": true
+      },
+      "loss_marker_ms": 164060,
+      "outage_observed_ms": 170191,
+      "restore_marker_ms": 187502,
+      "broker_observer_ready_ms": null,
+      "telemetry": [],
+      "heartbeats": [],
+      "status": null,
+      "broker_was_ready_at_marker": true,
+      "end_ms": 217573,
+      "reason": "Incomplete within 30 s observation window",
+      "result": {
+        "functional_recovery": false,
+        "uptime_continuous": false,
+        "uptime_delta_ms": null,
+        "expected_uptime_delta_ms": {
+          "min": null,
+          "max": null
+        },
+        "recovery_upper_bound_ms": null,
+        "telemetry_intervals": {
+          "count": 0,
+          "min_ms": null,
+          "max_ms": null
+        },
+        "heartbeat_intervals": {
+          "count": 0,
+          "min_ms": null,
+          "max_ms": null
+        },
+        "within_conservative_15s_target": false,
+        "timing_anchor": "Operator marker BEFORE restoring service; includes human, service-start and observer delays. Not isolated Pico WiFi time."
+      }
+    }
+  ],
+  "events": [
+    {
+      "at_ms": 6,
+      "message": "Observe wifi recovery; 5 trials. No service changes are automated. Type loss only when the car is ready."
+    },
+    {
+      "at_ms": 11,
+      "message": "TCP observer subscribed. This is broker readiness, not Pico recovery."
+    },
+    {
+      "at_ms": 13064,
+      "message": "Cannot start: need fresh telemetry AND heartbeat from the real car."
+    },
+    {
+      "at_ms": 32449,
+      "message": "Checking correlated Pico STATUS before allowing the outage..."
+    },
+    {
+      "at_ms": 32570,
+      "message": "Baseline confirmed. NOW stop the custom broker or turn off hotspot, keeping Pico powered."
+    },
+    {
+      "at_ms": 39757,
+      "message": "Outage observed. Keep service off at least 10 s; then type restore immediately BEFORE restoring it."
+    },
+    {
+      "at_ms": 52350,
+      "message": "Restoration marker set. NOW restart the custom broker or enable hotspot. Do not reboot Pico."
+    },
+    {
+      "at_ms": 74203,
+      "message": "Trial 1: {\"functional_recovery\":true,\"uptime_continuous\":true,\"uptime_delta_ms\":32640,\"expected_uptime_delta_ms\":{\"min\":28024,\"max\":34905},\"recovery_upper_bound_ms\":10220,\"telemetry_intervals\":{\"count\":22,\"min_ms\":0,\"max_ms\":2251},\"heartbeat_intervals\":{\"count\":1,\"min_ms\":6865,\"max_ms\":6865},\"within_conservative_15s_target\":true,\"timing_anchor\":\"Operator marker BEFORE restoring service; includes human, service-start and observer delays. Not isolated Pico WiFi time.\"}"
+    },
+    {
+      "at_ms": 74204,
+      "message": "Next trial: wait for fresh telemetry/heartbeat, then type loss."
+    },
+    {
+      "at_ms": 80641,
+      "message": "Checking correlated Pico STATUS before allowing the outage..."
+    },
+    {
+      "at_ms": 80693,
+      "message": "Baseline confirmed. NOW stop the custom broker or turn off hotspot, keeping Pico powered."
+    },
+    {
+      "at_ms": 82962,
+      "message": "Outage observed. Keep service off at least 10 s; then type restore immediately BEFORE restoring it."
+    },
+    {
+      "at_ms": 136015,
+      "message": "Restoration marker set. NOW restart the custom broker or enable hotspot. Do not reboot Pico."
+    },
+    {
+      "at_ms": 154079,
+      "message": "Trial 2: {\"functional_recovery\":true,\"uptime_continuous\":true,\"uptime_delta_ms\":65340,\"expected_uptime_delta_ms\":{\"min\":63269,\"max\":67438},\"recovery_upper_bound_ms\":9877,\"telemetry_intervals\":{\"count\":19,\"min_ms\":0,\"max_ms\":1841},\"heartbeat_intervals\":{\"count\":1,\"min_ms\":3878,\"max_ms\":3878},\"within_conservative_15s_target\":true,\"timing_anchor\":\"Operator marker BEFORE restoring service; includes human, service-start and observer delays. Not isolated Pico WiFi time.\"}"
+    },
+    {
+      "at_ms": 154079,
+      "message": "Next trial: wait for fresh telemetry/heartbeat, then type loss."
+    },
+    {
+      "at_ms": 163764,
+      "message": "Checking correlated Pico STATUS before allowing the outage..."
+    },
+    {
+      "at_ms": 164060,
+      "message": "Baseline confirmed. NOW stop the custom broker or turn off hotspot, keeping Pico powered."
+    },
+    {
+      "at_ms": 170191,
+      "message": "Outage observed. Keep service off at least 10 s; then type restore immediately BEFORE restoring it."
+    },
+    {
+      "at_ms": 179955,
+      "message": "Keep the outage for 10 seconds after the observation message before restoring."
+    },
+    {
+      "at_ms": 187502,
+      "message": "Restoration marker set. NOW restart the custom broker or enable hotspot. Do not reboot Pico."
+    },
+    {
+      "at_ms": 217574,
+      "message": "Trial 3: Incomplete within 30 s observation window"
+    },
+    {
+      "at_ms": 217575,
+      "message": "Next trial: wait for fresh telemetry/heartbeat, then type loss."
+    },
+    {
+      "at_ms": 230238,
+      "message": "Cannot start: need fresh telemetry AND heartbeat from the real car."
+    }
+  ],
+  "finished_utc": "2026-11-10T09:39:46.863Z",
+  "recorded_attempts": 3,
+  "complete_functional_trials": 2,
+  "within_conservative_target": 2
+}

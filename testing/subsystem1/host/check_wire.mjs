@@ -1,15 +1,29 @@
 // Decode actual C output; no browser, broker or simulated live feed is used.
 import {spawnSync} from 'node:child_process';
 import assert from 'node:assert/strict';
-import {decodeTelemetry,decodeHeartbeat,IMU_STATES} from '../../../dashboard/dist/protocol.js';
+import {decodeTelemetry,decodeHeartbeat,IMU_STATES,decodeStatusReply,encodeStatusRequest} from '../../../dashboard/dist/protocol.js';
 import {packet,concat,mqttString,parsePublish,PacketReader} from '../../../dashboard/dist/mqtt.js';
 
 assert.ok(process.argv[2], 'Pass the compiled emit_frames executable path');
 const result=spawnSync(process.argv[2],[],{encoding:'utf8',maxBuffer:8*1024*1024});
 assert.equal(result.status,0,result.stderr || result.error?.message);
-let telemetry=0,heartbeats=0,imu=0;
+let telemetry=0,heartbeats=0,imu=0,status=0,requests=0;
 for(const line of result.stdout.trim().split(/\r?\n/)) {
   const expected=JSON.parse(line), bytes=Uint8Array.from(Buffer.from(expected.hex,'hex'));
+  if(expected.kind==='status_request') {
+    assert.deepEqual(encodeStatusRequest(expected.id),bytes);requests++;continue;
+  }
+  if(expected.kind==='status') {
+    const reply=decodeStatusReply(bytes);
+    assert.equal(reply.request_id,expected.id);assert.equal(reply.uptime_ms,expected.id);
+    assert.equal(reply.test_build,Boolean(expected.test));
+    assert.equal(reply.sample_age_ms,expected.age===2047?null:expected.age);
+    if(expected.age===2047)assert.equal(reply.snapshot,null);
+    else {assert.equal(reply.snapshot.sequence,12);assert.equal(reply.snapshot.obstacle_mm,451);}
+    const reader=new PacketReader(),frame=packet(0x30,concat(mqttString('car/status'),bytes));
+    reader.push(frame.subarray(0,4));const parts=reader.push(frame.subarray(4));
+    assert.deepEqual(parsePublish(parts[0].header,parts[0].body).payload,bytes);status++;continue;
+  }
   if(expected.kind==='heartbeat') {
     assert.equal(decodeHeartbeat(bytes),expected.counter);heartbeats++;continue;
   }
@@ -38,6 +52,7 @@ for(const line of result.stdout.trim().split(/\r?\n/)) {
   if(expected.kind!=='imu')telemetry++;
 }
 assert.equal(telemetry,19914);assert.equal(heartbeats,3);
-assert.ok(imu>3602);
+assert.ok(imu>3602);assert.equal(status,24);assert.equal(requests,3);
 console.log(`PASS: ${telemetry} distance/IR and ${imu} IMU current-format C telemetry frames decoded and MQTT-framed byte-for-byte; ${heartbeats} C heartbeats decoded.`);
 console.log('C constructor also rejected all 114 reserved distance codes. This is offline contract evidence, not a hardware timing trial.');
+console.log(`PASS: ${requests} C STATUS requests match JS encoding; ${status} C STATUS replies decode and preserve MQTT bytes.`);

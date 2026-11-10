@@ -1,0 +1,83 @@
+{
+  "started_utc": "2026-11-10T10:07:29.058Z",
+  "local_uf2_sha256": "9c5ac8f0876055939f2cc4049a22e3ca9285b38ccccd889096bd801dafc2a7a0",
+  "image_note": "User now explicitly confirms flashing current UF2; earlier running-image identity is uncertain.",
+  "telemetry": 37,
+  "heartbeats": 3,
+  "status_reply": {
+    "request_id": 3475290662,
+    "uptime_ms": 173430,
+    "test_build": true,
+    "sample_age_ms": 70,
+    "snapshot": {
+      "sequence": 339,
+      "obstacle_valid": true,
+      "obstacle_mm": 768,
+      "line_bits": 4,
+      "ir": [
+        null,
+        0,
+        0
+      ],
+      "pitch_deg": 5.2,
+      "hump_mm": null,
+      "max_hump_mm": null,
+      "imu_state": "Monitoring",
+      "imu_flags": 17,
+      "imu_speed_source": "nominal",
+      "state": null,
+      "left_mps": null,
+      "right_mps": null,
+      "distance_m": null,
+      "barcode": null,
+      "faults": null,
+      "scan": null
+    },
+    "received_at": 1794305249477,
+    "round_trip_ms": 81
+  },
+  "connections": [
+    {
+      "utc": "2026-11-10T10:07:29.079Z",
+      "status": "connecting",
+      "detail": "Opening MQTT WebSocket"
+    },
+    {
+      "utc": "2026-11-10T10:07:29.095Z",
+      "status": "connected",
+      "detail": "Subscribed to telemetry, heartbeat and STATUS replies"
+    },
+    {
+      "utc": "2026-11-10T10:07:49.098Z",
+      "status": "disconnected",
+      "detail": "Disconnected"
+    }
+  ],
+  "latest_sample": {
+    "sequence": 375,
+    "obstacle_valid": false,
+    "obstacle_mm": null,
+    "line_bits": 4,
+    "ir": [
+      null,
+      0,
+      0
+    ],
+    "pitch_deg": 5.4,
+    "hump_mm": null,
+    "max_hump_mm": null,
+    "imu_state": "Monitoring",
+    "imu_flags": 17,
+    "imu_speed_source": "nominal",
+    "state": null,
+    "left_mps": null,
+    "right_mps": null,
+    "distance_m": null,
+    "barcode": null,
+    "faults": null,
+    "scan": null
+  },
+  "latest_heartbeat_counter": 35,
+  "finished_utc": "2026-11-10T10:07:49.098Z",
+  "communicating": true
+}

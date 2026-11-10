@@ -1,0 +1,111 @@
+{
+  "date": "2026-11-10",
+  "source": "Actual Pico via existing local MQTT broker; one real read-only STATUS request",
+  "events": [
+    {
+      "state": "connecting",
+      "detail": "Opening MQTT WebSocket"
+    },
+    {
+      "state": "connected",
+      "detail": "Subscribed to telemetry, heartbeat and STATUS replies"
+    }
+  ],
+  "telemetry": [
+    {
+      "at": 1794296524404,
+      "bytes": 11,
+      "sequence": 376,
+      "obstacle_mm": 500,
+      "line_bits": 5,
+      "pitch_deg": 5.1,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at": 1794296524938,
+      "bytes": 11,
+      "sequence": 377,
+      "obstacle_mm": 500,
+      "line_bits": 5,
+      "pitch_deg": 5,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at": 1794296526762,
+      "bytes": 11,
+      "sequence": 378,
+      "obstacle_mm": 532,
+      "line_bits": 5,
+      "pitch_deg": 5.2,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at": 1794296526856,
+      "bytes": 11,
+      "sequence": 379,
+      "obstacle_mm": 500,
+      "line_bits": 5,
+      "pitch_deg": 4.9,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at": 1794296526857,
+      "bytes": 11,
+      "sequence": 380,
+      "obstacle_mm": 500,
+      "line_bits": 5,
+      "pitch_deg": 5,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at": 1794296526964,
+      "bytes": 11,
+      "sequence": 381,
+      "obstacle_mm": 500,
+      "line_bits": 5,
+      "pitch_deg": 5,
+      "imu_state": "Monitoring"
+    }
+  ],
+  "heartbeats": [
+    {
+      "at": 1794296527380,
+      "counter": 37,
+      "bytes": 5
+    }
+  ],
+  "request_id": 4209474937,
+  "reply": {
+    "request_id": 4209474937,
+    "uptime_ms": 3355962186,
+    "test_build": true,
+    "sample_age_ms": 100,
+    "snapshot": {
+      "sequence": 376,
+      "obstacle_valid": true,
+      "obstacle_mm": 500,
+      "line_bits": 0,
+      "ir": [
+        null,
+        null,
+        null
+      ],
+      "pitch_deg": 5.1,
+      "hump_mm": 8,
+      "max_hump_mm": 73,
+      "imu_state": "Monitoring",
+      "imu_flags": 17,
+      "imu_speed_source": "nominal",
+      "state": null,
+      "left_mps": null,
+      "right_mps": null,
+      "distance_m": null,
+      "barcode": null,
+      "faults": null,
+      "scan": null
+    },
+    "received_at": 1794296524463,
+    "round_trip_ms": 59
+  },
+  "outcome": "PASS"
+}

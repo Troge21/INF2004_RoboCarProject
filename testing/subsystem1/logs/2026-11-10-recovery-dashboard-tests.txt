@@ -1,0 +1,43 @@
+✔ packet reader reassembles fragmented and coalesced MQTT messages (1.7947ms)
+✔ packet reader bounds untrusted lengths and rejects malformed varints (0.9337ms)
+✔ publish parser preserves binary bytes, retain flag and packet ID (1.5066ms)
+✔ live connection waits for all three subscriptions before declaring readiness (1.9515ms)
+✔ subscription failure never enables commands and disconnect cancels retries (0.8766ms)
+✔ unsafe or ambiguous broker/topic settings are rejected before opening a socket (0.4986ms)
+✔ a subscribed dashboard stays empty until fresh telemetry arrives (1.9809ms)
+✔ current 11-byte telemetry survives MQTT framing and reach the telemetry store (0.6782ms)
+✔ two-topic SUBACK cannot enable the three-topic STATUS connection (1.3561ms)
+✔ a fragmented STATUS reply matches its request without replacing live telemetry (0.7921ms)
+✔ current C golden vector supplies distance, IR and live IMU without invented feeds (3.1222ms)
+✔ offset byte views decode without using unrelated backing bytes (0.4071ms)
+✔ obsolete formats are rejected with a clear current-firmware instruction (0.633ms)
+✔ line readings preserve all patterns and unavailable independently of no echo (0.606ms)
+✔ distance boundary and reserved codes cannot appear as plausible measurements (0.388ms)
+✔ full signed pitch range and unavailable angle are distinct (0.2484ms)
+✔ accepted heights have a bounded range and no-event is not a measured zero (0.3445ms)
+✔ a missing IMU leaves real distance and IR usable (0.2609ms)
+✔ IMU fault invalidates angle while retaining accepted heights (0.2748ms)
+✔ calibration and speed-source flags are explicit (0.3526ms)
+✔ marker, padding and unavailable-state canonical bits are checked (0.2528ms)
+✔ binary heartbeats preserve full counters and reject old text (0.4049ms)
+✔ current values expire and disappear on disconnect without losing history (0.4599ms)
+✔ retained and rejected data never refresh live values (0.1993ms)
+✔ sequence wrap, gaps and replay checks apply to the single current format (0.339ms)
+✔ a robot heartbeat restart resets the sequence baseline (0.2081ms)
+✔ inspector uses each packet decoded value and readable hex on rejection (0.4491ms)
+✔ browser history and diagnostics remain bounded (6.962ms)
+✔ binary STATUS request is five bytes with an independent golden vector (0.2979ms)
+✔ STATUS no-sample golden vector preserves ID, uptime and test-build flag (0.3813ms)
+✔ STATUS decoder rejects malformed metadata, presence, reserved bits and snapshots (0.4891ms)
+✔ STATUS requires a matching current ID and ignores retained/unsolicited replies (0.6289ms)
+✔ STATUS timeout and disconnect never retry or accept a delayed reply (0.2693ms)
+✔ STATUS has one outstanding request, fresh IDs and browser rate limiting (0.2693ms)
+✔ STATUS snapshots stay separate from the live stream and inspector keeps each value (0.309ms)
+ℹ tests 35
+ℹ suites 0
+ℹ pass 35
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 125.7357

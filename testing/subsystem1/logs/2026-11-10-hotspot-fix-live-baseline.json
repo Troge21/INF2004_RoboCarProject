@@ -1,0 +1,1033 @@
+{
+  "started_utc": "2026-11-10T09:28:41.770Z",
+  "duration_ms": 60000,
+  "local_uf2_sha256": "9c5ac8f0876055939f2cc4049a22e3ca9285b38ccccd889096bd801dafc2a7a0",
+  "image_note": "User reports flashing replacement; local file hash is not flash readback.",
+  "transport": "MQTT WebSocket through actual dashboard adapter; read-only STATUS only",
+  "connections": [
+    {
+      "at_ms": 17,
+      "status": "connecting",
+      "detail": "Opening MQTT WebSocket"
+    },
+    {
+      "at_ms": 32,
+      "status": "connected",
+      "detail": "Subscribed to telemetry, heartbeat and STATUS replies"
+    },
+    {
+      "at_ms": 60039,
+      "status": "disconnected",
+      "detail": "Disconnected"
+    }
+  ],
+  "telemetry": [
+    {
+      "at_ms": 699,
+      "sequence": 685,
+      "obstacle_mm": 383,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 700,
+      "sequence": 686,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 700,
+      "sequence": 687,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 1139,
+      "sequence": 688,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 1645,
+      "sequence": 689,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 2160,
+      "sequence": 690,
+      "obstacle_mm": 383,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 2667,
+      "sequence": 691,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 3190,
+      "sequence": 692,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 3693,
+      "sequence": 693,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 4204,
+      "sequence": 694,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 4714,
+      "sequence": 695,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 5269,
+      "sequence": 696,
+      "obstacle_mm": 383,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 5741,
+      "sequence": 697,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 6250,
+      "sequence": 698,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 6770,
+      "sequence": 699,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 7259,
+      "sequence": 700,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 7762,
+      "sequence": 701,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 8280,
+      "sequence": 702,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 8783,
+      "sequence": 703,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 10506,
+      "sequence": 704,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 10507,
+      "sequence": 705,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 10507,
+      "sequence": 706,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 10829,
+      "sequence": 707,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 11350,
+      "sequence": 708,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 11841,
+      "sequence": 709,
+      "obstacle_mm": 383,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 12370,
+      "sequence": 710,
+      "obstacle_mm": 374,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 12880,
+      "sequence": 711,
+      "obstacle_mm": 374,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 13389,
+      "sequence": 712,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 15167,
+      "sequence": 713,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 15241,
+      "sequence": 714,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 15241,
+      "sequence": 715,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 15478,
+      "sequence": 716,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 17266,
+      "sequence": 717,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 17319,
+      "sequence": 718,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 17319,
+      "sequence": 719,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 17472,
+      "sequence": 720,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 19336,
+      "sequence": 721,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 19398,
+      "sequence": 722,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 19398,
+      "sequence": 723,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 19519,
+      "sequence": 724,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 20001,
+      "sequence": 725,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 20545,
+      "sequence": 726,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 21031,
+      "sequence": 727,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 21544,
+      "sequence": 728,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 22055,
+      "sequence": 729,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 22592,
+      "sequence": 730,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 23080,
+      "sequence": 731,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 25052,
+      "sequence": 732,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 25176,
+      "sequence": 733,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 25177,
+      "sequence": 734,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 25620,
+      "sequence": 736,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 26124,
+      "sequence": 737,
+      "obstacle_mm": 374,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 26641,
+      "sequence": 738,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 27145,
+      "sequence": 739,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 27694,
+      "sequence": 740,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 28169,
+      "sequence": 741,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 28687,
+      "sequence": 742,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 29203,
+      "sequence": 743,
+      "obstacle_mm": 383,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 29705,
+      "sequence": 744,
+      "obstacle_mm": 379,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 30213,
+      "sequence": 745,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 30730,
+      "sequence": 746,
+      "obstacle_mm": 379,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 31222,
+      "sequence": 747,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 31750,
+      "sequence": 748,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 32240,
+      "sequence": 749,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 32771,
+      "sequence": 750,
+      "obstacle_mm": 383,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 33260,
+      "sequence": 751,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 33779,
+      "sequence": 752,
+      "obstacle_mm": 383,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 34291,
+      "sequence": 753,
+      "obstacle_mm": 374,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 34803,
+      "sequence": 754,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 35306,
+      "sequence": 755,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 35821,
+      "sequence": 756,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 36331,
+      "sequence": 757,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 36843,
+      "sequence": 758,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 37381,
+      "sequence": 759,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 37867,
+      "sequence": 760,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 38359,
+      "sequence": 761,
+      "obstacle_mm": 383,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 40119,
+      "sequence": 762,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 40221,
+      "sequence": 763,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 40221,
+      "sequence": 764,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 41685,
+      "sequence": 765,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 41768,
+      "sequence": 766,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 41769,
+      "sequence": 767,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 43300,
+      "sequence": 768,
+      "obstacle_mm": 374,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 43501,
+      "sequence": 769,
+      "obstacle_mm": 374,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 43501,
+      "sequence": 770,
+      "obstacle_mm": 374,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 43502,
+      "sequence": 771,
+      "obstacle_mm": 374,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 44017,
+      "sequence": 772,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 44590,
+      "sequence": 773,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 46370,
+      "sequence": 774,
+      "obstacle_mm": 383,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 46551,
+      "sequence": 775,
+      "obstacle_mm": 383,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 46552,
+      "sequence": 776,
+      "obstacle_mm": 383,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 46641,
+      "sequence": 777,
+      "obstacle_mm": 383,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 47048,
+      "sequence": 778,
+      "obstacle_mm": 383,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 47550,
+      "sequence": 779,
+      "obstacle_mm": 383,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 48069,
+      "sequence": 780,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 48575,
+      "sequence": 781,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 49089,
+      "sequence": 782,
+      "obstacle_mm": 374,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 49579,
+      "sequence": 783,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 51586,
+      "sequence": 784,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 51674,
+      "sequence": 785,
+      "obstacle_mm": 383,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 51674,
+      "sequence": 786,
+      "obstacle_mm": 362,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 51675,
+      "sequence": 787,
+      "obstacle_mm": 383,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 52141,
+      "sequence": 788,
+      "obstacle_mm": 383,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 52639,
+      "sequence": 789,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 53161,
+      "sequence": 790,
+      "obstacle_mm": 383,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 53670,
+      "sequence": 791,
+      "obstacle_mm": 383,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 54180,
+      "sequence": 792,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 54708,
+      "sequence": 793,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 55206,
+      "sequence": 794,
+      "obstacle_mm": 383,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 55751,
+      "sequence": 795,
+      "obstacle_mm": 383,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 56224,
+      "sequence": 796,
+      "obstacle_mm": 374,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 56734,
+      "sequence": 797,
+      "obstacle_mm": 383,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 57252,
+      "sequence": 798,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 57759,
+      "sequence": 799,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 58270,
+      "sequence": 800,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 58760,
+      "sequence": 801,
+      "obstacle_mm": 383,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 59278,
+      "sequence": 802,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    },
+    {
+      "at_ms": 59867,
+      "sequence": 803,
+      "obstacle_mm": 378,
+      "line_bits": 4,
+      "imu_state": "Monitoring"
+    }
+  ],
+  "heartbeats": [
+    {
+      "at_ms": 633,
+      "counter": 68
+    },
+    {
+      "at_ms": 4123,
+      "counter": 69
+    },
+    {
+      "at_ms": 10485,
+      "counter": 70
+    },
+    {
+      "at_ms": 15241,
+      "counter": 71
+    },
+    {
+      "at_ms": 19399,
+      "counter": 72
+    },
+    {
+      "at_ms": 25176,
+      "counter": 73
+    },
+    {
+      "at_ms": 29129,
+      "counter": 74
+    },
+    {
+      "at_ms": 34165,
+      "counter": 75
+    },
+    {
+      "at_ms": 40220,
+      "counter": 76
+    },
+    {
+      "at_ms": 44351,
+      "counter": 77
+    },
+    {
+      "at_ms": 49180,
+      "counter": 78
+    },
+    {
+      "at_ms": 54149,
+      "counter": 79
+    },
+    {
+      "at_ms": 59128,
+      "counter": 80
+    }
+  ],
+  "status_requests": [
+    {
+      "at_ms": 5081,
+      "id": 372146529
+    },
+    {
+      "at_ms": 25103,
+      "id": 2706995388
+    },
+    {
+      "at_ms": 45046,
+      "id": 1520401741
+    }
+  ],
+  "status_replies": [
+    {
+      "at_ms": 5184,
+      "request_id": 372146529,
+      "uptime_ms": 355770,
+      "test_build": true,
+      "sample_age_ms": 490,
+      "snapshot": {
+        "sequence": 695,
+        "obstacle_valid": true,
+        "obstacle_mm": 378,
+        "line_bits": 0,
+        "ir": [
+          null,
+          null,
+          null
+        ],
+        "pitch_deg": null,
+        "hump_mm": 23,
+        "max_hump_mm": 23,
+        "imu_state": "Monitoring",
+        "imu_flags": 13,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      },
+      "received_at": 1794302926954,
+      "round_trip_ms": 103
+    },
+    {
+      "at_ms": 25311,
+      "request_id": 2706995388,
+      "uptime_ms": 375710,
+      "test_build": true,
+      "sample_age_ms": 30,
+      "snapshot": {
+        "sequence": 735,
+        "obstacle_valid": true,
+        "obstacle_mm": 378,
+        "line_bits": 4,
+        "ir": [
+          null,
+          0,
+          0
+        ],
+        "pitch_deg": 5.2,
+        "hump_mm": 23,
+        "max_hump_mm": 23,
+        "imu_state": "Monitoring",
+        "imu_flags": 29,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      },
+      "received_at": 1794302947080,
+      "round_trip_ms": 207
+    },
+    {
+      "at_ms": 46551,
+      "request_id": 1520401741,
+      "uptime_ms": 395670,
+      "test_build": true,
+      "sample_age_ms": 100,
+      "snapshot": {
+        "sequence": 774,
+        "obstacle_valid": true,
+        "obstacle_mm": 383,
+        "line_bits": 0,
+        "ir": [
+          null,
+          null,
+          null
+        ],
+        "pitch_deg": 5,
+        "hump_mm": 23,
+        "max_hump_mm": 23,
+        "imu_state": "Monitoring",
+        "imu_flags": 29,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      },
+      "received_at": 1794302968321,
+      "round_trip_ms": 1505
+    }
+  ],
+  "finished_utc": "2026-11-10T09:29:41.819Z",
+  "telemetry_summary": {
+    "count": 118,
+    "max_interval_ms": 2007
+  },
+  "heartbeat_summary": {
+    "count": 13,
+    "max_interval_ms": 6362
+  },
+  "baseline_observed": true,
+  "rejected": 0,
+  "sequence_gaps": 1
+}

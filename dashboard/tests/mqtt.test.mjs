@@ -1,8 +1,8 @@
-import {telemetry} from './fixtures.mjs';
+import {telemetry,statusReply} from './fixtures.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {PacketReader,packet,mqttString,parsePublish,concat,MqttConnection} from '../dist/mqtt.js';
-import {TelemetryStore} from '../dist/protocol.js';
+import {TelemetryStore,encodeStatusRequest} from '../dist/protocol.js';
 const enc=new TextEncoder();
 
 test('packet reader reassembles fragmented and coalesced MQTT messages',()=>{
@@ -27,25 +27,25 @@ class FakeSocket{
   receive(bytes){this.onmessage({data:bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength)});}
   close(){this.readyState=3;this.onclose?.();}
 }
-const options={url:'ws://localhost:9001',telemetryTopic:'car/telemetry',heartbeatTopic:'car/heartbeat'};
-test('live connection waits for both SUBACKs before declaring readiness',()=>{
+const options={url:'ws://localhost:9001',telemetryTopic:'car/telemetry',heartbeatTopic:'car/heartbeat',statusTopic:'car/status',commandTopic:'car/command'};
+test('live connection waits for all three subscriptions before declaring readiness',()=>{
   const statuses=[],messages=[];
   const c=new MqttConnection(options,{WebSocketClass:FakeSocket,onStatus:s=>statuses.push(s),onMessage:m=>messages.push(m)});
   try{
     c.connect();const ws=FakeSocket.instances.at(-1);ws.open();assert.equal(ws.sent[0][0],0x10);
     ws.receive(packet(0x20,new Uint8Array([0,0])));assert.equal(c.ready,false);assert.equal(ws.sent[1][0],0x82);assert.ok(!statuses.includes('connected'));
-    ws.receive(packet(0x90,new Uint8Array([0,1,0,0])));assert.equal(c.ready,true);assert.equal(statuses.at(-1),'connected');
+    ws.receive(packet(0x90,new Uint8Array([0,1,0,0,0])));assert.equal(c.ready,true);assert.equal(statuses.at(-1),'connected');
     ws.receive(packet(0x31,concat(mqttString('car/telemetry'),new Uint8Array([0,255]))));assert.equal(messages[0].retained,true);assert.deepEqual([...messages[0].payload],[0,255]);
-    c.publish('car/command',enc.encode('STATUS'));assert.equal(ws.sent.at(-1)[0],0x30);
+    c.publish(options.commandTopic,encodeStatusRequest(12));assert.equal(ws.sent.at(-1)[0],0x30);
   }finally{c.disconnect();}
 });
 test('subscription failure never enables commands and disconnect cancels retries',()=>{
   const statuses=[];const c=new MqttConnection(options,{WebSocketClass:FakeSocket,onStatus:s=>statuses.push(s)});
-  try{c.connect();const ws=FakeSocket.instances.at(-1);ws.open();ws.receive(packet(0x20,new Uint8Array([0,0])));ws.receive(packet(0x90,new Uint8Array([0,1,0,128])));assert.equal(c.ready,false);assert.ok(statuses.includes('error'));assert.throws(()=>c.publish('car/command',new Uint8Array()),/not subscribed/);}finally{c.disconnect();}
+  try{c.connect();const ws=FakeSocket.instances.at(-1);ws.open();ws.receive(packet(0x20,new Uint8Array([0,0])));ws.receive(packet(0x90,new Uint8Array([0,1,0,0,128])));assert.equal(c.ready,false);assert.ok(statuses.includes('error'));assert.throws(()=>c.publish('car/command',new Uint8Array()),/not subscribed/);}finally{c.disconnect();}
   assert.equal(c.closed,true);
 });
 test('unsafe or ambiguous broker/topic settings are rejected before opening a socket',()=>{
-  for(const bad of [{url:'http://localhost'},{url:'ws://user:pass@localhost'},{heartbeatTopic:'car/telemetry'},{telemetryTopic:'car/#'}])assert.throws(()=>new MqttConnection({...options,...bad},{WebSocketClass:FakeSocket}).connect());
+  for(const bad of [{url:'http://localhost'},{url:'ws://user:pass@localhost'},{heartbeatTopic:'car/telemetry'},{telemetryTopic:'car/#'},{statusTopic:'car/heartbeat'},{commandTopic:'car/+'}])assert.throws(()=>new MqttConnection({...options,...bad},{WebSocketClass:FakeSocket}).connect());
 });
 
 test('a subscribed dashboard stays empty until fresh telemetry arrives',()=>{
@@ -54,7 +54,7 @@ test('a subscribed dashboard stays empty until fresh telemetry arrives',()=>{
   try{
     c.connect();const ws=FakeSocket.instances.at(-1);ws.open();
     ws.receive(packet(0x20,new Uint8Array([0,0])));
-    ws.receive(packet(0x90,new Uint8Array([0,1,0,0])));
+    ws.receive(packet(0x90,new Uint8Array([0,1,0,0,0])));
     assert.equal(c.ready,true);assert.equal(store.sample,null);assert.equal(store.history.length,0);
     const body=concat(mqttString('car/telemetry'),telemetry({sequence:1}));
     ws.receive(packet(0x31,body));
@@ -73,7 +73,7 @@ test('current 11-byte telemetry survives MQTT framing and reach the telemetry st
   const c=new MqttConnection(options,{WebSocketClass:FakeSocket,onMessage:m=>store.ingest(m.payload,'telemetry',1000,m.retained,m.topic)});
   try {
     c.connect();const ws=FakeSocket.instances.at(-1);ws.open();
-    ws.receive(packet(0x20,new Uint8Array([0,0])));ws.receive(packet(0x90,new Uint8Array([0,1,0,0])));
+    ws.receive(packet(0x20,new Uint8Array([0,0])));ws.receive(packet(0x90,new Uint8Array([0,1,0,0,0])));
     const bytes=telemetry();
     const frame=packet(0x30,concat(mqttString(options.telemetryTopic),bytes));
     ws.receive(frame.subarray(0,5));assert.equal(store.sample,null);
@@ -82,4 +82,27 @@ test('current 11-byte telemetry survives MQTT framing and reach the telemetry st
     assert.deepEqual(store.sample.ir,[null,1,0]);assert.equal(store.lastPayloadBytes,11);
     assert.deepEqual(store.packets[0].bytes,bytes);
   } finally { c.disconnect(); }
+});
+
+test('two-topic SUBACK cannot enable the three-topic STATUS connection',()=>{
+  const c=new MqttConnection(options,{WebSocketClass:FakeSocket});
+  try {
+    c.connect();const ws=FakeSocket.instances.at(-1);ws.open();
+    ws.receive(packet(0x20,new Uint8Array([0,0])));
+    ws.receive(packet(0x90,new Uint8Array([0,1,0,0])));assert.equal(c.ready,false);
+  }finally{c.disconnect();}
+});
+test('a fragmented STATUS reply matches its request without replacing live telemetry',()=>{
+  const store=new TelemetryStore();store.ingest(telemetry({sequence:99}),'telemetry',900);
+  const c=new MqttConnection(options,{WebSocketClass:FakeSocket,onMessage:m=>store.ingest(m.payload,'status',1100,m.retained,m.topic)});
+  try {
+    c.connect();const ws=FakeSocket.instances.at(-1);ws.open();
+    ws.receive(packet(0x20,new Uint8Array([0,0])));ws.receive(packet(0x90,new Uint8Array([0,1,0,0,0])));
+    c.publish(options.commandTopic,store.beginStatus(12,1000));
+    const frame=packet(0x30,concat(mqttString(options.statusTopic),statusReply()));
+    ws.receive(frame.subarray(0,8));assert.ok(store.pendingStatus);
+    ws.receive(frame.subarray(8));assert.equal(store.pendingStatus,null);
+    assert.equal(store.statusReply.request_id,12);assert.equal(store.statusReply.round_trip_ms,100);
+    assert.equal(store.sample.sequence,99);assert.equal(store.lastTelemetry,900);assert.equal(store.history.length,1);
+  }finally{c.disconnect();}
 });

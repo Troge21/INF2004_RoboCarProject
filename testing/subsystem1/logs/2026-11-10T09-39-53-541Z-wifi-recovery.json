@@ -1,0 +1,18 @@
+{
+  "started_utc": "2026-11-10T09:39:53.542Z",
+  "kind": "wifi",
+  "host": "172.20.10.2",
+  "port": 1883,
+  "requested_trials": 5,
+  "topics": {
+    "telemetry": "mtk3smp-pico/telemetry",
+    "heartbeat": "mtk3smp-pico/heartbeat",
+    "command": "mtk3smp-pico/command",
+    "status": "mtk3smp-pico/status"
+  },
+  "local_uf2_sha256": "9c5ac8f0876055939f2cc4049a22e3ca9285b38ccccd889096bd801dafc2a7a0",
+  "probe_sha256": "0ba128ad62de87c65b5dc100f6f065f6371c07bf4acd49e3e5fd0aaedfb194ff",
+  "image_note": "Local file fingerprint only; operator must verify the flashed image.",
+  "trials": [],
+  "events": []
+}

@@ -1,0 +1,18 @@
+{
+  "date_local": "2026-11-10",
+  "timezone": "Asia/Kuala_Lumpur",
+  "git_base": "d3cdd0893e5b6c97fe847f86f280e3283163beb5",
+  "uf2_bytes": 707584,
+  "uf2_sha256": "aaf0e39836b759904add31509ca4fef3a06a6892f6e58589b3cbf4342226fa77",
+  "flashed": "User-reported; real TEST=1 STATUS and fresh telemetry observed; no flash readback.",
+  "firmware_changed_in_live_session": false,
+  "physical_broker_interruptions": 5,
+  "hotspot_trials": "Pending",
+  "sha256": {
+    "testing/subsystem1/recovery_probe.mjs": "0ba128ad62de87c65b5dc100f6f065f6371c07bf4acd49e3e5fd0aaedfb194ff",
+    "testing/subsystem1/host/recovery_probe.test.mjs": "da5af2afde8b92b3c1b1042dcb4782951acc5f3dd404c3365d4f6fc45f112498",
+    "testing/subsystem1/logs/2026-11-10-broker-recovery-live.json": "4b24ec6edab17cef09a957f66c5a72cdae12e0989f55fede044e9a5a34691916",
+    "testing/subsystem1/logs/2026-11-10-broker-recovery-live-continued.json": "8f8d588a865fc1718bacc1b51d1d2a621c143db843add23b69b3ef8b1c985898",
+    "testing/subsystem1/logs/2026-11-10-broker-recovery-summary.json": "c112a67900cf60a3dff4f511194853637f4767dbed4b0b8ec1bad5e5a831db4f"
+  }
+}

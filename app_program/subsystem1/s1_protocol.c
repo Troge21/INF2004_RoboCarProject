@@ -159,3 +159,41 @@ int s1_pack_frame(const S1_TELEMETRY *sample, const S1_LINE_TELEMETRY *line,
     for (i = 0; i < S1_FRAME_BYTES; ++i) out[i] = frame[i];
     return S1_FRAME_BYTES;
 }
+
+int s1_parse_status_request(const uint8_t *bytes, unsigned length, uint32_t *id)
+{
+    uint32_t value;
+    if (bytes == 0 || id == 0 || length != S1_STATUS_REQUEST_BYTES || bytes[0] != 0xa0U)
+        return S1_CODEC_INVALID;
+    value = s1_read_u32(bytes + 1);
+    if (value == 0U) return S1_CODEC_INVALID;
+    *id = value;
+    return S1_CODEC_OK;
+}
+int s1_pack_status_reply(uint32_t id, uint32_t uptime_ms, unsigned sample_age_ms,
+                         unsigned test_build, const uint8_t *frame,
+                         uint8_t *out, unsigned capacity)
+{
+    uint8_t reply[S1_STATUS_MAX_BYTES];
+    unsigned length = S1_STATUS_HEADER_BYTES, word, i;
+    if (id == 0U || test_build > 1U || out == 0 ||
+        (sample_age_ms > 2000U && sample_age_ms != S1_STATUS_NO_SAMPLE))
+        return S1_CODEC_INVALID;
+    if (sample_age_ms != S1_STATUS_NO_SAMPLE) {
+        S1_TELEMETRY sample;
+        if (frame == 0) return S1_CODEC_INVALID;
+        for (i = 0; i < S1_TELEMETRY_BYTES; ++i) sample.bytes[i] = frame[i];
+        if (s1_validate_telemetry(&sample) != S1_CODEC_OK || !valid_imu(imu_word(frame + 6)))
+            return S1_CODEC_INVALID;
+        length += S1_FRAME_BYTES;
+    } else if (frame != 0) return S1_CODEC_INVALID;
+    if (capacity < length) return S1_CODEC_INVALID;
+    reply[0] = 0xa1U;
+    s1_write_u32(reply + 1, id);
+    s1_write_u32(reply + 5, uptime_ms);
+    word = sample_age_ms | (test_build << 11);
+    reply[9] = (uint8_t)word; reply[10] = (uint8_t)(word >> 8);
+    for (i = S1_STATUS_HEADER_BYTES; i < length; ++i) reply[i] = frame[i - S1_STATUS_HEADER_BYTES];
+    for (i = 0; i < length; ++i) out[i] = reply[i];
+    return (int)length;
+}

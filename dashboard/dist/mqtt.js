@@ -32,6 +32,12 @@ export function parsePublish(header,body){
   const id=qos ? body.slice(2+length,4+length) : null;
   return {topic,payload:body.slice(2+length+(qos?2:0)),retained:Boolean(header&1),id};
 }
+export function validateTopics(options) {
+  const topics=['telemetryTopic','heartbeatTopic','statusTopic','commandTopic'].map(key=>options[key]);
+  if(topics.some(t=>typeof t!=='string'||!t||/[+#\0]/.test(t))||new Set(topics).size!==4)
+    throw new Error('Use four different, exact telemetry/heartbeat/status/command topics');
+  return topics.slice(0,3);
+}
 export class MqttConnection {
   constructor(options,{onStatus=()=>{},onMessage=()=>{},WebSocketClass=globalThis.WebSocket}={}){
     this.options=options;this.onStatus=onStatus;this.onMessage=onMessage;this.WS=WebSocketClass;this.closed=false;this.ready=false;this.retry=null;this.timer=null;this.deadline=null;
@@ -39,7 +45,7 @@ export class MqttConnection {
   connect(){
     const o=this.options,url=new URL(o.url);
     if(!['ws:','wss:'].includes(url.protocol)||url.username||url.password)throw new Error('Use a ws:// or wss:// broker URL without embedded credentials');
-    if(!o.telemetryTopic||!o.heartbeatTopic||o.telemetryTopic===o.heartbeatTopic||[o.telemetryTopic,o.heartbeatTopic].some(t=>/[+#\0]/.test(t)))throw new Error('Use two different, exact topic names');
+    validateTopics(o);
     this.closed=false;this.ready=false;this.reader=new PacketReader();this.awaitingPing=false;
     this.onStatus('connecting','Opening MQTT WebSocket');
     const socket=new this.WS(o.url,['mqtt']);this.socket=socket;socket.binaryType='arraybuffer';
@@ -68,11 +74,11 @@ export class MqttConnection {
     const type=header>>4;
     if(type===2){
       if(body.length!==2||body[0]!==0||body[1]!==0)throw new Error(`MQTT connection rejected (${body[1]??'invalid reply'})`);
-      const topics=concat(mqttString(this.options.telemetryTopic),new Uint8Array([0]),mqttString(this.options.heartbeatTopic),new Uint8Array([0]));
+      const topics=concat(...validateTopics(this.options).flatMap(topic=>[mqttString(topic),new Uint8Array([0])]));
       this.send(packet(0x82,concat(new Uint8Array([0,1]),topics)));
     }else if(type===9){
-      if(body.length!==4||body[0]!==0||body[1]!==1||body.slice(2).some(x=>x!==0))throw new Error('Broker did not accept QoS 0 subscriptions');
-      clearTimeout(this.deadline);this.ready=true;this.onStatus('connected','Subscribed to telemetry and heartbeat');
+      if(body.length!==5||body[0]!==0||body[1]!==1||body.slice(2).some(x=>x!==0))throw new Error('Broker did not accept QoS 0 subscriptions');
+      clearTimeout(this.deadline);this.ready=true;this.onStatus('connected','Subscribed to telemetry, heartbeat and STATUS replies');
       this.timer=setInterval(()=>{try{if(this.awaitingPing){this.fail('MQTT heartbeat response timed out');return;}this.awaitingPing=true;this.send(packet(0xc0));}catch(error){this.fail(error.message);}},15000);
     }else if(type===3){
       const msg=parsePublish(header,body);

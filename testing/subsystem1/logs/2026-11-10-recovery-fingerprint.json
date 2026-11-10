@@ -1,0 +1,31 @@
+{
+  "date_local": "2026-11-10",
+  "timezone": "Asia/Kuala_Lumpur",
+  "git_base": "d3cdd0893e5b6c97fe847f86f280e3283163beb5",
+  "source_note": "Uncommitted local working copy; hashes are exact file bytes including line endings.",
+  "build_flags": "NET=lwip MQTT=1 TEST=1",
+  "hardware_note": "Car unavailable; not flashed; live recovery trials NOT RUN.",
+  "uf2_bytes": 707584,
+  "uf2_sha256": "aaf0e39836b759904add31509ca4fef3a06a6892f6e58589b3cbf4342226fa77",
+  "linked_text": 353580,
+  "linked_data": 104,
+  "linked_bss": 82508,
+  "linked_static_ram": 82612,
+  "sha256": {
+    "lib/libwifi/sysdepend/pico_rp2040/cyw43_utk.c": "a80fac7fb6890e1c76d97a5da69a24eea909a6c013d9ac876e68725af8729b1e",
+    "lib/libwifi/sysdepend/pico_rp2040/cyw43_utk.h": "65e34a81a07f6c8f308934a97116d98fce39f276c5f5204201e010d00667bca4",
+    "lib/libwifi/sysdepend/pico_rp2040/wifi_recovery.h": "597dc8a7e9c6d43f7aa6d8b8c2fc002b54c4445c0e07d7051dcfa22f81dc60d9",
+    "lib/liblwip/sysdepend/pico_rp2040/mqtt_utk.c": "e14c8cc679aead96461737108dd4ca20413f9999d67d4020f4470a35eef0126f",
+    "lib/liblwip/sysdepend/pico_rp2040/mqtt_utk.h": "1a4a04e15c450b42f23876c2ec5cb949e1e91bb6ca6113b67f66ee42b280decf",
+    "app_program/subsystem1/s1_protocol.c": "98a716d828687e9595a5a33c868b79ddd00861f09a1d0c3721331f1a686b8f4d",
+    "app_program/subsystem1/s1_protocol.h": "f680076012bcaaf0cc4ba8796ab8f25f83e7371274e4ef8e53c27f23ebcd151d",
+    "app_program/subsystem1/subsystem1.c": "64e144750622a93d0215079dea2e340d028bbfc33b85105e1fbd3531bed7c5ed",
+    "testing/subsystem1/host/test_wifi_recovery.c": "41a3d3fc0384a715aa743b39c2b7628389304a921c6b73ed51762b32f4cd4c40",
+    "testing/subsystem1/host/test_status_mqtt.c": "bff1881f8196e749358ba4935b75a30cec98be304fef6e288801ae335d6586d7",
+    "testing/subsystem1/host/recovery_probe.test.mjs": "d39869f9f70e9046509481dad0098f6d8586e6e85ca37bdc20340b8b75207fba",
+    "testing/subsystem1/recovery_probe.mjs": "3bc58597c6e8fad5d9c9db5b44df6b7d485d463e361912bc5d724a314b998b9a",
+    "testing/subsystem1/RECOVERY_TESTS.md": "6ffb04e60b22af5979c413423e1852213d0143c5df1fd6cf1da6c5d5691226a3",
+    "dashboard/dist/protocol.js": "cb580c3ea41ae3cc5a258ee8b86569b71ee129c987815a3c01516c8eb84c5930",
+    "dashboard/dist/mqtt.js": "4fe0ce715a26aabd2b3e7628413b0e7597eeac7bd62b76fc84ffa8e5042f51bb"
+  }
+}

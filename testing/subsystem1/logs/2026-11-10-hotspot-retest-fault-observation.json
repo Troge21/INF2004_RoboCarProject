@@ -1,0 +1,25 @@
+{
+  "date_local": "2026-11-10",
+  "timezone": "Asia/Kuala_Lumpur",
+  "operator_confirmations": [
+    "Laptop restarted between partial and complete series",
+    "Pico powered by laptop USB, hotspot on, laptop connected after final timeout"
+  ],
+  "mqtt_check": {
+    "capture": "2026-11-10-hotspot-retest-current-check.json",
+    "sha256": "95e83777dda6bb5c25945080a3bb6169ee9afb5db30f819a278149fe2508d1f9",
+    "broker_websocket_subscribed": true,
+    "telemetry_in_12s": 0,
+    "heartbeats_in_12s": 0,
+    "matching_status_reply": false
+  },
+  "windows_usb": {
+    "port": "COM5",
+    "present": true,
+    "pnp_status": "OK",
+    "config_manager_error_code": 0,
+    "open_115200_error": "A device attached to the system is not functioning."
+  },
+  "interpretation": "Powered Pico is not communicating; MCU/USB-driver/radio failure cause not isolated. Do not label final timeout a passing recovery.",
+  "next_action": "Normal USB power cycle with battery off, no BOOTSEL or reflash, then observe MQTT/STATUS and USB again."
+}

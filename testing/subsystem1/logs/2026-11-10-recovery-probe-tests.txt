@@ -1,0 +1,14 @@
+✔ recovery baseline requires fresh real telemetry, heartbeat and subscribed connection (0.853ms)
+✔ observer accepts forward/wrapped sequence and rejects duplicate/backward half-range (0.162ms)
+✔ complete recovery has a conservative marker-based upper bound (0.2309ms)
+✔ Pico reboot, stale status and incomplete samples cannot count as recovery passes (0.2317ms)
+✔ uptime wrap remains continuous; over-target result retains functional evidence (0.1485ms)
+✔ CLI refuses an outage without live baseline and preserves existing evidence (147.0732ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 240.4901
