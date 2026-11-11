@@ -79,12 +79,12 @@ make all -j8
 Flash `build_make/mtk3pico_smp1_usb_cdc_wifi.uf2`. Startup now prints
 `[CTRL] Line follower starts in 3000 ms; duty=25%.`.
 
-Host checks (gcc required) run the actual controller policy and motor API/loop:
+The existing legacy controller-policy check (gcc required) is:
 
 ```sh
 python testing/subsystem2/test_line_recovery.py
-python testing/subsystem2/test_motor_commands.py
 ```
 
-They cover recovery direction and timeout, steering, reacquisition, stale/invalid stops,
-command bounds/readiness, motor command expiry, lock contention, and clock wrap.
+It covers the legacy controller's recovery direction and timeout, steering,
+reacquisition, stale/invalid stops, and clock wrap. The current analog/PID
+setup is documented in `testing/subsystem2/MOTOR_FEEDBACK.md`.

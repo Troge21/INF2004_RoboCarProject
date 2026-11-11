@@ -1,5 +1,54 @@
 # Team and subsystems
 
+## Reusable S2 feedback and PID - 11 November 2026
+
+S2's core-0 `motor_task` (priority 14) now owns PWM, encoder setup,
+counts/RPM/distance estimation and optional RPM-mode PID control. There
+are two private S2 semaphores: commands and coherent read-only feedback.
+`subsystem2_set_rpm_x10()` requests wheel speeds; `subsystem2_set_duty()`
+retains the open-loop API. `subsystem2_get_motion()` provides a snapshot
+for future telemetry consumers. No S1/Wi-Fi/MQTT/dashboard code is changed.
+
+GPIO IRQ13 on core 0 is shared through `app_program/gpio_irq.c`; callbacks
+are registered per pin. S2 owns GP16/GP0 rising edges, using GP17/GP1 for
+direction. S5 owns GP5 rise/fall events. S5 now masks only its echo pin
+while idle instead of disabling wheel encoder interrupts. Its telemetry
+code is unchanged. All GPIO IRQ13 users must use this dispatcher.
+
+Normal analog tracking requests 35/35 RPM forward or 26/35 and 35/26 RPM
+for corrections (`S2_LINE_USE_RPM_CONTROL=1`). The left IR remains barcode
+only. Initial PID gains are provisional. The dedicated TEST=1 bench
+requests 35 RPM per wheel after 5 seconds, runs for 10 seconds, then stops.
+Its coordinator is priority 15/core 0; it buffers samples while moving.
+Faults latch off until reboot, and the 100 ms command watchdog remains.
+Latest user-confirmed 10-turn zero-start totals L=-6337/R=5409 set x1
+counts/rev to **633.7 left / 540.9 right**, superseding the earlier
+636.8/588.2 calibration. PID tuning remains provisional; the new scale
+requires another raised-wheel and floor check.
+See `testing/subsystem2/MOTOR_FEEDBACK.md` for API units and test details.
+
+## Earlier standalone encoder check - 11 November 2026
+
+User-confirmed wiring: left encoder A/B GP16/17, right encoder A/B GP0/1.
+IR AO inputs are left/barcode GP28, centre GP27 and right GP26.
+`TEST=1` with `S2_ENCODER_CALIBRATION=1` starts the standalone S2 encoder
+bench, owning IO_BANK0 IRQ13 exclusively on core 0. Hand-turn mode is
+`S2_ENCODER_POWERED_TEST=0`. The current powered mode (`=1`) starts the
+existing motor task (priority 14, core 0) plus the timed command/RPM bench
+(priority 15, core 0): wait 5 seconds, run left at 18% and right at 20% for 5 seconds,
+then stop until reset. Its provisional x1 counts/rev are L=636.8/R=588.2,
+with the left encoder sign inverted. The motor watchdog remains active.
+Both tyres are provisionally treated as 65 mm outside diameter. The bench
+now reports signed per-wheel distance and their average, using total
+counts from run start through the stop window. This is encoder odometry
+in the bench only; normal driving feedback/PID integration is pending.
+The revised v2 bench buffers samples during motion, prints them after
+stopping, and repeats supervisor status outside the run. It no longer
+creates a separate core-1 reporter task.
+Normal builds still enter the standalone analog IR/steering test. Legacy
+normal-subsystem descriptions below are historical and are not the active
+standalone wiring. See `testing/subsystem2/MOTOR_FEEDBACK.md` for the current setup.
+
 ## Current centre/right tracking and left barcode setup - 3 November 2026
 
 Three IR inputs are used: left GP26 for barcode capture, centre GP6 and right
@@ -94,8 +143,8 @@ fixed.
 | GP3 | S4 - Thaw Zin | GY-511 SCL — I2C1 |
 | GP4 | S5 - Siyona | Ultrasonic TRIG — GPIO output |
 | GP5 | S5 - Siyona | Ultrasonic ECHO — GPIO input |
-| GP6 | S3 - Troy | Centre IR sensor DO — GPIO input |
-| GP7 | S2 - Zayar | Left wheel encoder A |
+| GP6 | | Former digital centre IR input; currently unused |
+| GP7 | | Former left encoder A; currently unused |
 | GP8 | S2 - Zayar | Left motor M1A — PWM/GPIO output |
 | GP9 | S2 - Zayar | Left motor M1B — PWM/GPIO output |
 | GP10 | S2 - Zayar | Right motor M2A — PWM/GPIO output |
@@ -104,16 +153,16 @@ fixed.
 | GP13 | | |
 | GP14 | | |
 | GP15 | | |
-| GP16 | S3 - Troy | Right IR sensor DO — GPIO input |
-| GP17 | | |
+| GP16 | S2 - Zayar | Left wheel encoder A |
+| GP17 | S2 - Zayar | Left wheel encoder B |
 | GP18 | | |
 | GP19 | | |
 | GP20 | | |
 | GP21 | | |
 | GP22 | | |
-| GP26 | S3 - barcode software now Zayar | Left digital IR DO repurposed as barcode input |
-| GP27 | | |
-| GP28 | S2 - Zayar | Left wheel encoder B |
+| GP26 | S3 - Troy | Right IR AO - ADC0 |
+| GP27 | S3 - Troy | Centre IR AO - ADC1 |
+| GP28 | S3 - Troy | Left / barcode IR AO - ADC2 |
 
 ## 3. Peripherals
 
@@ -153,7 +202,7 @@ the drivers have no locking to stop it.
 | ADC | Not used | | |
 | Motor PWM slices 4 and 5 | S2 - Zayar | `motor_task` | GP8 / GP9 / GP10 / GP11 |
 | Servo PWM slice — number TBD | S5 - Siyona | Servo / Ultrasonic Task | GP12 |
-| IO_BANK0 IRQ13, GP5 echo edges | S5 - Siyona (current bench build) | `ultrasonic_task`, core 0 | GP5 via 5 V to 3.3 V divider; incompatible with optional S2 encoder calibration |
+| IO_BANK0 IRQ13 dispatcher | S2 + S5, per-pin callbacks | `gpio_irq.c`, core 0 | S2: GP16/GP0 rising; S5: GP5 rise/fall via 5 V to 3.3 V divider |
 | Timer alarm 2 / IRQ2 | S3 - barcode software | sampler ISR and `ir_task`, core 0 | GP26 sampled every 500 us; exclusive alarm reservation |
 | WiFi radio, TCP/IP, MQTT | *kernel* | `cyw43_utk_task` (built in) | GP23–25, GP29 |
 
@@ -190,7 +239,7 @@ change it only by team agreement. Write down every task you create.
 | Subsystem | Priority band | Tasks (name – priority – core) |
 |---|---|---|
 | 1 — Wilson | 12–13 | `wifi_status_task` – 12 – any core; telemetry formatting and status monitoring; command routing pending |
-| 2 — Zayar | 14–15(TBD) | Motor Control Task – TBD (High intended) – TBD  |
+| 2 — Zayar | 14–15 | `motor_task` – 14 – core 0; optional `encoder_bench` – 15 – core 0 |
 | 3 — Troy | 16–17(TBD) | IR / Barcode Task – TBD (High intended) – TBD |
 | 4 — Thaw Zin | 18–19 | `imu_hump_task` – 18 – core 0 (`TP_PRC1`) |
 | 5 — Siyona | 20–21 | `ultrasonic_task` – 20 – core 0 (`TP_PRC1`); servo not started |
@@ -235,8 +284,8 @@ Optional S2 calibration adds one task when enabled in a test build.
 
 | Object | Limit | S1 | S2 | S3 | S4 | S5 |
 |---|---|---|---|---|---|---|
-| Task | 32 | 1 | | 1 | | 1 |
-| Semaphore | 16 | | | | | 1 |
+| Task | 32 | 1 | 1 normal / 2 powered bench | 1 | | 1 |
+| Semaphore | 16 | | 2 when motor task is used | | | 1 |
 | Event flag | 16 | | | | | |
 | Mailbox | 12 | | | | | |
 | Mutex | 12 | | | | | |

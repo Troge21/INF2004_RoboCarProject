@@ -3,19 +3,16 @@
  * Only this core-0 task owns the sensor. No servo or controller commands yet.
  */
 #include "subsystem5.h"
+#include "../gpio_irq.h"
 #include "../subsystem2/subsystem2.h"
 #include "../subsystem1/subsystem1.h"
 #include <sys/sysdef.h>
 #include <tk/syslib.h>
 
 
-#define ECHO_IRQ 13
 #define ECHO_FALL (4U << (4 * S5_ECHO_PIN))
 #define ECHO_RISE (8U << (4 * S5_ECHO_PIN))
 #define ECHO_EDGES (ECHO_FALL | ECHO_RISE)
-#define GPIO_INTR0 (IO_BANK0_BASE + 0xf0)
-#define GPIO_PROC0_INTE0 (IO_BANK0_BASE + 0x100)
-#define GPIO_PROC0_INTS0 (IO_BANK0_BASE + 0x120)
 #define ECHO_TIMEOUT_MS 40
 #define SAMPLE_PAUSE_MS 500 /* comfortably longer than 60 ms trigger spacing */
 
@@ -34,13 +31,12 @@ EXPORT ER s5_echo_to_mm(UW pulse_us, UW *mm)
     return E_OK;
 }
 
-static void echo_isr(UINT intno)
+static void echo_isr(UINT pin, UINT events, UW levels, UW now)
 {
-    UW pending = in_w(GPIO_PROC0_INTS0) & ECHO_EDGES;
-    UW now = in_w(TIMER_TIMERAWL); /* free-running microseconds */
-    (void)intno;
+    UW pending = events << (4U * S5_ECHO_PIN);
+    (void)pin;
+    (void)levels;
     if (pending == 0) return;
-    out_w(GPIO_INTR0, pending); /* edge status is write-one-to-clear */
     if (echo_state == WAIT_RISE && pending == ECHO_RISE) {
         rise_us = now;
         echo_state = WAIT_FALL;
@@ -53,7 +49,7 @@ static void echo_isr(UINT intno)
         /* Coalesced edges or unexpected order cannot give a valid width. */
         echo_state = BAD_EDGES;
     }
-    clr_w(GPIO_PROC0_INTE0, ECHO_EDGES);
+    (void)app_gpio_irq_enable(S5_ECHO_PIN, FALSE);
     tk_sig_sem(echo_done, 1); /* no printing or waiting in interrupt context */
 }
 
@@ -65,19 +61,15 @@ static const char *measure(UW *mm, UW *pulse)
     if (gpio_get_val(S5_ECHO_PIN)) return "ECHO_HIGH_BEFORE_TRIGGER";
     while (tk_wai_sem(echo_done, 1, TMO_POL) == E_OK) { /* drain stale signal */ }
 
-    DisableInt(ECHO_IRQ);
+    (void)app_gpio_irq_enable(S5_ECHO_PIN, FALSE);
     echo_state = WAIT_RISE;
     width_us = 0;
-    out_w(GPIO_INTR0, ECHO_EDGES);
-    ClearInt(ECHO_IRQ);
-    set_w(GPIO_PROC0_INTE0, ECHO_EDGES);
-    EnableInt(ECHO_IRQ, 3);
+    (void)app_gpio_irq_enable(S5_ECHO_PIN, TRUE);
     gpio_set_val(S5_TRIG_PIN, 1);
     WaitUsec(12); /* HC-SR04 requires at least 10 us */
     gpio_set_val(S5_TRIG_PIN, 0);
     er = tk_wai_sem(echo_done, 1, ECHO_TIMEOUT_MS);
-    DisableInt(ECHO_IRQ);
-    clr_w(GPIO_PROC0_INTE0, ECHO_EDGES);
+    (void)app_gpio_irq_enable(S5_ECHO_PIN, FALSE);
     if (er == E_TMOUT) {
         return echo_state == WAIT_RISE ? "NO_ECHO_TIMEOUT" : "ECHO_END_TIMEOUT";
     }
@@ -89,16 +81,11 @@ static const char *measure(UW *mm, UW *pulse)
 
 static void ultrasonic_task(INT stacd, void *exinf)
 {
-    T_DINT dint = {0};
     ER er;
     (void)stacd;
     (void)exinf;
     /* GPIO interrupt routing and NVIC setup are both on physical core 0. */
-    DisableInt(ECHO_IRQ);
-    clr_w(GPIO_PROC0_INTE0, ECHO_EDGES);
-    dint.intatr = TA_HLNG;
-    dint.inthdr = (FP)echo_isr;
-    er = tk_def_int(ECHO_IRQ, &dint);
+    er = app_gpio_irq_register(S5_ECHO_PIN, APP_GPIO_RISE | APP_GPIO_FALL, echo_isr);
     if (er < E_OK) {
         CHECK(er, "ultrasonic IRQ setup");
         tk_exd_tsk();

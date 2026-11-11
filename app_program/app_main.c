@@ -13,6 +13,9 @@
 #include "subsystem2/subsystem2.h"
 #include "subsystem3/subsystem3.h"
 
+/* Standalone analog IR/steering test; other normal subsystem tasks stay off. */
+extern void ir_adc_test(void) __attribute__((noreturn));
+
 #if !APP_TEST
 /* Barcode diagnostics run independently of line following.
  * Deliberately no letter-to-turn mapping: A-D in the brief were examples. */
@@ -147,12 +150,27 @@ EXPORT ID app_start_task(FP entry, PRI pri, UW prc, const char *name)
 	/* tk_sta_tsk: DORMANT -> READY.  The int is passed as stacd. */
 	er = tk_sta_tsk(tid, 0);
 	CHECK(er, name);
+	if (er < E_OK) {
+		(void)tk_del_tsk(tid);
+		return er;
+	}
 	return tid;
 }
 
 EXPORT INT usermain(void)
 {
 	T_RVER	ver;
+
+#if APP_TEST && S2_ENCODER_CALIBRATION
+    /* Exclusive encoder bench; powered mode starts only S2 motor PWM. */
+    subsystem2_test();
+    for (;;) {
+        (void)tk_dly_tsk(2000);
+        subsystem2_test_status();
+    }
+#else
+    ir_adc_test();
+#endif
 
 	/* tk_ref_ver: ask the kernel who it is */
 	tk_ref_ver(&ver);

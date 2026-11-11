@@ -1,112 +1,184 @@
-/* Optional manual calibration: set S2_ENCODER_CALIBRATION=1 in subsystem2.h,
- * then make TEST=1 -j8 in build_make.
- * Motors never run automatically. Raise wheels and turn them by hand.
- * Left encoder GP7/GP28; right GP0/GP1. Use 3.3 V signals/common ground.
- * Counts use the same x1 (A rising edge) mode as the powered bench test.
- * This test owns IO_BANK0 IRQ13 and GP0/1/7/8/9/10/11/28 exclusively.
- */
+/* Exclusive S2 bench: TEST=1, USB CDC, CRASH_REPORT=0.
+ * POWERED_TEST=0: hand-turn counts. POWERED_TEST=1: timed motor trial.
+ * PID_TEST=1 requests RPM; PID_TEST=0 keeps the calibrated 18/20 duty trial.
+ * The bench uses normal S2 feedback/control; no second encoder ISR. */
 #include "subsystem2.h"
-
-#if APP_TEST && S2_ENCODER_CALIBRATION
+#include "encoder_capture.h"
+#include "motion_control.h"
 #include <sys/sysdef.h>
 #include <tk/syslib.h>
 
-#if TM_CONSOLE_UART
-#error "Encoder GP0/GP1 conflicts with UART: use CONSOLE=usb_cdc CRASH_REPORT=0"
-#endif
+#if APP_TEST && S2_ENCODER_CALIBRATION
+static const char * volatile bench_stage = "STARTING";
+static const char * volatile bench_result = "not started";
+static volatile ER bench_error;
+static volatile BOOL bench_running;
 
-#define ENC_IRQ 13
-#define ENC_REG(offset) (IO_BANK0_BASE + (offset))
-#define ENC_EVENT(pin) (8U << (4 * (pin))) /* A pins GP0 and GP7 share bank 0 */
-#define ENC_EVENTS (ENC_EVENT(7) | ENC_EVENT(0))
+#if S2_ENCODER_POWERED_TEST
+/* Retain the late samples too when the test duration is increased. */
+static S2_MOTION_DATA records[S2_ENCODER_TEST_RUN_MS / 1000U + 1U], baseline;
+static UINT record_count;
+static BOOL have_baseline;
 
-static const UINT encoder_a[] = {7, 0};
-static const UINT encoder_b[] = {28, 1};
-static volatile INT counts[2];
-
-/* Runs on core 0. B's level at each A rising edge determines direction.
- * Never print or wait in this interrupt handler. */
-static void encoder_isr(UINT intno)
+static void print_record(UINT number, const S2_MOTION_DATA *m)
 {
-    UW pending = in_w(ENC_REG(0x120)) & ENC_EVENTS; /* PROC0_INTS0 */
-    UW levels = in_w(GPIO_IN);
-    UINT i;
-    (void)intno;
-    out_w(ENC_REG(0xf0), pending); /* INTR0: write-one-to-clear */
-    for (i = 0; i < 2; ++i) {
-        if (pending & ENC_EVENT(encoder_a[i])) {
-            counts[i] += (levels & (1U << encoder_b[i])) ? 1 : -1;
-        }
-    }
+    tm_printf((UB *)"[S2-PID] sample=%u target_rpm_x10 L=%d R=%d; actual_rpm_x10 L=%d R=%d; duty_x100 L=%d R=%d; speed_valid=%d faults=0x%x\n",
+              number, m->target_left_rpm_x10, m->target_right_rpm_x10,
+              m->actual_left_rpm_x10, m->actual_right_rpm_x10,
+              m->duty_left_x100, m->duty_right_x100, m->speed_valid, m->faults);
 }
 
-static ER calibration_init(void)
+static ER read_feedback(S2_MOTION_DATA *m)
 {
-    T_DINT dint = {0};
-    UINT pin, i;
-    ER er;
-
-    /* SIO outputs bypass PWM entirely. Low/low brakes during setup;
-     * high/high selects Robo Pico's coast mode for hand rotation. */
-    for (pin = 8; pin <= 11; ++pin) {
-        gpio_set_val(pin, 0);
-        gpio_set_pin(pin, GPIO_MODE_OUT);
-    }
-    out_w(GPIO_OUT_SET, 0xfU << 8); /* both inputs high on both motors */
-
-    DisableInt(ENC_IRQ);
-    clr_w(ENC_REG(0x100), ENC_EVENTS); /* PROC0_INTE0 */
-    for (i = 0; i < 2; ++i) {
-        UINT pins[] = {encoder_a[i], encoder_b[i]};
-        UINT j;
-        for (j = 0; j < 2; ++j) {
-            gpio_set_pin(pins[j], GPIO_MODE_IN);
-            clr_w(GPIO(pins[j]), GPIO_PDE);
-            set_w(GPIO(pins[j]), GPIO_PUE); /* open-collector pull-up */
-        }
-        counts[i] = 0;
-    }
-    dint.intatr = TA_HLNG;
-    dint.inthdr = (FP)encoder_isr;
-    er = tk_def_int(ENC_IRQ, &dint);
-    if (er < E_OK) return er;
-    out_w(ENC_REG(0xf0), ENC_EVENTS);
-    set_w(ENC_REG(0x100), ENC_EVENTS);
-    ClearInt(ENC_IRQ);
-    EnableInt(ENC_IRQ, 3);
+    SYSTIM now;
+    ER er = subsystem2_get_motion(m);
+    if (er != E_OK) return er;
+    (void)tk_get_tim(&now);
+    if ((UW)((UW)now.lo - m->timestamp_ms) > S2_FEEDBACK_MAX_AGE_MS) return E_TMOUT;
     return E_OK;
 }
 
+static void __attribute__((noreturn)) finish_trial(const char *reason)
+{
+    S2_MOTION_DATA final;
+    ER er = subsystem2_set_rpm_x10(0, 0);
+    UINT i;
+    if (er != E_OK) CHECK(er, "S2 bench stop request");
+    (void)tk_dly_tsk(S2_COMMAND_MAX_AGE_MS + 2U * S2_PERIOD_MS);
+    bench_running = FALSE;
+    bench_stage = "STOPPED";
+    bench_result = reason;
+    for (i = 0; i < record_count; ++i) print_record(i + 1U, &records[i]);
+    er = read_feedback(&final);
+    if (er == E_OK) {
+        print_record(0, &final); /* final applied duty should be zero */
+        if (have_baseline) {
+            tm_printf((UB *)"[S2-DIST] counts L=%d R=%d; distance_mm_x10 L=%d R=%d centre=%d\n",
+                      (INT)(final.count_left - baseline.count_left),
+                      (INT)(final.count_right - baseline.count_right),
+                      (INT)(final.distance_left_mm_x10 - baseline.distance_left_mm_x10),
+                      (INT)(final.distance_right_mm_x10 - baseline.distance_right_mm_x10),
+                      (INT)(final.distance_centre_mm_x10 - baseline.distance_centre_mm_x10));
+        }
+    } else CHECK(er, "S2 final feedback");
+    tm_printf((UB *)"[S2-PID] %s. Motor trial stopped; reset repeats countdown.\n", reason);
+    for (;;) (void)tk_dly_tsk(1000);
+}
+
+static void powered_trial(void)
+{
+    SYSTIM now;
+    UW start_ms, report_ms;
+    UINT remaining, attempt;
+    ER er;
+    S2_MOTION_DATA motion;
+    bench_stage = "MOTOR_INIT";
+    er = subsystem2_init();
+    if (er == E_OK) er = subsystem2_start();
+    if (er != E_OK) { bench_error = er; finish_trial("ABORT: motor setup"); }
+    for (attempt = 0; attempt < 25U; ++attempt) {
+        er = read_feedback(&motion);
+        if (er == E_OK) break;
+        (void)tk_dly_tsk(20);
+    }
+    if (er != E_OK || motion.faults != 0U) {
+        bench_error = er != E_OK ? er : E_IO;
+        finish_trial("ABORT: encoder setup/feedback");
+    }
+    bench_stage = "COUNTDOWN";
+#if S2_ENCODER_PID_TEST
+    tm_printf((UB *)"[S2-PID] RAISE WHEELS: target=%d x10 RPM on each wheel; run=%u ms; PID tuning is provisional.\n",
+              S2_ENCODER_TEST_RPM_X10, S2_ENCODER_TEST_RUN_MS);
+#else
+    tm_printf((UB *)"[S2-PID] OPEN-LOOP trial: duty L=%d R=%d; run=%u ms.\n",
+              S2_ENCODER_TEST_LEFT_DUTY, S2_ENCODER_TEST_RIGHT_DUTY, S2_ENCODER_TEST_RUN_MS);
+#endif
+    for (remaining = S2_ENCODER_TEST_WAIT_MS; remaining > 0U;) {
+        UINT delay = remaining > 1000U ? 1000U : remaining;
+        tm_printf((UB *)"[S2-PID] COUNTDOWN %u ms; raise wheels.\n", remaining);
+        (void)tk_dly_tsk(delay);
+        remaining -= delay;
+    }
+    er = read_feedback(&baseline);
+    if (er != E_OK || !baseline.speed_valid || baseline.faults != 0U) {
+        bench_error = er != E_OK ? er : E_IO;
+        finish_trial("ABORT: feedback not ready");
+    }
+    have_baseline = TRUE;
+    (void)tk_get_tim(&now);
+    start_ms = report_ms = (UW)now.lo;
+    bench_stage = "RUNNING";
+    bench_running = TRUE;
+    for (;;) {
+        (void)tk_get_tim(&now);
+        if ((UW)((UW)now.lo - start_ms) >= S2_ENCODER_TEST_RUN_MS) break;
+#if S2_ENCODER_PID_TEST
+        er = subsystem2_set_rpm_x10(S2_ENCODER_TEST_RPM_X10, S2_ENCODER_TEST_RPM_X10);
+#else
+        er = subsystem2_set_duty(S2_ENCODER_TEST_LEFT_DUTY, S2_ENCODER_TEST_RIGHT_DUTY);
+#endif
+        if (er != E_OK) { bench_error = er; finish_trial("ABORT: command rejected"); }
+        er = read_feedback(&motion);
+        if (er == E_OK && motion.faults != 0U) {
+            bench_error = E_IO;
+            finish_trial("ABORT: motor fault (see faults bitmask)");
+        }
+        if (er == E_OK && (UW)((UW)now.lo - report_ms) >= 1000U) {
+            if (record_count < sizeof(records) / sizeof(records[0])) records[record_count++] = motion;
+            report_ms = (UW)now.lo;
+        }
+        (void)tk_dly_tsk(S2_PERIOD_MS);
+    }
+    finish_trial("DONE");
+}
+#endif
+
 static void calibration_task(INT stacd, void *exinf)
 {
-    ER er = calibration_init();
-    (void)stacd;
-    (void)exinf;
-    if (er < E_OK) {
-        CHECK(er, "encoder calibration setup");
-        tk_exd_tsk();
-        return;
+    (void)stacd; (void)exinf;
+#if S2_ENCODER_POWERED_TEST
+    powered_trial();
+#else
+    S2_ENCODER_COUNTS counts;
+    ER er;
+    UINT pin;
+    for (pin = 8; pin <= 11; ++pin) {
+        (void)gpio_set_val(pin, 0);
+        (void)gpio_set_pin(pin, GPIO_MODE_OUT);
     }
-    tm_printf((UB *)"[CAL] READY: motors OFF/coasting. Turn one wheel by hand.\n");
-    tm_printf((UB *)"[CAL] Record START, turn exactly 10 revolutions, record END.\n");
-    tm_printf((UB *)"[CAL] Counts/revolution = abs(END - START) / 10. Reset restarts at zero.\n");
+    out_w(GPIO_OUT_SET, 0xfU << 8); /* coast for hand rotation */
+    er = s2_encoder_start();
+    if (er != E_OK) {
+        bench_error = er; bench_stage = "FAILED";
+        tk_exd_tsk(); return;
+    }
+    bench_stage = "HAND_TURN";
+    tm_printf((UB *)"[CAL] motors OFF; forward now counts POSITIVE on both wheels.\n");
     for (;;) {
-        tm_printf((UB *)"[CAL] LIVE motors OFF | LEFT=%d RIGHT=%d (x1 counts)\n",
-                  counts[0], counts[1]);
-        tk_dly_tsk(1000);
+        if (s2_encoder_read(&counts) == E_OK)
+            tm_printf((UB *)"[CAL] LEFT=%d RIGHT=%d (normalized x1 counts)\n",
+                      s2_count_delta(counts.left, 0), s2_count_delta(counts.right, 0));
+        (void)tk_dly_tsk(1000);
     }
+#endif
 }
 
 EXPORT void subsystem2_test(void)
 {
-    /* Core-0 routing matches the IRQ enable registers above. */
-    ID tid = app_start_task((FP)calibration_task, 13, TP_PRC1,
-                            "encoder_calibration");
-    CHECK(tid, "start encoder calibration");
+    ID tid;
+    tm_printf((UB *)"[S2-PID] BOOT: reusable motor feedback/PID bench.\n");
+    tid = app_start_task((FP)calibration_task, S2_PRI_MOTOR + 1, TP_PRC1, "encoder_bench");
+    if (tid < E_OK) { bench_error = tid; bench_stage = "FAILED"; }
+}
+
+EXPORT void subsystem2_test_status(void)
+{
+    if (!bench_running)
+        tm_printf((UB *)"[S2-PID] STATUS: %s error=%d result=%s.\n", bench_stage, bench_error, bench_result);
 }
 #elif APP_TEST
 EXPORT void subsystem2_test(void)
 {
-    tm_printf((UB *)"[TEST] subsystem2: encoder calibration disabled (S2_ENCODER_CALIBRATION=0).\n");
+    tm_printf((UB *)"[TEST] S2 encoder bench disabled.\n");
 }
-#endif /* APP_TEST && S2_ENCODER_CALIBRATION */
+#endif
