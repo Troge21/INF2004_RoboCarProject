@@ -168,7 +168,7 @@ EXPORT INT usermain(void)
         (void)tk_dly_tsk(2000);
         subsystem2_test_status();
     }
-#else
+#elif APP_IR_ADC_BENCH_ENABLED
     ir_adc_test();
 #endif
 

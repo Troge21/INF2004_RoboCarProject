@@ -28,7 +28,8 @@
 #define TASK_STACK_SIZE		2048	/* bytes; tm_printf needs ~1 KB */
 
 /* IR-to-motor controller settings; normal builds only. */
-#define APP_LINE_FOLLOW_ENABLED  1 /* centre/right line tracking; left is barcode only */
+#define APP_LINE_FOLLOW_ENABLED  0 /* S5 obstacle avoidance owns steering */
+#define APP_IR_ADC_BENCH_ENABLED 0 /* 1 runs the standalone IR bench forever */
 #define APP_CONTROL_PERIOD_MS    20
 #define APP_IR_MAX_AGE_MS        100U
 #define APP_START_DELAY_MS       3000
