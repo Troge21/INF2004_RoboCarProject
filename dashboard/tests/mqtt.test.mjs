@@ -1,4 +1,4 @@
-import {telemetry,statusReply} from './fixtures.mjs';
+import {telemetry,statusReply,syncStore} from './fixtures.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {PacketReader,packet,mqttString,parsePublish,concat,MqttConnection} from '../dist/mqtt.js';
@@ -49,7 +49,7 @@ test('unsafe or ambiguous broker/topic settings are rejected before opening a so
 });
 
 test('a subscribed dashboard stays empty until fresh telemetry arrives',()=>{
-  const store=new TelemetryStore();
+  const store=syncStore(new TelemetryStore(),{at:700,uptime:700});
   const c=new MqttConnection(options,{WebSocketClass:FakeSocket,onMessage:message=>store.ingest(message.payload,'telemetry',1000,message.retained,message.topic)});
   try{
     c.connect();const ws=FakeSocket.instances.at(-1);ws.open();
@@ -68,8 +68,8 @@ test('a subscribed dashboard stays empty until fresh telemetry arrives',()=>{
   }finally{c.disconnect();}
 });
 
-test('current 11-byte telemetry survives MQTT framing and reach the telemetry store',()=>{
-  const store=new TelemetryStore();
+test('current 46-byte telemetry survives MQTT framing and reach the telemetry store',()=>{
+  const store=syncStore(new TelemetryStore(),{at:700,uptime:700});
   const c=new MqttConnection(options,{WebSocketClass:FakeSocket,onMessage:m=>store.ingest(m.payload,'telemetry',1000,m.retained,m.topic)});
   try {
     c.connect();const ws=FakeSocket.instances.at(-1);ws.open();
@@ -79,7 +79,7 @@ test('current 11-byte telemetry survives MQTT framing and reach the telemetry st
     ws.receive(frame.subarray(0,5));assert.equal(store.sample,null);
     ws.receive(frame.subarray(5));
     assert.equal(store.sample.sequence,12);assert.equal(store.sample.obstacle_mm,451);
-    assert.deepEqual(store.sample.ir,[null,1,0]);assert.equal(store.lastPayloadBytes,11);
+    assert.deepEqual(store.sample.ir,[null,1,0]);assert.equal(store.lastPayloadBytes,46);
     assert.deepEqual(store.packets[0].bytes,bytes);
   } finally { c.disconnect(); }
 });
@@ -93,7 +93,7 @@ test('two-topic SUBACK cannot enable the three-topic STATUS connection',()=>{
   }finally{c.disconnect();}
 });
 test('a fragmented STATUS reply matches its request without replacing live telemetry',()=>{
-  const store=new TelemetryStore();store.ingest(telemetry({sequence:99}),'telemetry',900);
+  const store=syncStore(new TelemetryStore(),{at:700,uptime:700});store.ingest(telemetry({sequence:99}),'telemetry',900);
   const c=new MqttConnection(options,{WebSocketClass:FakeSocket,onMessage:m=>store.ingest(m.payload,'status',1100,m.retained,m.topic)});
   try {
     c.connect();const ws=FakeSocket.instances.at(-1);ws.open();

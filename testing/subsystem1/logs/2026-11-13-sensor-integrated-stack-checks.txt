@@ -1,0 +1,11 @@
+Actual ARM -fstack-usage, unchanged compiler flags:
+Collector static chain 464/2048 bytes.
+usermain 24; S1 test 144; tm_printf 32; tm_vsprintf 96; out_cons 16.
+Known S1 startup-test/console chain 312/1024 bytes.
+S5 sensing/scan static chain 136/2048 bytes.
+Known S5 startup-test/console chain 208/1024 bytes.
+PASS collector/startup/S5 guards.
+Actual ARM build-mode checks passed for normal, stationary, explicit IR and
+explicit encoder modes, including controller static frame <=768 bytes
+and no S5 imports of subsystem2_set_*.
+This is static frame analysis, not measured runtime high-water.

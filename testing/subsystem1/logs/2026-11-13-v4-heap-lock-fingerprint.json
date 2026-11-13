@@ -1,0 +1,43 @@
+{
+  "recorded_utc": "2026-11-13T09:12:57.998308+00:00",
+  "parent_record": "2026-11-13-s1-batch-fingerprint.json",
+  "change": "Read-only heap snapshot now takes SMP kernel critical section; DI/EI was local-core-only.",
+  "definite_code_defect": true,
+  "live_fault_resolution_confirmed": false,
+  "software_check": "testing/subsystem1/logs/s1-batch-2026-11-13T09-09-58/heap-snapshot.txt",
+  "build_result": {
+    "profile": "NET=lwip MQTT=1 TEST=1 APP_MODE=integrated",
+    "text": 359276,
+    "data": 108,
+    "bss": 83088,
+    "static_ram": 83196,
+    "exit_code": 0
+  },
+  "files": [
+    {
+      "path": "kernel/tkernel/memory.c",
+      "bytes": 8687,
+      "sha256": "4635f0ae5037546c16b16dd28939be1b09da82e631d82aa94a6f0c3d91123eca"
+    },
+    {
+      "path": "testing/subsystem1/test_memory_stats.py",
+      "bytes": 2439,
+      "sha256": "5d05249f158e4f92b85223c37462cd379674fdc3451a6ef5d7cd735674534cf5"
+    },
+    {
+      "path": "build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2",
+      "bytes": 718848,
+      "sha256": "16d737e9056637d168f95f543258af2a5b08c9711245dc6c4d328a3ce30b3491"
+    },
+    {
+      "path": "build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.elf",
+      "bytes": 3346156,
+      "sha256": "76524da31c8bb9e2a387b90b435ee04ddb5cb471943e12b9fb85b65fabe5db51"
+    }
+  ],
+  "limits": [
+    "No sensor/decoder/schema/motor behavior changed.",
+    "First v4 offline passes did not establish SMP runtime correctness.",
+    "The prior normal image must be rebuilt before further normal use."
+  ]
+}

@@ -1,0 +1,8 @@
+Actual origin/sensor s5_choose_motion, isolated host execution. Enum STOP=0, FORWARD=1, LEFT=2, RIGHT=3.
+clear centre: 1
+blocked left 240, clear right 260: 2
+blocked left 250, clear right 251: 2
+clear left 260, blocked right 240: 2
+invalid centre: 0
+
+The 250 mm threshold is branch-owned. Left can be selected at/below it when right is clear within the 30 mm tie margin. No owner code changed.

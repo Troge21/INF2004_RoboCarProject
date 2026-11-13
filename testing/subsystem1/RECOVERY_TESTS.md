@@ -1,33 +1,22 @@
-# S1 WiFi and MQTT recovery tests
+# S1 WiFi and MQTT recovery tests ? current v4
 
-Prepared **10 November 2026**, initially while the car was unavailable.
-Later the user reported flashing the current UF2, and five actual broker
-restart trials restored telemetry, heartbeat and STATUS without a detected
-Pico reboot. Conservative recovery bounds were 3.318..5.811 s. Some delivery
-intervals exceeded the earlier 2 s/5 s design targets. Five later hotspot
-trials produced three correlated recoveries at 15.572, 18.015 and 20.484 s,
-and two incomplete trials within 30 s. **The hotspot target was not met.**
-See [the live evidence](TEST_LOG.md#live-broker-recovery---10-november-2026).
+Prepared for the final hardware session. The current single UF2 is stationary
+NET=lwip MQTT=1 TEST=1 APP_MODE=integrated, with Packed v4 main frames (46
+bytes), diagnostics (40), optional scan chunks (19..56), five-byte heartbeats
+and 16/62-byte STATUS replies. Old telemetry/STATUS/beacon decoders are gone.
+No current-batch outage test has run. Follow [the combined checklist](FINAL_ACCEPTANCE.md).
 
-A replacement UF2 now uses MQTT keepalive 5 s instead of 60 s and bounds
-pending TCP/MQTT connection attempts to 5 s. It is built and passed 36 port
-host checks. The user then reported flashing it; a one-minute live baseline
-received 118 telemetry, 13 heartbeats and three STATUS replies with no Pico
-MQTT restart. **Corrected-image hotspot recovery remains untested.** Its SHA-256
-is `9c5ac8f0876055939f2cc4049a22e3ca9285b38ccccd889096bd801dafc2a7a0`.
-Retain the original failed results when collecting a new series.
-Follow-up clarification: later captures recorded 2/3 passes in a partial run
-and 4/5 in a complete run after a laptop restart. The user subsequently said
-the intended UF2 had not been flashed, then explicitly reported flashing it.
-Those captures remain evidence with **unconfirmed running-image identity**;
-their local hashes alone do not validate the intended image. A new confirmed-
-flash check received telemetry, heartbeat and STATUS; a clean recovery series
-after that flash is still needed. Do not discard the earlier failures.
-The current normal baseline still exceeded the earlier strict arrival-interval
-targets (2.007 s telemetry and 6.362 s heartbeat); baseline success does not
-close those acceptance items. An allowlisted Pico serial/laptop-interface
-capture was started for the retest, but the laptop restart terminated it.
-It does not cover the later complete series; do not assume it is still running.
+The network owner retains WiFi DOWN/failure retries (5 s), MQTT error backoff
+(3 s), keepalive and pending connection deadline (5 s). Application heartbeat
+is now nominally 4 s and main telemetry 400 ms to leave delivery jitter margin.
+Schedules and offline checks are not physical timing guarantees.
+
+Historical results remain in [the test log](TEST_LOG.md): five broker restarts
+recovered in 3.318..5.811 s. The confirmed-flash clean hotspot series on
+11 November recovered 5/5 in 7.922..9.242 s. Its maximum main/heartbeat arrival
+gaps were 2.080/5.086 s, leaving those strict targets open. Earlier failures
+and image-unconfirmed runs are preserved. Those results belong to their
+original v3 images, not the current v4 batch.
 
 ## What this checks
 
@@ -45,8 +34,9 @@ timings and agree the final acceptance criteria with the team.
 
 1. Flash the single current file:
    `build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2`.
-   This is the stationary `NET=lwip MQTT=1 TEST=1` build. Keep the car battery
-   off and power the Pico normally by USB after flashing. Keep that power
+   This is the stationary `NET=lwip MQTT=1 TEST=1 APP_MODE=integrated` build. Laptop USB or a
+   power bank is the sole car supply; there is no separate battery switch.
+   Power the car normally by USB after flashing. Keep that power
    connected for the entire series; do not press BOOTSEL or reset during trials.
 2. Join the configured hotspot with iPhone **Maximize Compatibility** enabled.
    Confirm the laptop's WiFi IPv4 matches the broker IP in the firmware and
@@ -62,8 +52,8 @@ timings and agree the final acceptance criteria with the team.
    The separate default Windows Mosquitto service on `127.0.0.1:1883` is not
    involved; leave it alone.
 4. Start the local dashboard in another terminal (`cd dashboard`, `npm start`).
-   Refresh `http://127.0.0.1:4173`, connect, confirm real 11-byte telemetry,
-   five-byte heartbeats and a successful **Request status** reply.
+   Refresh `http://127.0.0.1:4173`, connect, confirm accepted 46-byte main telemetry,
+   40-byte resource packets, five-byte heartbeats and a successful **Request status** reply.
 5. Optionally capture timestamped Pico USB serial output at 115200 baud.
    Preserve the boot S1 summary, link transitions and MQTT connection logs.
    Do not add WiFi passwords or SSIDs to evidence.
@@ -162,31 +152,13 @@ Network scheduling can add jitter: retain measured values instead of rounding
 them down. The local UF2 hash is recorded when available, but it does not read
 back the Pico's flash; record what you actually flashed alongside the capture.
 
-Several hotspot recoveries delivered multiple heartbeats together. Such
-burst intervals are not steady-state cadence evidence. Current v3 has no
-sample-generation timestamp on the wire, so a new sequence/non-retained
-packet does not independently establish its source age after transport
-buffering. A fresh correlated STATUS establishes recent Pico communication;
-continue observing periodic delivery afterward. Include laptop reconnection
-and Pico serial link/MQTT times in the next series to separate the delays.
+Historical hotspot recoveries delivered heartbeats in bursts; tiny burst
+intervals are not steady-state cadence evidence. Current v4 includes main
+generation boot time and session. The recorder filters pre-restoration
+generation and old-session data using correlated STATUS timing. Scan/resource
+packets do not advance main cadence. Continue observing sustained delivery;
+capture laptop and Pico serial transitions to separate component delays.
 
 Record results in the [S1 test log](TEST_LOG.md), with a source revision,
 firmware hash, power source and any failed/incomplete attempts. Software tests
 and a successful build do not substitute for these physical observations.
-
-## Changes prepared for this session
-
-- WiFi DOWN (0), as well as negative failure states, retries with a 5 s delay.
-  Unchanged failure states continue retrying; JOIN/DHCP progress is left alone.
-- A transient initial join-request error keeps the radio service running.
-  A failed hardware/interface initialization still parks the failed service.
-- WiFi/IP loss cancels MQTT timers, pending requests and stale TCP state.
-  Restoration permits a clean connection and command subscription.
-- Immediate MQTT connection/allocation/address failures use one 3 s retry,
-  preventing a connection attempt on every 2 ms network poll.
-- Following the failed hotspot trials, pending connections also have a 5 s
-  deadline. MQTT keepalive is 5 s; the application's separate heartbeat is
-  still 5 s. These source changes require flashing and physical retesting.
-- Existing binary packet formats, sensor drivers and IMU algorithm are unchanged.
-  STOP stays disabled: a latched controller-owned stop is still an integration
-  dependency, not equivalent to writing motor duty zero once.

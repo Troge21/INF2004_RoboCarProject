@@ -1,0 +1,34 @@
+[
+  {
+    "path": "build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt.uf2",
+    "bytes": 710656,
+    "sha256": "536a762f1b6663a15aff368a01713f7aec34a0f6ddce22ae3b27b7b1a1ad53a7",
+    "profile": "NET=lwip MQTT=1 TEST=0 APP_MODE=integrated",
+    "text": 355204,
+    "data": 108,
+    "bss": 83248,
+    "static_ram": 83356,
+    "retained": false
+  },
+  {
+    "path": "build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2",
+    "bytes": 718848,
+    "sha256": "13057e343727ce8e151784c944c86331f1f492c2e89959985b6628d86565e0f4",
+    "profile": "NET=lwip MQTT=1 TEST=1 APP_MODE=integrated",
+    "text": 359204,
+    "data": 108,
+    "bss": 83088,
+    "static_ram": 83196,
+    "retained": true
+  },
+  {
+    "path": "build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt.elf",
+    "bytes": 3337524,
+    "sha256": "2230ca458c10302a69ca89040b0c1a3ffecdd3c89fe26506cc967abc004d8eed"
+  },
+  {
+    "path": "build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.elf",
+    "bytes": 3344064,
+    "sha256": "383f4fa9e8dfa90c52fd163a5aa28b35029321aacbe14db339f7da6c70417537"
+  }
+]

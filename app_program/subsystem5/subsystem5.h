@@ -1,4 +1,4 @@
-/* Subsystem 5: fixed-position HC-SR04 bench measurement (servo not started). */
+/* S5 owns HC-SR04/servo sensing. Only the shared controller requests wheels. */
 #ifndef SUBSYSTEM5_H
 #define SUBSYSTEM5_H
 
@@ -7,7 +7,37 @@
 #define S5_PRI_MAIN 20
 #define S5_TRIG_PIN 4
 #define S5_ECHO_PIN 5
+#define S5_SERVO_PIN 12
 #define S5_ULTRA_LOG_ENABLED 0 /* set to 1 to restore ultrasonic output */
+
+/* Imported from origin/sensor c8a789b. Angles are commanded, not servo feedback. */
+#define S5_SERVO_RIGHT_DEG       30U
+#define S5_SERVO_CENTRE_DEG      90U
+#define S5_SERVO_LEFT_DEG       150U
+#define S5_SERVO_SETTLE_MS      300U
+#define S5_OBSTACLE_MM          250U
+#define S5_CLEARANCE_MARGIN_MM   30U
+#define S5_TURN_OUTER_RPM_X10    260
+#define S5_TURN_INNER_RPM_X10      0
+#define S5_TURN_MS              500U
+#define S5_NAV_MAX_AGE_MS        200U
+typedef enum {
+    S5_MOTION_STOP, S5_MOTION_FORWARD, S5_MOTION_LEFT, S5_MOTION_RIGHT
+} S5_MOTION;
+typedef enum {
+    S5_NAV_UNAVAILABLE, S5_NAV_CLEAR, S5_NAV_SCANNING,
+    S5_NAV_LEFT, S5_NAV_RIGHT, S5_NAV_BLOCKED
+} S5_NAV_PHASE;
+typedef struct { UW timestamp_ms; UINT phase; } S5_NAV_DATA;
+/* Nonconsuming publication; the controller checks age and its own STOP latch. */
+EXPORT ER subsystem5_get_navigation(S5_NAV_DATA *out);
+EXPORT S5_MOTION s5_choose_motion(BOOL centre_valid, UW centre_mm,
+                                BOOL left_valid, UW left_mm,
+                                BOOL right_valid, UW right_mm);
+typedef struct { UW timestamp_ms,sequence,distance_mm; BOOL valid; } S5_RANGE_DATA;
+/* Protected passive snapshot. E_TMOUT before first result or when busy.
+ * A valid snapshot may report valid=FALSE (no usable echo), never clear space. */
+EXPORT ER subsystem5_get_range(S5_RANGE_DATA *out);
 
 /* Internal conversion shared with subsystem5_test.c. Valid range 20–4000 mm.
  * Returns E_PAR for invalid widths and clears *mm on failure. */

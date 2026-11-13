@@ -1,5 +1,66 @@
 # Team and subsystems
 
+## S5/controller scan integration - 13 November 2026
+
+User-authorized adaptation of sensor c8a789b: S5 owns GP4/5 ultrasonic and
+GP12 servo, publishing centre range, a packed five-byte phase/time snapshot
+and thirteen-byte three-point profile/time/ID under the existing range semaphore.
+S1's prepared strong getter path carries the sorted 30/90/150 degree scan.
+The existing controller alone calls S2, with STOP/startup/feedback/freshness
+gates before line or turn intent; line following remains enabled.
+S5 never calls a wheel API. No new task, queue or kernel object. TEST=1 keeps
+wheel motors disabled while servo scans remain enabled.
+[Integration and verification](testing/subsystem1/SENSOR_INTEGRATION.md).
+Earlier dated narratives below describe their respective stages.
+
+
+## Current S1 transport / owner interfaces ? 13 November 2026
+
+S1 now gathers passive protected snapshots independently of S5 every 40 ms
+and transmits one Packed v4 main frame every 400 ms. S2 measured motion and
+known faults are connected; S3/S4 ownership stays unchanged. S5 publishes a
+ten-byte protected range view. S1 has one semaphore, zero message buffers,
+a 73-byte packed publication and one 462-byte completed scan cache.
+Barcode/path/external fault producers use
+[telemetry_sources.h](app_program/telemetry_sources.h); see
+[the owner handoff](testing/subsystem1/PRODUCER_HANDOFF.md).
+A strong owner getter activates the existing transport/display without queue
+consumption. Missing algorithms stay owner work.
+
+Current controller word is state4/latch1/TEST1, six bits; its protected
+timestamped publication stays five bytes. State travels in the main frame,
+not a beacon. STATUS is 16/62 bytes and STOP result 11 bytes. Existing
+persistent inhibit/zero-duty handoff is implemented; the dedicated S2
+stop-event flag below is an alternative proposal, not required for this
+existing STOP path. Physical STOP passed on the preceding v3 image; v4
+offline checks/builds pass and its hardware session is deferred.
+Earlier dated integration narratives below are historical.
+
+## Integrated AO / S1 startup — 12 November 2026
+
+The user explicitly requested integration after pulling f37055f. Default
+APP_MODE=integrated now starts S1, S2, S3 AO sampling, S4, S5 and the shared
+controller. APP_MODE=ir selects the retained standalone analog diagnostic;
+TEST=1 APP_MODE=encoder explicitly selects the powered S2 diagnostic. TEST=1
+with integrated mode is stationary and contains no motor task.
+
+S3 alone reads ADC2/1/0 on GP28/27/26, using the teammate thresholds and
+discard-plus-two-sample average. Its shared raw/validity/timestamp record is
+nine packed bytes; the line pair remains a nonblocking snapshot API. GP16
+is encoder-only. No digital barcode capture or timer-2 sampler is started
+on AO wiring; GP28 decoding remains pending. The current line geometry uses
+both white or both black for forward, individual black for corrections.
+
+The controller keeps the teammate RPM targets/PID and S2 driver ownership.
+It checks fresh analog and motor feedback, handles latched STOP before any
+steering, and reports a known S2 fault rather than successful STOP. S2/ultra
+retain the shared per-pin IRQ13 dispatcher; echo waits cannot mask encoders.
+This is local user-authorized integration, not a fabricated team sign-off or
+physical pass. Earlier sections below describe historical configurations.
+See dashboard/README.md and testing/subsystem1/MOTOR_STOP_TEST.md.
+
+
+
 ## Reusable S2 feedback and PID - 11 November 2026
 
 S2's core-0 `motor_task` (priority 14) now owns PWM, encoder setup,
@@ -199,11 +260,11 @@ the drivers have no locking to stop it.
 | I2C1 | S4 - Thaw Zin| IMU / Hump Task | GP2 SDA / GP3 SCL |
 | SPI0 | Not used | | |
 | SPI1 | Not used | | |
-| ADC | Not used | | |
+| ADC | S3 via kernel ADC device | ir_task requests conversions; kernel driver owns ADC IRQ | GP28/27/26 AO; never GP29 |
 | Motor PWM slices 4 and 5 | S2 - Zayar | `motor_task` | GP8 / GP9 / GP10 / GP11 |
 | Servo PWM slice — number TBD | S5 - Siyona | Servo / Ultrasonic Task | GP12 |
 | IO_BANK0 IRQ13 dispatcher | S2 + S5, per-pin callbacks | `gpio_irq.c`, core 0 | S2: GP16/GP0 rising; S5: GP5 rise/fall via 5 V to 3.3 V divider |
-| Timer alarm 2 / IRQ2 | S3 - barcode software | sampler ISR and `ir_task`, core 0 | GP26 sampled every 500 us; exclusive alarm reservation |
+| Timer alarm 2 / IRQ2 | Inactive in AO integrated mode | Legacy digital capture not started | No current barcode timer claim |
 | WiFi radio, TCP/IP, MQTT | *kernel* | `cyw43_utk_task` (built in) | GP23–25, GP29 |
 
 ### WiFi and MQTT are special
@@ -238,9 +299,9 @@ change it only by team agreement. Write down every task you create.
 
 | Subsystem | Priority band | Tasks (name – priority – core) |
 |---|---|---|
-| 1 — Wilson | 12–13 | `wifi_status_task` – 12 – any core; telemetry formatting and status monitoring; command routing pending |
+| 1 — Wilson | 12–13 | `wifi_status_task` – 12 – any core; telemetry gathering/status monitoring; MQTT remains in its network owner |
 | 2 — Zayar | 14–15 | `motor_task` – 14 – core 0; optional `encoder_bench` – 15 – core 0 |
-| 3 — Troy | 16–17(TBD) | IR / Barcode Task – TBD (High intended) – TBD |
+| 3 — Troy | 16–17 | ir_task – 17 – core 0; AO sampling and protected line publication |
 | 4 — Thaw Zin | 18–19 | `imu_hump_task` – 18 – core 0 (`TP_PRC1`) |
 | 5 — Siyona | 20–21 | `ultrasonic_task` – 20 – core 0 (`TP_PRC1`); servo not started |
 
@@ -259,19 +320,19 @@ sends to it or waits on it. Agree on the data format before coding.
 
 | ID | From → To | Mechanism | Object ID name | Data / meaning | Agreed by |
 |---|---|---|---|---|---|
-| IF-01 | S3 → Controller | Result queue; concrete kernel type TBD; controller owns | TBD (suggested `mbf_line_barcode`) | IR/line status, barcode result validity and supported action; reject invalid/incomplete captures; report each valid barcode once | TBD: Troy + controller owner |
+| IF-01 | S3 → Controller/S1 | Nonconsuming semaphore-protected ADC snapshot; S3 owns | subsystem3_get_line() | GP27/26 threshold pattern, validity, source time; nine packed shared bytes; GP28 barcode not decoded | Local user-authorized 12 Nov integration; owner/hardware review pending |
 | IF-02 | S4 → Controller | Result queue; type TBD; controller owns | TBD (suggested `mbf_hump_result`) | Tilt/hump state, height, run maximum, validity and sensor faults | TBD: Thaw Zin + controller owner |
-| IF-03 | S5 → Controller | Result queue; type TBD; controller owns | TBD (suggested `mbf_scan_result`) | Distance, scan profile/clearance, validity and failure; missing echo is not clear space | TBD: Siyona + controller owner |
-| IF-04 | Controller → S2 | Latest motor-command channel; type TBD; S2 owns | TBD (suggested `mbf_motor_cmd`) | Requested left/right movement, bounds and freshness; exact units/ranges TBD | TBD: Zayar + controller owner |
-| IF-05 | S2 → Controller | Feedback queue; type TBD; controller owns | TBD (suggested `mbf_motion_feedback`) | Encoder counts, wheel speed, distance, motion/fault status and validity | TBD: Zayar + controller owner |
-| IF-06 | Controller → S2 | Separate stop event flag, owned by S2 | TBD (suggested `flg_motor_stop`) | Stop overrides movement queue; wake path, latch/clear rules and stale-command invalidation TBD | TBD: Zayar + controller owner |
-| IF-07 | Controller → S5 | Scan-request queue; type TBD; S5 owns | TBD (suggested `mbf_scan_request`) | Coarse/fine scan request and angle parameters; units, bounds and timing TBD | TBD: Siyona + controller owner |
+| IF-03 | S5 -> Controller/S1 | Protected nonconsuming navigation/scan snapshots | subsystem5_get_navigation() / telemetry_get_scan() | S5 phase expires after 200 ms; completed immutable three-angle scan; no echo is unknown | User-authorized sensor integration, 13 Nov; physical trajectory review pending |
+| IF-04 | Controller → S2 | Existing latest-command channel owned by S2 | subsystem2_set_rpm_x10() / set_duty() | 35/35 RPM forward, 26/35 or 35/26 correction; zero STOP; controller latch takes priority; 100 ms S2 watchdog retained | Local user-authorized integration; hardware pass pending |
+| IF-05 | S2 ? Controller/S1 | Protected nonblocking S2 snapshot | subsystem2_get_motion() | Fresh measured speed/counts/signed net distance/mode/reason/faults in v4; true path has separate optional getter | Implemented; current-image accuracy pending |
+| IF-06 | Controller ? S2 (alternative proposal) | Separate stop event flag, not used by current latch | TBD flg_motor_stop | Existing inhibit/zero-duty API already implements STOP; separate wake/arbitration would need owner agreement | Optional future design, not an unfinished current S1 path |
+| IF-07 | Controller/S5 scan coordination | Autonomous S5 scan loop; no request queue needed in current mode | S5 navigation publication | Centre <=250 mm triggers a scan; controller stops wheels during scanning and arbitrates escape intent | Implemented current integration; future requested/dense scans remain owner work |
 | IF-08 | Controller → S4 | Run-reset queue; type TBD; S4 owns | TBD (suggested `mbf_run_reset`) | Confirmed new-run reset; temporary stops do not clear maximum hump height | TBD: Thaw Zin + controller owner |
-| IF-09 | Controller → S1 | Telemetry queue; type TBD; S1 owns | TBD (suggested `mbf_telemetry`) | Operating state and available motion/line/barcode/hump/obstacle measurements with validity | TBD: Wilson + controller owner |
-| IF-10 | S1 → Controller | Request/status queue; type TBD; controller owns | TBD (suggested `mbf_supervisory`) | Validated permitted commands and connection state; command list/topics TBD; reject stale replay | TBD: Wilson + controller owner |
-| IF-11 | S1 → kernel network service | Bounded message buffer owned by S1; `s1_network_poll()` uses `TMO_POL` | private `network_tx_mbf`; access through S1 API | Bench telemetry JSON, max 127 bytes; latest fresh queued sample, 2 s expiry; QoS 0, no retain; offline and failed publishes dropped | Bench implementation requested in session; formal Wilson + team + instructor sign-off pending |
-| IF-12 | Kernel network service → S1 | Proposed bounded nonblocking inbound channel owned by S1; type TBD | TBD (suggested `mbf_network_rx`) | Received command payload/connection events for application handling; overflow policy TBD | TBD: Wilson + team + instructor |
-| IF-13 | S5 → S1 (temporary bench route) | Bounded message buffer owned by S1; `s1_submit_telemetry()` uses `TMO_POL` | private `telemetry_mbf`; `S1_TELEMETRY` in `subsystem1.h` | Sequence, distance in mm, validity; valid range 20–4000 mm; failures encode null; full queue drops new sample; final route remains via controller IF-03/09 | Bench setup requested in session; team sign-off pending |
+| IF-09 | Controller ? S1 | Protected timestamped snapshot; controller owns semaphore | app_controller_snapshot() | Boot time32 + state4/latch1/TEST1/reserved2; 500 ms expiry; actual state in v4 main and STATUS | Implemented/offline checked; current-image physical check deferred |
+| IF-10 | S1 → Controller | One protected request and result slot; controller owns | `app_controller_submit_stop()` / `app_controller_take_reply()` | STOP ID/session/deadline; controller owns persistent inhibit and zero-duty handoff to existing S2 API; success only after owner processing; no RESUME | Local user-authorized implementation, 11 Nov; team review/hardware validation pending |
+| IF-11 | S1 ? kernel network service | Protected packed latest publication, nonblocking copy | s1_network_poll() / s1_network_aux() | 46-byte main, bounded scan and resource packets; explicit source/session/boot freshness; no S1 MBFs | Implemented/offline checked; current-image physical check deferred |
+| IF-12 | Kernel network service ? S1/controller | Network-owner nonblocking dispatch | bounded 13-byte RX slot; S1 APIs | STATUS read-only; STOP session/ID/deadline/length/rate checks; correlated results, no beacon | Implemented/offline checked; current-image physical check deferred |
+| IF-13 | S5 ? S1 | S5-owned passive range snapshot/semaphore | subsystem5_get_range() | Ten-byte packed sequence/time/distance12/present1 view; invalid echo unavailable; no trigger/IRQ behavior change | Implemented/offline checked; current-image physical check deferred |
 
 Each interface is tested by at least one integration test
 (`testing/integration/TEST_LOG.md`).
@@ -285,11 +346,11 @@ Optional S2 calibration adds one task when enabled in a test build.
 | Object | Limit | S1 | S2 | S3 | S4 | S5 |
 |---|---|---|---|---|---|---|
 | Task | 32 | 1 | 1 normal / 2 powered bench | 1 | | 1 |
-| Semaphore | 16 | | 2 when motor task is used | | | 1 |
+| Semaphore | 16 | 1 | 2 when motor task is used | 1 | 1 | 2 |
 | Event flag | 16 | | | | | |
 | Mailbox | 12 | | | | | |
 | Mutex | 12 | | | | | |
-| Message buffer | 12 | 2 | | | | |
+| Message buffer | 12 | 0 | | | | |
 | Fixed memory pool | 12 | | | | | |
 | Variable memory pool | 12 | | | | | |
 | Cyclic handler | 12 | | | | | |
@@ -306,7 +367,32 @@ It publishes forward-only 0..100% wheel commands through
 `subsystem2_set_duty()`. S2's motor_task (priority 14, core 0) alone writes PWM
 and stops on missing or older-than-100-ms commands. S2 owns the command semaphore
 and PWM slices 4/5; servo slice 6 is untouched. S3's ir_task uses priority 17.
-Normal builds start following after 3 seconds; APP_TEST builds disable the
-controller and motor task, preserving manual encoder calibration. This initial
-command API does not implement the proposed remote stop-event arbitration.
+Normal builds start following after 3 seconds. APP_TEST builds disable the
+motor task but now run the supervisory controller without motor calls; encoder
+calibration mode publishes controller unavailable. The controller owns a
+persistent stop inhibit and uses the existing S2 zero-duty API. The proposed
+separate S2 stop-event arbitration (IF-06) remains unimplemented.
 See `testing/subsystem2/LINE_FOLLOW.md` for behavior, settings and bench checks.
+
+## Current controller/S1 integration — 11 November 2026
+
+This is the local implementation explicitly requested in the user session,
+not evidence of teammate/instructor sign-off. S2–S5 source folders are unchanged.
+Review the shared interfaces with their owners before the group merge/demo.
+
+`vehicle_controller_task` remains priority 15/core 0. It now runs in stationary
+builds too, publishing Control disabled and servicing a logical stop latch;
+it never calls S2 in that mode. The controller adds **one semaphore** and no
+kernel message buffer. Its 2048-byte dynamic task stack/kernel overhead are
+additional in TEST=1; the normal driving image already had this task. The
+object-budget table above is incomplete for other subsystems and is not a
+whole-firmware allocation measurement.
+
+The normal controller services STOP during startup and before each line
+iteration, submits zero duty repeatedly while latched, and never clears it
+on new line data or reconnect. S2 retains PWM ownership. If controller lock
+access is busy, the normal loop requests zero duty for that iteration.
+Published state uses a protected five-byte timestamp/state snapshot. Sensor
+telemetry remains 11 bytes; state/session/latch beacons use six bytes on the
+existing status topic. Full contracts, costs and the pending physical test:
+[Controller commands](testing/subsystem1/CONTROLLER_COMMANDS.md).

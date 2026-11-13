@@ -1,0 +1,47 @@
+{
+  "capture": "testing/subsystem1/logs/2026-11-13T09-25-03-485Z-controller-observation.json",
+  "main_frames": 86,
+  "heartbeats": 9,
+  "diagnostics": 7,
+  "matching_status_rtt_ms": [
+    41
+  ],
+  "decode_errors": [],
+  "distance_mm": {
+    "valid_samples": 86,
+    "min": 366,
+    "max": 542
+  },
+  "line_bits": [
+    4,
+    5,
+    6,
+    7
+  ],
+  "pitch_deg": {
+    "valid_samples": 86,
+    "min": -0.5,
+    "max": 7.6
+  },
+  "diagnostics_latest": {
+    "session_token": 1055369326,
+    "uptime_ms": 79640,
+    "static_ram_bytes": 84668,
+    "heap_free_bytes": 150384,
+    "largest_free_block_bytes": 150384,
+    "sampled_min_heap_free_bytes": 150384,
+    "task_stack_capacity_bytes": 10240,
+    "stack_high_water_bytes": null,
+    "publish_errors": 15,
+    "rejected_commands": 0,
+    "mqtt_connections": 1,
+    "snapshot_contention": 1
+  },
+  "expected_local_uf2": {
+    "path": "C:\\Users\\wilso\\OneDrive\\Desktop\\INF2004 Embedded Systems Programming\\INF2004_RoboCarProject\\build_make\\mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2",
+    "bytes": 719360,
+    "sha256": "390c589344927280ab77175a1cee2d04a07beacad2d522d63760146ad30f6f55",
+    "note": "Intended local file, not flash readback"
+  },
+  "limits": "Stationary live restoration only; not calibrated sensor accuracy, full IR pattern or recovery acceptance."
+}

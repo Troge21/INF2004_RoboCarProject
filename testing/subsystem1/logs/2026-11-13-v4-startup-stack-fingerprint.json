@@ -1,0 +1,66 @@
+{
+  "recorded_utc": "2026-11-13T09:24:56.402799+00:00",
+  "parent_record": "2026-11-13-v4-collector-stack-fingerprint.json",
+  "definite_defect": "New on-board startup test/console static chain exceeded the 1024-byte initial-task stack.",
+  "old_known_startup_chain": 1040,
+  "new_known_startup_chain": 312,
+  "initial_stack": 1024,
+  "collector_static_chain": 464,
+  "collector_stack": 2048,
+  "live_restoration_confirmed": true,
+  "build": {
+    "profile": "NET=lwip MQTT=1 TEST=1 APP_MODE=integrated",
+    "text": 359332,
+    "data": 108,
+    "bss": 84560,
+    "static_ram": 84668
+  },
+  "files": [
+    {
+      "path": "app_program/subsystem1/subsystem1_test.c",
+      "bytes": 6548,
+      "sha256": "96aa6156dcb3fe52c2d9635817f558d0ea02c94b632cd251bab604bc8dd1bf29"
+    },
+    {
+      "path": "app_program/subsystem1/subsystem1.c",
+      "bytes": 12371,
+      "sha256": "f425b876ef07954474614bde03d4e2e7865fdb5e1a35a7cf8ae952315ad11b1b"
+    },
+    {
+      "path": "kernel/tkernel/memory.c",
+      "bytes": 8687,
+      "sha256": "4635f0ae5037546c16b16dd28939be1b09da82e631d82aa94a6f0c3d91123eca"
+    },
+    {
+      "path": "kernel/sysdepend/cpu/core/armv6m/exc_hdr.c",
+      "bytes": 4463,
+      "sha256": "d1c25931e385b38c0ca1eceae7dcd654abcd8d5bb08e9e035d57dde1c9ba7dad"
+    },
+    {
+      "path": "testing/subsystem1/test_s1_stack_frames.py",
+      "bytes": 2446,
+      "sha256": "4d8a886dd29be8293f5f22094f45b88465340ea62ab7903c9f6422e425fc2880"
+    },
+    {
+      "path": "build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2",
+      "bytes": 719360,
+      "sha256": "390c589344927280ab77175a1cee2d04a07beacad2d522d63760146ad30f6f55"
+    },
+    {
+      "path": "build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.elf",
+      "bytes": 3346500,
+      "sha256": "614962d6a9af3ad6586027b56da2b030460a0cf8eae112ab72fa70ccf88589f1"
+    }
+  ],
+  "user_reports_flashing": true,
+  "user_reports_dashboard_updates": true,
+  "restoration_evidence": "2026-11-13-v4-restored-measurements-summary.json",
+  "serial_capture": "2026-11-13-v4-startup-stack-fixed-serial.txt",
+  "owner_source_audit": "2026-11-13-v4-owner-source-audit.json",
+  "limits": [
+    "Functional stationary restoration only.",
+    "Local hash is not flash readback.",
+    "Sensor accuracy, motor STOP, recovery/cadence acceptance and true runtime peaks remain open.",
+    "The earlier normal ELF is stale; rebuild before a normal trial."
+  ]
+}

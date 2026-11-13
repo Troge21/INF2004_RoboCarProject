@@ -1,0 +1,113 @@
+{
+  "client_date": "2026-11-13",
+  "recorded_at_utc": "2026-11-13T06:25:26.815678+00:00",
+  "user_preparation": "User confirms both wheels raised and normal UF2 flashed/reconnected.",
+  "baseline_capture": {
+    "path": "testing/subsystem1/logs/2026-11-13-normal-motor-baseline.json",
+    "sha256": "8ade367ceb277ede44281f31ebf49bc05c0a91a45e98fc78d1e7b257be802378"
+  },
+  "expected_local_uf2": {
+    "path": "C:\\Users\\wilso\\OneDrive\\Desktop\\INF2004 Embedded Systems Programming\\INF2004_RoboCarProject\\build_make\\mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt.uf2",
+    "bytes": 701952,
+    "sha256": "1a2687d1c3b642626fb8c81b355587f8327e6d32a82e08e6829ae0d02dd1fc08",
+    "note": "Intended local file only, no flash readback"
+  },
+  "packet_counts": {
+    "telemetry": 80,
+    "status": 42,
+    "heartbeat": 8
+  },
+  "decode_errors": 0,
+  "telemetry_line_codes": {
+    "7": 36,
+    "5": 24,
+    "6": 6,
+    "4": 14
+  },
+  "matching_status": [
+    {
+      "round_trip_ms": 203,
+      "decoded": {
+        "request_id": 3365344910,
+        "uptime_ms": 57330,
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false,
+        "sample_age_ms": 50,
+        "snapshot": {
+          "sequence": 112,
+          "obstacle_valid": true,
+          "obstacle_mm": 342,
+          "line_bits": 5,
+          "ir": [
+            null,
+            0,
+            1
+          ],
+          "pitch_deg": 2.2,
+          "hump_mm": 16,
+          "max_hump_mm": 22,
+          "imu_state": "Monitoring",
+          "imu_flags": 17,
+          "imu_speed_source": "nominal",
+          "state": null,
+          "left_mps": null,
+          "right_mps": null,
+          "distance_m": null,
+          "barcode": null,
+          "faults": null,
+          "scan": null
+        }
+      }
+    }
+  ],
+  "physical_motor_STOP": "PASS, user-observed: both wheels rotated before explicit website STOP, then both stopped with dashboard confirmation.",
+  "limitations": "Local artifact hash is not flash readback. This is not an encoder calibration, stopping-time or recovery acceptance test. Recorder sends read-only STATUS only.",
+  "pre_command_recording": {
+    "path": "testing/subsystem1/logs/2026-11-13-normal-motor-stop-trial.json",
+    "sha256": "0b384ceaa36acc03e2e6fa21a1876010d07798caf7ec48c4d281668419636043",
+    "packet_count": 486,
+    "stop_results_captured": 0,
+    "limit": "No STOP result captured in this earlier window; not counted as a STOP trial. The later successful continuous-power recording establishes the functional result."
+  },
+  "physical_motor_STOP_user_report": "User reports both wheels rotated, then both stopped after Latch stop; dashboard Stop latched confirmed.",
+  "persistence_validation": "PASS, user-observed while USB remained connected: both wheels stayed stopped through all four IR patterns and dashboard disconnect/reconnect.",
+  "restart_clarification": "User deliberately unplugged/reconnected after an earlier STOP; normal new-run unlatching and wheel restart were expected. Not counted as a continuous-power latch loss.",
+  "recorded_final_utc": "2026-11-13T06:39:12.540282+00:00",
+  "successful_stop_capture": {
+    "path": "testing/subsystem1/logs/2026-11-13-normal-stop-continuous-power.json",
+    "sha256": "48094d72499d5a3db81097848ff427c1cdfc2eb58b1cf729bf5dccbd427f1c54",
+    "captured_STOP_result": {
+      "request_id": 2378069613,
+      "session_token": 3056588280,
+      "result": 0,
+      "result_name": "Stop latched",
+      "controller_word": 14,
+      "controller_state_code": 6,
+      "controller_state": "Stop latched",
+      "controller_valid": true,
+      "stop_latched": true,
+      "test_build": false
+    },
+    "result_received_at_capture_ms": 23490,
+    "post_STOP_telemetry": 535,
+    "post_STOP_line_codes": {
+      "4": 128,
+      "5": 179,
+      "7": 149,
+      "6": 79
+    },
+    "post_STOP_controller_beacons": 272,
+    "all_beacons_normal_latched_same_session": true,
+    "post_STOP_heartbeats": 55,
+    "telemetry_sequence_forward": true,
+    "heartbeat_counter_forward": true,
+    "decode_errors": 0
+  },
+  "limits": "One functional raised-wheel normal-build check with user-observed physical motion and independent protocol/state evidence. No measured stopping time/encoder standstill, repeated performance, source flash readback, calibrated sensor accuracy, final-image recovery or peak runtime RAM acceptance.",
+  "earlier_post_STOP_check": "Fresh read-only STATUS reports Following line/unlatched with uptime 5750 ms and a different session. Prior matching uptimes were 57330 ms and later 6970 ms; restarts observed. User asked whether USB was deliberately reconnected after STOP."
+}

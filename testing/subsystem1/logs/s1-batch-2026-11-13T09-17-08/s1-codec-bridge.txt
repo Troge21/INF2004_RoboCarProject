@@ -1,0 +1,50 @@
+[TEST] S1-V4-01 PASS  one packed frame and byte-packed shared snapshot
+[TEST] S1-V4-02 PASS  full sequence and current framing preserved
+[TEST] S1-V4-03 PASS  missing motion is not measured stationary zero
+[TEST] S1-V4-04 PASS  short output rejected without writes
+[TEST] S1-V4-05 PASS  range and validity bounds
+[TEST] S1-V4-06 PASS  IR can expire independently of range
+[TEST] S1-V4-07 PASS  all line combinations
+[TEST] S1-V4-07 PASS  all line combinations
+[TEST] S1-V4-07 PASS  all line combinations
+[TEST] S1-V4-07 PASS  all line combinations
+[TEST] S1-V4-08 PASS  real IMU view can be packed
+[TEST] S1-V4-09 PASS  stale pitch clears independently of retained height/status
+[TEST] S1-V4-10 PASS  measured zero motion stays valid
+[TEST] S1-V4-11 PASS  overflow becomes unavailable, never wraps/clamps
+[TEST] S1-V4-12 PASS  Code39 validity is independent of navigation mapping
+[TEST] S1-V4-13 PASS  barcode A and controller-supplied left intent preserved
+[TEST] S1-V4-14 PASS  faults must be explicitly known before active
+[TEST] S1-V4-15 PASS  current STATUS has canonical snapshot presence
+[TEST] S1-V4-16 PASS  full STOP lease clock preserved
+[TEST] S1-V4-17 PASS  only applied nonfault controller stop can acknowledge success
+[TEST] S1-V4-18 PASS  future controller vocabulary retains latch invariants
+[TEST] S1-V4-19 PASS  181 point profile is bounded into small exact chunks
+[TEST] S1-V4-20 PASS  unsupported high-water stays unavailable
+[TEST] subsystem1 v4 codec and startup clock SUMMARY 23 passed, 0 failed
+[S1 bridge] PASS collector starts with one protected publication and no input queue
+[S1 bridge] PASS motion publishes when ultrasonic source is absent
+[S1 bridge] PASS S2 RPM is converted to actual speed with its tyre geometry
+[S1 bridge] PASS telemetry rate is bounded independently of producer rates
+[S1 bridge] PASS STATUS reserializes snapshots without calling a producer/driver
+[S1 bridge] PASS actual resource inputs and unsupported high-water remain distinct
+[S1 bridge] PASS radio-owner snapshot contention never blocks or invents a measurement
+[S1 bridge] PASS stale motion expires even while the network continues publishing
+[S1 bridge] PASS requested application stack accounting includes successful task starts
+[S1 bridge] PASS future scan getter automatically activates bounded packets
+[S1 bridge] PASS scan retry has a bounded backoff
+[S1 bridge] PASS rejected scan chunk retries the same indices
+[S1 bridge] PASS completed scan has stable source metadata across chunks
+[S1 bridge] PASS completed scan has stable source metadata across chunks
+[S1 bridge] PASS completed scan has stable source metadata across chunks
+[S1 bridge] PASS completed scan has stable source metadata across chunks
+[S1 bridge] PASS completed scan has stable source metadata across chunks
+[S1 bridge] PASS completed scan has stable source metadata across chunks
+[S1 bridge] PASS completed scan has stable source metadata across chunks
+[S1 bridge] PASS completed scan has stable source metadata across chunks
+[S1 bridge] PASS completed scan has stable source metadata across chunks
+[S1 bridge] PASS completed scan has stable source metadata across chunks
+[S1 bridge] PASS completed scan has stable source metadata across chunks
+[S1 bridge] PASS all 181 scan points fit twelve bounded packets
+[S1 bridge] PASS malformed future scan does not corrupt the published cache
+[S1 bridge] SUMMARY 25 checks, 0 failures

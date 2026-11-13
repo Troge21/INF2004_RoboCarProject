@@ -289,12 +289,14 @@ class BarcodeTests(unittest.TestCase):
         source = directory/f'line-{pin}.c'
         actual = '\n'.join((ROOT/'app_program/subsystem3'/name).read_text()
                            for name in ('line_detection.c', 'subsystem3.c'))
-        harness = Path(__file__).with_name('line_input_harness.c').read_text()
+        actual = '\n'.join(line for line in actual.splitlines()
+                           if not line.startswith('#include <'))
+        harness = Path(__file__).with_name('analog_input_harness.c').read_text()
         source.write_text(harness.replace('/* SUBSYSTEM_SOURCE */', actual))
         executable = directory/(f'line-{pin}.exe' if os.name == 'nt' else f'line-{pin}')
         command = [COMPILER] + (['cc'] if Path(COMPILER).stem == 'zig' else [])
         command += ['-std=c99', '-Wall', '-Wextra', '-Werror',
-                    f'-DAPP_LINE_FOLLOW_ENABLED={pin}', '-DAPP_TEST=0', '-DAPP_RECOVERY_TIMEOUT_MS=200U', '-I', str(ROOT/'app_program/subsystem3'),
+                    f'-DAPP_LINE_FOLLOW_ENABLED={pin}', '-DAPP_TEST=0', '-I', str(ROOT/'app_program/subsystem3'),
                     str(source), str(ROOT/'app_program/subsystem3/barcode_decoder.c'),
                     '-o', str(executable)]
         command += extra or []

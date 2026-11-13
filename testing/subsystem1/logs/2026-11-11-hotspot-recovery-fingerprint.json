@@ -1,0 +1,14 @@
+{
+  "date_local": "2026-11-11",
+  "timezone": "Asia/Kuala_Lumpur",
+  "git_head_at_review": "b11c682808c3e82caae907fba0d1ef5c3c69311c",
+  "local_uf2_sha256": "9c5ac8f0876055939f2cc4049a22e3ca9285b38ccccd889096bd801dafc2a7a0",
+  "source_note": "Tracked source was clean at review start; documentation updated afterward. No rebuild/reflash performed in this review.",
+  "sha256": {
+    "testing/subsystem1/logs/2026-11-11T06-09-18-051Z-wifi-recovery.json": "38e8486a8414a8d783f6b7bf28bf102faba362a65845a6f1f5f1f1d0b2c489c3",
+    "testing/subsystem1/logs/2026-11-11-hotspot-confirmed-recovery-summary.json": "fe8de5c653b86381a300a0d201b1461d746795a0e464a7b13c0d7a1724a525a7",
+    "testing/subsystem1/recovery_probe.mjs": "0ba128ad62de87c65b5dc100f6f065f6371c07bf4acd49e3e5fd0aaedfb194ff",
+    "lib/liblwip/sysdepend/pico_rp2040/mqtt_utk.c": "28f7880911fe8d140a174f83b4a6ef77535aee0b8e82020e1c94605a8fe59371",
+    "lib/libwifi/sysdepend/pico_rp2040/cyw43_utk.c": "a80fac7fb6890e1c76d97a5da69a24eea909a6c013d9ac876e68725af8729b1e"
+  }
+}

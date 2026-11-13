@@ -1,0 +1,885 @@
+{
+  "recorded_at_utc": "2026-11-13T06:18:26.224141+00:00",
+  "client_date": "2026-11-13",
+  "base_commit": "f37055f567d46d4f2465725e1af46082b880ba29",
+  "source_state": "Uncommitted analog integration and restored S1 work; firmware sources identical to 12 November software-tested integration. No push.",
+  "build": {
+    "profile": "NET=lwip MQTT=1 TEST=0 APP_MODE=integrated",
+    "forced_rebuild": true,
+    "sdk": "/opt/robocar/pico-sdk-2.2.0",
+    "warnings": 0,
+    "normal_ELF_symbols": "motor_task, s3_line_sample, wifi_status_task, app_controller_poll present; calibration_task, s3_capture_start, ir_adc_test absent"
+  },
+  "artifact": {
+    "path": "build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt.uf2",
+    "bytes": 701952,
+    "sha256": "1a2687d1c3b642626fb8c81b355587f8327e6d32a82e08e6829ae0d02dd1fc08"
+  },
+  "ELF": {
+    "path": "build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt.elf",
+    "bytes": 3282384,
+    "sha256": "b98630aa87acae4d81436d6851f9f793d789ec4c4e095d6b213a2971ad69d731"
+  },
+  "linked_sections": {
+    "text": 350712,
+    "data": 104,
+    "bss": 82652,
+    "static_ram": 82756
+  },
+  "resources": {
+    "s1_queue_requests_bytes": 192,
+    "s3_snapshot_bytes": 9,
+    "runtime_heap_stack_peaks": "Unmeasured"
+  },
+  "prior_source_validation": {
+    "path": "testing/subsystem1/logs/2026-11-12-wiring-fingerprint.json",
+    "sha256": "c7181477ac17166da30c2a323e12a022f69547770c264c2574175dbf43877bd0",
+    "unchanged_firmware_files": 90,
+    "checks": {
+      "s3_host_suite_groups": 16,
+      "actual_controller_and_s2_pid_loop": 13,
+      "analog_policy": "RPM and duty modes passed",
+      "shared_gpio_irq": "Passed; echo masking preserves encoders",
+      "controller_owner_per_TEST_mode": 17,
+      "s1_codec": 36,
+      "s1_queue_cache": 23,
+      "mqtt_port": 50,
+      "dashboard": 45,
+      "cross_language_sensor_frames": 23997,
+      "cross_language_controller_vectors": 147,
+      "heartbeat_vectors": 3,
+      "status_requests": 3,
+      "status_replies": 24,
+      "ARM_startup_modes": 4,
+      "stationary_ELF_symbols": "Passed",
+      "ARM_normal_and_stationary_links": "Passed",
+      "observer_and_dashboard_syntax": "Passed",
+      "expected_board_S1_checks": 37,
+      "board_checks_observed": false,
+      "browser_visual_QA": "Unavailable; browser host failed"
+    }
+  },
+  "stationary_validation": {
+    "captured_telemetry": 77,
+    "captured_heartbeat": 8,
+    "captured_status_rtt_ms": 31,
+    "valid_distance_and_pitch_samples": 77,
+    "decode_errors": 0,
+    "user_all_four_physical_IR_patterns": true,
+    "user_latch_survives_browser_reconnect": true,
+    "user_latch_clears_USB_power_cycle": true,
+    "summary": "testing/subsystem1/logs/2026-11-13-wiring-stationary-summary.json",
+    "stationary_UF2_removed_after_verification": true,
+    "stationary_UF2_sha256": "2cb408f2b453226ad9a55c005b59bad1e7171b0ccc4204b69a246fd129f2eccb"
+  },
+  "power_setup": "Single whole-car supply: laptop USB or power bank. No separate battery/motor switch. Raise both drive wheels before flashing/connecting normal firmware; automatic motion may start after 3 seconds. Disconnect active USB supply to turn off.",
+  "physical_validation": "Current normal image not yet flashed; moving-wheel STOP and actual encoder behavior pending. Stationary/user observations are not normal-image motor acceptance.",
+  "credentials": "Private wifi_secrets.h excluded and not read.",
+  "files": [
+    {
+      "path": "app_program/app.h",
+      "bytes": 3831,
+      "sha256": "0367390628fbf164124b868276bd4d12639974f6c0497bf0f48eef430361ce47"
+    },
+    {
+      "path": "app_program/app_main.c",
+      "bytes": 7323,
+      "sha256": "efa407380532f268fd031bea1eb41c7c2b792ce4a5241d3a358f2a8c9f6f9700"
+    },
+    {
+      "path": "app_program/controller.c",
+      "bytes": 4874,
+      "sha256": "f64144f0ac2368033eea4270cbfa6d5a0fa978f6e1f28d3dbeed5d8f5b25f756"
+    },
+    {
+      "path": "app_program/controller.h",
+      "bytes": 1385,
+      "sha256": "7fd139e01b6098ff6c48af8e63b4878789095b4b47b87befc52bb05dbaaf68c0"
+    },
+    {
+      "path": "app_program/gpio_irq.c",
+      "bytes": 2835,
+      "sha256": "54747912a0fbaefda676916db1f8674f5b5098200eac455d83d625af0cb6195c"
+    },
+    {
+      "path": "app_program/gpio_irq.h",
+      "bytes": 530,
+      "sha256": "42411f0bf769ab81fde9b2ad7cfc1f456b88942b81bf6ba171466618957925c5"
+    },
+    {
+      "path": "app_program/subsystem1/s1_protocol.c",
+      "bytes": 10040,
+      "sha256": "c5c912f5eab74b8074f7eff33cbfcd52ba9d435de770f33bbcd5d29be60bc65d"
+    },
+    {
+      "path": "app_program/subsystem1/s1_protocol.h",
+      "bytes": 4616,
+      "sha256": "e770dc95cdd16609c117bb14fcd7ae65e3be0a50e8bc6002b9a9af6b72585082"
+    },
+    {
+      "path": "app_program/subsystem1/subsystem1.c",
+      "bytes": 10318,
+      "sha256": "9d7323edce0bc3a5aa7be142c135b4a570829e6fb4ea19098c945d3a394b78ed"
+    },
+    {
+      "path": "app_program/subsystem1/subsystem1.h",
+      "bytes": 1690,
+      "sha256": "757ae59e3887d6be21e5e955d7553c569f05bba583d7bfee321ddb2508051222"
+    },
+    {
+      "path": "app_program/subsystem1/subsystem1_test.c",
+      "bytes": 14582,
+      "sha256": "217094249db9d92143a7e5f43329af7927dcb6194164c001725124aa0ca593ac"
+    },
+    {
+      "path": "app_program/subsystem2/encoder_capture.c",
+      "bytes": 2087,
+      "sha256": "1e806dd7f75100fff477e5e8e0c26b278d2bfa7904df2f4666147015aa3b02f3"
+    },
+    {
+      "path": "app_program/subsystem2/encoder_capture.h",
+      "bytes": 376,
+      "sha256": "c27303eea1b18e1ef990c1bf4bb50b5375209ca837fb50caea1e770b089d2ce1"
+    },
+    {
+      "path": "app_program/subsystem2/motion_control.c",
+      "bytes": 8345,
+      "sha256": "268be5d3c4b217543aa569d79b4b177330ff0aab128f6da7249ea8ac0df0b50b"
+    },
+    {
+      "path": "app_program/subsystem2/motion_control.h",
+      "bytes": 1071,
+      "sha256": "5f96e918c68792c4cb6d194dab37befcbe7e2bc9e3c22a4427aa5b0362bb92ec"
+    },
+    {
+      "path": "app_program/subsystem2/subsystem2.c",
+      "bytes": 5767,
+      "sha256": "4f432e114a4d2f4b94040d0f4e4f70501de6589f6651398d7ad5bca70775c27f"
+    },
+    {
+      "path": "app_program/subsystem2/subsystem2.h",
+      "bytes": 5334,
+      "sha256": "d34fbb31ae1403dc014acf0e9992805ebf440e7888230ef468f8289d23500b97"
+    },
+    {
+      "path": "app_program/subsystem2/subsystem2_test.c",
+      "bytes": 7128,
+      "sha256": "3acf712c07e3a77c121b85242b04ee97001bfa5c03efdc4cfd7e595a228d13a7"
+    },
+    {
+      "path": "app_program/subsystem3/barcode_capture.c",
+      "bytes": 3767,
+      "sha256": "37abf55d95115ed713f1de6e1a7e3b425fd771382ef33ac83e7d3973427d9016"
+    },
+    {
+      "path": "app_program/subsystem3/barcode_capture.h",
+      "bytes": 589,
+      "sha256": "0181ba05cf6c36facf011e357f3c617166211aeda41ded728b745b4e30e8b799"
+    },
+    {
+      "path": "app_program/subsystem3/barcode_decoder.c",
+      "bytes": 7726,
+      "sha256": "93f0a674284b10b8743654066d00017cd1556b47b22d40541bf84aa126f8dc0d"
+    },
+    {
+      "path": "app_program/subsystem3/barcode_decoder.h",
+      "bytes": 1826,
+      "sha256": "b9c16866941476ccf8ec293a0da962f0f40aec82bc1d66733ef28989ad60766a"
+    },
+    {
+      "path": "app_program/subsystem3/ir_adc_test.c",
+      "bytes": 7659,
+      "sha256": "7e011125f2dca9cc618d5b0c663e8159b5812e19a5afd642be38684a77de3f79"
+    },
+    {
+      "path": "app_program/subsystem3/line_detection.c",
+      "bytes": 3358,
+      "sha256": "5a5c85f67bd0e5b679dfda1eb046b002ded23e32d8ca8a5343e43befe9b1cfb7"
+    },
+    {
+      "path": "app_program/subsystem3/line_detection.h",
+      "bytes": 435,
+      "sha256": "62731eab10ac21e707c064ad34835cf7430457acd61271ee36d23ba099a109ba"
+    },
+    {
+      "path": "app_program/subsystem3/subsystem3.c",
+      "bytes": 1005,
+      "sha256": "e7bcc191f1eccd117b09fe7f6e5615c186ebc33f93f57b6149ac7f1c16727021"
+    },
+    {
+      "path": "app_program/subsystem3/subsystem3.h",
+      "bytes": 1399,
+      "sha256": "3a932adbe1b7d8f9fa6fd046f933ea0f92133a89e6b9ac88685e6b8db8f1f4c0"
+    },
+    {
+      "path": "app_program/subsystem3/subsystem3_test.c",
+      "bytes": 1661,
+      "sha256": "36366885c3ea1d3e1eff4839b780f5a8528bebfdcd61081daf602af95172c858"
+    },
+    {
+      "path": "app_program/subsystem4/drv_gy511.c",
+      "bytes": 10207,
+      "sha256": "36aa2a51100798ac404b2b7f53beda78d2b8dc8d907362976092028cf9fa1bea"
+    },
+    {
+      "path": "app_program/subsystem4/drv_gy511.h",
+      "bytes": 3890,
+      "sha256": "2879b2eb4baca3b16bf4e19de900639934aa698d833fe7604ad393748d36e3d0"
+    },
+    {
+      "path": "app_program/subsystem4/subsystem4.c",
+      "bytes": 19707,
+      "sha256": "8daffb73aa163ae4b2c6e74d186de78d7348e768dac39de84fec29cf1e68de69"
+    },
+    {
+      "path": "app_program/subsystem4/subsystem4.h",
+      "bytes": 5139,
+      "sha256": "c90d9144efa1a05783ae25aeebb87ca0fe43c671d0d58da0d914a59b718624c2"
+    },
+    {
+      "path": "app_program/subsystem4/subsystem4_test.c",
+      "bytes": 3506,
+      "sha256": "03207a225ec7e833bf785c3c960e7e37210ac738b777427173ccf7a54dc7d393"
+    },
+    {
+      "path": "app_program/subsystem5/subsystem5.c",
+      "bytes": 5313,
+      "sha256": "68096bc3a14aef5c737160136a3eaefd0e689086ef6c6586b1abcaaca7cef146"
+    },
+    {
+      "path": "app_program/subsystem5/subsystem5.h",
+      "bytes": 523,
+      "sha256": "cce73bae16059e36d0951ff68dd9f046c91635904b1527cf2d5e2679be9d54de"
+    },
+    {
+      "path": "app_program/subsystem5/subsystem5_test.c",
+      "bytes": 1027,
+      "sha256": "a9484230bc12973a0220ff36b2ffe67d03c8a04d77de449dbe8c2ad0fc2f797c"
+    },
+    {
+      "path": "app_program/test_report.h",
+      "bytes": 1259,
+      "sha256": "68858801abeef5aeb8d8588995392d78b2b550ba905ee1352cf4d4c31baa379b"
+    },
+    {
+      "path": "build_make/.build_profile",
+      "bytes": 64,
+      "sha256": "b026e608a61b6eff1416c0e15905ae94c0f4a86173e4422be9ad1a3a7b13159d"
+    },
+    {
+      "path": "build_make/Makefile",
+      "bytes": 2704,
+      "sha256": "a0e159a02c04e58029e6690a9109a9177984ee9f0e7c4dd8f188c044e73bccec"
+    },
+    {
+      "path": "build_make/pico_rp2040.mk",
+      "bytes": 20928,
+      "sha256": "e516cda14c0c9afeaa7126d59bb15ce37f83e334822a0fbbb558ca3df25028db"
+    },
+    {
+      "path": "config/config.h",
+      "bytes": 6482,
+      "sha256": "afc5e0df62d0245f455fb5bcf3b077a31bdabd058e9498372755379a4e85a712"
+    },
+    {
+      "path": "config/config_device.h",
+      "bytes": 1091,
+      "sha256": "1f5ea3bcffdbe0f395a1436ff2a1b322746eeb844edc7369b8a643ffe5f09846"
+    },
+    {
+      "path": "config/config_func.h",
+      "bytes": 4145,
+      "sha256": "6c35f2ce02a141f205f9164fe3436829554eabb5696ff6dd7df15f9560eed5f8"
+    },
+    {
+      "path": "config/config_tm.h",
+      "bytes": 2003,
+      "sha256": "3eda2e4399e37a1559fe09b1a010ebd989d4c23c5b1884bc9bd8e91a14baae4c"
+    },
+    {
+      "path": "config/wifi_secrets.example.h",
+      "bytes": 1105,
+      "sha256": "d1cdf77188fc12cf1497deeafa266c02d7f572e60124697816cd0acd5a4ee854"
+    },
+    {
+      "path": "dashboard/dist/app.js",
+      "bytes": 37330,
+      "sha256": "693fe197c540ff38d08eba1d6056ab78a3a722f56083ca539435f22058269e1b"
+    },
+    {
+      "path": "dashboard/dist/charts.js",
+      "bytes": 5500,
+      "sha256": "ce6b62b6452b817f6445b63d3bff8618f3736c9aa9c34233b221e4ed1aeabdec"
+    },
+    {
+      "path": "dashboard/dist/index.html",
+      "bytes": 6788,
+      "sha256": "54ad1706ed8b9448da85e49cb241a32bd0d0b759065c0cd5e0b39aa0621bf0e0"
+    },
+    {
+      "path": "dashboard/dist/mqtt.js",
+      "bytes": 6436,
+      "sha256": "4fe0ce715a26aabd2b3e7628413b0e7597eeac7bd62b76fc84ffa8e5042f51bb"
+    },
+    {
+      "path": "dashboard/dist/protocol.js",
+      "bytes": 16834,
+      "sha256": "1ea8058652c88d466024806058c8abdf941638f5a849ca4c46a42ccc9eaf5c84"
+    },
+    {
+      "path": "dashboard/dist/styles.css",
+      "bytes": 23355,
+      "sha256": "3430dbd9597a1fc7ef65976f86ba0f449d2bcf3f8bf8781a849927a773d1d21d"
+    },
+    {
+      "path": "dashboard/README.md",
+      "bytes": 11262,
+      "sha256": "f8b93a0c806bf8603429939783a309b7fb89ae1014259a3491b40329e854b560"
+    },
+    {
+      "path": "dashboard/tests/controller.test.mjs",
+      "bytes": 5335,
+      "sha256": "09ba74d20134c856bcf6a0833e14f9eeecf66c7e5afa2ed3d8d071e679bd9b3c"
+    },
+    {
+      "path": "dashboard/tests/fixtures.mjs",
+      "bytes": 1571,
+      "sha256": "9c92ecad14027e0848fe1a856190882682fe8f450fba02b8a01c51b67405fb59"
+    },
+    {
+      "path": "dashboard/tests/mqtt.test.mjs",
+      "bytes": 7752,
+      "sha256": "d545802750eafa12c929e07d951a48ec857a5cdb545cc86106158941c0f190fc"
+    },
+    {
+      "path": "dashboard/tests/protocol.test.mjs",
+      "bytes": 11904,
+      "sha256": "7136d585d0dbd81b17694dffbb3d317b3c59efdf1e4b23a59079320807d59be7"
+    },
+    {
+      "path": "device/adc/adc.c",
+      "bytes": 5911,
+      "sha256": "7f76655d44754c85d08debc5cbbb3ccbb3ecad9b38b3b35557845183fbcc307e"
+    },
+    {
+      "path": "device/adc/adc.h",
+      "bytes": 1798,
+      "sha256": "b14c3146fcc6d6cbc54f84af70432eccef8173f33999d2c9038bd734cf152b39"
+    },
+    {
+      "path": "device/adc/adc_cnf.h",
+      "bytes": 1027,
+      "sha256": "6883acf1f6ef1b4802067f59d055a97b4519e424e829b757b1824294ce4d9091"
+    },
+    {
+      "path": "device/adc/sysdepend/rp2040/adc_cnf_sysdep.h",
+      "bytes": 1570,
+      "sha256": "3affc71fcb52b6aff4b7d7be4dc893f6b4eaba1c2bae64413be4a9ebd916c3ca"
+    },
+    {
+      "path": "device/adc/sysdepend/rp2040/adc_rp2040.c",
+      "bytes": 5107,
+      "sha256": "fa927e7ac1020f27c7068599c31c6aea1deebce48fc7153c75bba6d1ef814f0d"
+    },
+    {
+      "path": "device/adc/sysdepend/rp2040/adc_sysdep.h",
+      "bytes": 2394,
+      "sha256": "f0d0287c2ee364df88800ff53817df90388c7ac5c918759ab873be7d3c1307b2"
+    },
+    {
+      "path": "device/adc/sysdepend/rx231/adc_cnf_sysdep.h",
+      "bytes": 1215,
+      "sha256": "62f17df89ac0fa039b72e7cf3862f28507573b2c75f87320931d662934ce6b7f"
+    },
+    {
+      "path": "device/adc/sysdepend/rx231/adc_rx231.c",
+      "bytes": 3936,
+      "sha256": "6024a49f7cc40072204da0a7f352fedb7d091b7d052b425e88e165111f543fc1"
+    },
+    {
+      "path": "device/adc/sysdepend/rx231/adc_sysdep.h",
+      "bytes": 1618,
+      "sha256": "4e99f07a83db37e5ab98255da8b7e3cd48852ebddebe3ad3a394845b62371f65"
+    },
+    {
+      "path": "device/adc/sysdepend/rx65n/adc_cnf_sysdep.h",
+      "bytes": 2220,
+      "sha256": "588d1915be3a15f6138c2e064470680a50f4903bd053d95822d9fad745bc44e8"
+    },
+    {
+      "path": "device/adc/sysdepend/rx65n/adc_rx65n.c",
+      "bytes": 6524,
+      "sha256": "984f5f88c2c297a18625f91a444595de129804a3c702d6d704e2508619eb3258"
+    },
+    {
+      "path": "device/adc/sysdepend/rx65n/adc_sysdep.h",
+      "bytes": 1929,
+      "sha256": "1554382f4713ce0518b3cdc9b4aa7d39092b9173d819d899d4e44b81e96d40a2"
+    },
+    {
+      "path": "device/adc/sysdepend/rza2m/adc_cnf_sysdep.h",
+      "bytes": 1194,
+      "sha256": "276ac52271c3bca46f7b2b46a93694c864c26a098159c7e2bed40f2dc984f6e7"
+    },
+    {
+      "path": "device/adc/sysdepend/rza2m/adc_rza2m.c",
+      "bytes": 3481,
+      "sha256": "558cd50789aa569410dc410d05debd0147a19da30c1ef0ecae33835c524fa297"
+    },
+    {
+      "path": "device/adc/sysdepend/rza2m/adc_sysdep.h",
+      "bytes": 2205,
+      "sha256": "8ae65bbf30e043de8f839361a33994da8ce9b78192969117d41a89ff42caa403"
+    },
+    {
+      "path": "device/adc/sysdepend/stm32h7/adc_cnf_sysdep.h",
+      "bytes": 3156,
+      "sha256": "97955d2af08c2e10da339f8526c8350d3133bd008d844b56c6ff8b536b2e52b9"
+    },
+    {
+      "path": "device/adc/sysdepend/stm32h7/adc_stm32h7.c",
+      "bytes": 7544,
+      "sha256": "2052987e887d5523b0a62d3afd20f423662b1dd3eb12c66dcc988e52a13f5d47"
+    },
+    {
+      "path": "device/adc/sysdepend/stm32h7/adc_sysdep.h",
+      "bytes": 4027,
+      "sha256": "c42fc5afe5b99e634e6c44b4c7763a41943aef60b39c79782813df0c78295fd5"
+    },
+    {
+      "path": "device/adc/sysdepend/stm32l4/adc_cnf_sysdep.h",
+      "bytes": 1725,
+      "sha256": "b664105b1dede0f5681a045f4b0402580b1ea2acf8c247da99be0c3b32dc2dd5"
+    },
+    {
+      "path": "device/adc/sysdepend/stm32l4/adc_stm32l4.c",
+      "bytes": 6696,
+      "sha256": "50b91ca1dd4bd3a8737e5c26e0adf578ddc1e87583c486a89af58c8b49c6983f"
+    },
+    {
+      "path": "device/adc/sysdepend/stm32l4/adc_sysdep.h",
+      "bytes": 3320,
+      "sha256": "25f105c71096beb7517c5fe3a2b3950a2ce1f703ca4dc937b17ad56331acadcc"
+    },
+    {
+      "path": "device/adc/sysdepend/tx03_m367/adc_cnf_sysdep.h",
+      "bytes": 1157,
+      "sha256": "a2fb022cbdeb9ec051183cd2d7c1e1b7a60fbc02d7137b24c3fead556c6ee1a4"
+    },
+    {
+      "path": "device/adc/sysdepend/tx03_m367/adc_m367.c",
+      "bytes": 4082,
+      "sha256": "90b20e64c33185f91bc7aee4233d18de09765a1635f5594c9907b3d12893e363"
+    },
+    {
+      "path": "device/adc/sysdepend/tx03_m367/adc_sysdep.h",
+      "bytes": 1969,
+      "sha256": "26a9c5844508898256e7a867f96869566b3964e200687ed39f2168dace17a990"
+    },
+    {
+      "path": "kernel/sysdepend/pico_rp2040/cpu_clock.c",
+      "bytes": 4743,
+      "sha256": "0993661384a5a1b26fcea476c42bd463913428ddcd973db2d23c32436a93eefd"
+    },
+    {
+      "path": "kernel/sysdepend/pico_rp2040/cpu_status.h",
+      "bytes": 682,
+      "sha256": "7fe59ded2a3bd6ca80d1b4fe0dc3c813832dfc73053ee538d53b2ed44031a8d7"
+    },
+    {
+      "path": "kernel/sysdepend/pico_rp2040/cpu_task.h",
+      "bytes": 679,
+      "sha256": "835caef98f90fc5bca9b5548cdbd7eee1f7f1bca93cffcf8e734176c040a87d3"
+    },
+    {
+      "path": "kernel/sysdepend/pico_rp2040/devinit.c",
+      "bytes": 3190,
+      "sha256": "97c64a39f66976e0e996a2397abf7237a5e244976398e7135fb35a1c7b27fdf6"
+    },
+    {
+      "path": "kernel/sysdepend/pico_rp2040/hw_setting.c",
+      "bytes": 6243,
+      "sha256": "9147fda845a6b5180f882d442369d4a78eb40ac4d19432058310baaa390fb9fb"
+    },
+    {
+      "path": "kernel/sysdepend/pico_rp2040/power_save.c",
+      "bytes": 1011,
+      "sha256": "c988c1b0643d8430aa86e62fb8316356f5328be249dd28efc9453d252ce81bfb"
+    },
+    {
+      "path": "kernel/sysdepend/pico_rp2040/sys_msg.h",
+      "bytes": 837,
+      "sha256": "1c9f6af5b3a5e37e2937920ff24e8ab9a189c0bee4fb68424ca6186283e65dd0"
+    },
+    {
+      "path": "kernel/sysdepend/pico_rp2040/sys_timer.h",
+      "bytes": 691,
+      "sha256": "9aa2f061ad353311ad09427f5810bd0c2adbc1c755b0917804fe7cb757cbbd81"
+    },
+    {
+      "path": "kernel/sysdepend/pico_rp2040/sysdepend.h",
+      "bytes": 897,
+      "sha256": "cd1a272cc63013e1e9fbc2640fa412f6fda4ea7e7052ebee8ad5eaed726e12de"
+    },
+    {
+      "path": "lib/liblwip/sysdepend/pico_rp2040/include/arch/cc.h",
+      "bytes": 2619,
+      "sha256": "795c8b932fe6426f6849c57c550bd6ba14ce51e102c623c9b851404b0247235a"
+    },
+    {
+      "path": "lib/liblwip/sysdepend/pico_rp2040/include/arch/sys_arch.h",
+      "bytes": 840,
+      "sha256": "8efcbc692de1130a9e8ad445f01651a04fa5dc81a3c5a79a281cb96b38927517"
+    },
+    {
+      "path": "lib/liblwip/sysdepend/pico_rp2040/lwipopts.h",
+      "bytes": 3967,
+      "sha256": "708afa92378248452894fec00cf00069c692bfaecf8aca7ff68420d30f51d1c4"
+    },
+    {
+      "path": "lib/liblwip/sysdepend/pico_rp2040/mqtt_utk.c",
+      "bytes": 14394,
+      "sha256": "de8f9e5d765a062c04d9a452c7378d6221f272b0960ad87df6bb25934e54182c"
+    },
+    {
+      "path": "lib/liblwip/sysdepend/pico_rp2040/mqtt_utk.h",
+      "bytes": 1616,
+      "sha256": "e214329e371d21a6d9558653ed47ed768befd5e0f3473bb63ccfb096f5f2bd49"
+    },
+    {
+      "path": "lib/liblwip/sysdepend/pico_rp2040/sys_arch.c",
+      "bytes": 2362,
+      "sha256": "cd941b66abd9e68bc7b3e1acda0bc21224fe983150086b2bfcb10623d476c994"
+    },
+    {
+      "path": "lib/libwifi/sysdepend/pico_rp2040/cyw43_bus_pio_spi.pio.h",
+      "bytes": 1317,
+      "sha256": "e17984a59480a228b08521be89dcea9222a152fe29bb08fd866d5897c8fa1145"
+    },
+    {
+      "path": "lib/libwifi/sysdepend/pico_rp2040/cyw43_configport.h",
+      "bytes": 3107,
+      "sha256": "82956d38218c110569ed9a6f9e4a36a509f48b861b171b5e404743bb9f94c697"
+    },
+    {
+      "path": "lib/libwifi/sysdepend/pico_rp2040/cyw43_utk.c",
+      "bytes": 13590,
+      "sha256": "b966652fd49d2df9ed5590cc8547141accf7b1633f05bd903cc45d17f9b73e63"
+    },
+    {
+      "path": "lib/libwifi/sysdepend/pico_rp2040/cyw43_utk.h",
+      "bytes": 980,
+      "sha256": "65e34a81a07f6c8f308934a97116d98fce39f276c5f5204201e010d00667bca4"
+    },
+    {
+      "path": "lib/libwifi/sysdepend/pico_rp2040/cyw43_utk_compat.c",
+      "bytes": 6014,
+      "sha256": "48ed37f7b69d5c152ce00ec1be82b23dcecdd0a5faeac2623a0554361cb1b93b"
+    },
+    {
+      "path": "lib/libwifi/sysdepend/pico_rp2040/cyw43_utk_kernel.c",
+      "bytes": 1670,
+      "sha256": "563e70835fbdf219f86349794bae85adf1c44b94c8236fa49e1111032f83c8a4"
+    },
+    {
+      "path": "lib/libwifi/sysdepend/pico_rp2040/wifi_recovery.h",
+      "bytes": 856,
+      "sha256": "597dc8a7e9c6d43f7aa6d8b8c2fc002b54c4445c0e07d7051dcfa22f81dc60d9"
+    },
+    {
+      "path": "README.md",
+      "bytes": 12520,
+      "sha256": "ba7b19b9cc0794a97e477aa75e15394c4f433dd552f4f24cd5a6b2da1b0b36fc"
+    },
+    {
+      "path": "TEAM.md",
+      "bytes": 23534,
+      "sha256": "e0b4b0855f2f01303e06e65eb4f30fa094132345ce7476c053084599c5d2c171"
+    },
+    {
+      "path": "TEMP_S1_PROGRESS_AND_PLANS.md",
+      "bytes": 9863,
+      "sha256": "712cb26689e5dab9bce528110dc84a9ad84283f3bae0e1e615f5c456a7eb9638"
+    },
+    {
+      "path": "testing/subsystem1/CHANGE_REQUIREMENT_1.md",
+      "bytes": 24761,
+      "sha256": "0e3f70620ada7f7b57fdc89c729f01e2f25230de98e87de77ff7b4cf7147825e"
+    },
+    {
+      "path": "testing/subsystem1/CONTROLLER_COMMANDS.md",
+      "bytes": 14882,
+      "sha256": "c45ada82ff4606c4e9dc350da4659b2d8a9a75436eda8151ea4cd3340f1d0eeb"
+    },
+    {
+      "path": "testing/subsystem1/host/check_wire.mjs",
+      "bytes": 5078,
+      "sha256": "336309947eca84a293fdcb09687883313e572e1a9f72741f42a34483ae1e43af"
+    },
+    {
+      "path": "testing/subsystem1/host/emit_frames.c",
+      "bytes": 6903,
+      "sha256": "41089542364907d424e5bd5ab832cfb6b4bbc9096e8af72e519a0ccd62c9a369"
+    },
+    {
+      "path": "testing/subsystem1/host/include/bsp/libbsp.h",
+      "bytes": 63,
+      "sha256": "5e833eadedd9f1f840ddf67d4b0b0187886e78a18a108b21dfe6a3f512528563"
+    },
+    {
+      "path": "testing/subsystem1/host/include/lwip/apps/mqtt.h",
+      "bytes": 856,
+      "sha256": "b90cf90cde2d222fbaecd840c6eca036919e57acce32553f79f1ef69d4d39bdb"
+    },
+    {
+      "path": "testing/subsystem1/host/include/lwip/ip_addr.h",
+      "bytes": 234,
+      "sha256": "ad4b4e6e65a4a03eecd88e34b5b352247781c71d4c0dd8dfb88551a5308f929c"
+    },
+    {
+      "path": "testing/subsystem1/host/include/lwip/sys.h",
+      "bytes": 58,
+      "sha256": "deff1a80565817f806c13df954856b40fec279618020851beee72feb70e6d1b5"
+    },
+    {
+      "path": "testing/subsystem1/host/include/lwip/timeouts.h",
+      "bytes": 100,
+      "sha256": "238cfa9bec0156ce5340b37eacda0dc65ba8555d9a232391dac091492dfb7e60"
+    },
+    {
+      "path": "testing/subsystem1/host/include/sys/sysdef.h",
+      "bytes": 79,
+      "sha256": "33b5f8aca8695e02c499af000c432839523568f017a6a441a07269425142376e"
+    },
+    {
+      "path": "testing/subsystem1/host/include/tk/syslib.h",
+      "bytes": 67,
+      "sha256": "0a99035b9522e1c7014fecf9c1de7225cd1ed19ab55e8d79edc648a16adad1ce"
+    },
+    {
+      "path": "testing/subsystem1/host/include/tk/tkernel.h",
+      "bytes": 156,
+      "sha256": "524407a2e76adf9172ad5363e0bd15135ab937c6a4b3bd44e19c2e2e79d55449"
+    },
+    {
+      "path": "testing/subsystem1/host/include/tm/tmonitor.h",
+      "bytes": 83,
+      "sha256": "7fe23b1a78a0d1f44b4c550abd7ff8ef1da162dba7f59af58746870a70712fa1"
+    },
+    {
+      "path": "testing/subsystem1/host/measure_layout.c",
+      "bytes": 1520,
+      "sha256": "106644bac6d3e5b132c8a6e088096594706caf6946c568d8b23babd00b1d753f"
+    },
+    {
+      "path": "testing/subsystem1/host/recovery_probe.test.mjs",
+      "bytes": 4545,
+      "sha256": "da5af2afde8b92b3c1b1042dcb4782951acc5f3dd404c3365d4f6fc45f112498"
+    },
+    {
+      "path": "testing/subsystem1/host/test_controller.c",
+      "bytes": 5299,
+      "sha256": "2427366107863fa03778afa5033b23d00a26b84b62020e4a5bad8a8507fa3b80"
+    },
+    {
+      "path": "testing/subsystem1/host/test_imu_snapshot.c",
+      "bytes": 7196,
+      "sha256": "efa846eadf9606f9b3823e9dfe432196f4575dd2d56a81b176729cc805775a76"
+    },
+    {
+      "path": "testing/subsystem1/host/test_status_mqtt.c",
+      "bytes": 19405,
+      "sha256": "14c35ec0f97edd6f6cfe28a5ae41c36833497f762b14da216e8ee9a90bd3ebeb"
+    },
+    {
+      "path": "testing/subsystem1/host/test_telemetry.c",
+      "bytes": 15141,
+      "sha256": "2633f9f5b5504f98c9ddec39d3eaee4604d6cff70ea7026499e1bed7e8bc3e9c"
+    },
+    {
+      "path": "testing/subsystem1/host/test_wifi_recovery.c",
+      "bytes": 1908,
+      "sha256": "41a3d3fc0384a715aa743b39c2b7628389304a921c6b73ed51762b32f4cd4c40"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-12-wiring-analog-tests.txt",
+      "bytes": 2471,
+      "sha256": "10fa7e8034ee97a8124251cb5924c3229d287e804bb876f247105c47394e910d"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-12-wiring-dashboard-tests.txt",
+      "bytes": 4019,
+      "sha256": "2404cc1ed2ca848ce3e03bdb3520b613f2dfd24ab02ee5250b9d11d3eafd9301"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-12-wiring-final-normal-build.txt",
+      "bytes": 586672,
+      "sha256": "8e3e9669a16343eb5c1e6e893add468ad66ec6e0d97959810e0f06b846c83cbf"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-12-wiring-firmware-build.txt",
+      "bytes": 586680,
+      "sha256": "313d10d209e30dee1466681d470c868cd23fa9594da4a85b60b02224c402af70"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-12-wiring-gpio-tests.txt",
+      "bytes": 111,
+      "sha256": "0cc78a3a58ee5666e15336172cad811c6d3d21ff8f0aa327531340bf926bed07"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-12-wiring-image-check.txt",
+      "bytes": 131,
+      "sha256": "af23d6dfb94a1bcd2c354bf1c10dd226d33ea6bcb6ead54e3ccc4edd4e8a5fba"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-12-wiring-motor-tests.txt",
+      "bytes": 1001,
+      "sha256": "1065bb88b7d7be10e55b52220ac65a617aa4325687d3216bf87d8a33b07f8d6f"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-12-wiring-mqtt-tests.txt",
+      "bytes": 4000,
+      "sha256": "5a9e60346ba3aaeb65f3f4c5f0cd8f54d1a9cd1c1b6fa61b5f201e250d023357"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-12-wiring-owner-tests.txt",
+      "bytes": 2540,
+      "sha256": "ac1923d89809381cf6ec674ca695638bcf59c33087f2f007828cf16c87709397"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-12-wiring-policy-tests.txt",
+      "bytes": 99,
+      "sha256": "cf4de7ee62ba9a49c71f97fe1f065ee31b6d699de08337907604aba1769e6429"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-12-wiring-profile-tests.txt",
+      "bytes": 404,
+      "sha256": "1b9c385eb10be0b4c1c7ff768d0f51f6c587c688d8ee459088244d82bf4fcdda"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-12-wiring-s1-tests.txt",
+      "bytes": 4732,
+      "sha256": "a2be874b11285906e5c91a4fa4ab7549b6486b890c19c215618aba163234c2d4"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-12-wiring-stationary-build.txt",
+      "bytes": 586720,
+      "sha256": "8ab9f5ca104197dd6a4782ecead16ace7036747b2f690aa073a8d5d6e19dd3ca"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-12-wiring-wire-tests.txt",
+      "bytes": 487,
+      "sha256": "76646994add6de3dfe7a806be2a97557ba7b6303e85937e039d9486268638d19"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-13-normal-motor-build.txt",
+      "bytes": 586680,
+      "sha256": "eca593b9f0b6c270ee721f81e6770aa4e14ea903774b4b5124d967c01df23ee5"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-13-wiring-latch-check.json",
+      "bytes": 328481,
+      "sha256": "594a4ff1f9596d0ca711525c15d82ea093d7d80538ea8fe4b3be966c692216a0"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-13-wiring-pattern-check-usb.json",
+      "bytes": 214039,
+      "sha256": "a94684844b953297d37c4e91daa100948a56fd96663616f43247f0986b796a81"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-13-wiring-pattern-check.json",
+      "bytes": 186405,
+      "sha256": "5e3453c6c476d453a7eafb99ec5518fb32cdbe7735ca69635e77038d236b3b9b"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-13-wiring-stationary-baseline.json",
+      "bytes": 75910,
+      "sha256": "29f1dde1c474177170835204ba28839bd2accfc3d3280b4a1277208f5944ea28"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-13-wiring-stationary-summary.json",
+      "bytes": 3175,
+      "sha256": "e04c19678a8a5ac828c6684919ea1b39825137be59287b7bbf8905475ee1c090"
+    },
+    {
+      "path": "testing/subsystem1/MOTOR_STOP_TEST.md",
+      "bytes": 7131,
+      "sha256": "7c13f26f98e95c7cbb301004f8b3e007014150a0012744528eebbb122dba1c22"
+    },
+    {
+      "path": "testing/subsystem1/observe_controller.mjs",
+      "bytes": 5728,
+      "sha256": "94d797c67a76c7af08dfb70bfef5ac40f46062b45f7e95f27aad8c4d7ab6854e"
+    },
+    {
+      "path": "testing/subsystem1/recovery_probe.mjs",
+      "bytes": 13482,
+      "sha256": "936a29fccbe736a352e57279889c347586e9de11dfd5f07fcb4d69c0b1870ac5"
+    },
+    {
+      "path": "testing/subsystem1/RECOVERY_TESTS.md",
+      "bytes": 13100,
+      "sha256": "ea63dfe2a1401265d95d11df326599cb33c8b6523805972aa8cdefe52b548eb7"
+    },
+    {
+      "path": "testing/subsystem1/test_build_modes.py",
+      "bytes": 2647,
+      "sha256": "1cf08904b3c5ce83efad2ccf16afcdb3625eef1e49553116d4150701b268b70e"
+    },
+    {
+      "path": "testing/subsystem1/test_gpio_sharing.py",
+      "bytes": 3318,
+      "sha256": "13479840de8a5f9e0b5b2d37a4f9024b9f970f8e8a60ac8dd730341f1892ea48"
+    },
+    {
+      "path": "testing/subsystem1/TEST_LOG.md",
+      "bytes": 87402,
+      "sha256": "47c3be3f91f54a29d5f0a48485f9f60ec01fdaf25e8529cb5eaf36e229ec0c39"
+    },
+    {
+      "path": "testing/subsystem1/test_motor_stop_path.py",
+      "bytes": 8344,
+      "sha256": "53b9f142001b755f639fd6f867da4fa06d466edbb17b1e8947467719b4987342"
+    },
+    {
+      "path": "testing/subsystem2/LINE_FOLLOW.md",
+      "bytes": 2451,
+      "sha256": "66ff137b273460fbbdc9450c919c47d5c868d088f8e507a093c7f4fb58660030"
+    },
+    {
+      "path": "testing/subsystem2/MOTOR_FEEDBACK.md",
+      "bytes": 11631,
+      "sha256": "65edaab68f120d5f043d96f7f0672572ba954ac142ad7896ce6d6934c7cd78b9"
+    },
+    {
+      "path": "testing/subsystem2/test_analog_policy.py",
+      "bytes": 1382,
+      "sha256": "770857cbb1e24f1a0d0500b1b990afb4d5b7998cc2410b1b4a8bf657d4d2c8a7"
+    },
+    {
+      "path": "testing/subsystem3/analog_input_harness.c",
+      "bytes": 5475,
+      "sha256": "ce3bca558347e41ac01cbe646651ecf5f2cd7f019983d46f1088d3cc51c59e44"
+    },
+    {
+      "path": "testing/subsystem3/BARCODE_GUIDE.md",
+      "bytes": 9279,
+      "sha256": "98e406f63b1d29afcfab3a39f02ec6a4e3c1dbba590a2d3e1c2899654f8ba9ca"
+    },
+    {
+      "path": "testing/subsystem3/capture_harness.c",
+      "bytes": 3998,
+      "sha256": "53d51f36debd0114cdbff9b788d4452756c2af136950f2c8990ae36016bcbea4"
+    },
+    {
+      "path": "testing/subsystem3/SOFTWARE_VALIDATION.md",
+      "bytes": 3907,
+      "sha256": "5c1f510aef973d59728c0fb8e1fdfe444134d996753cb146d37c8b865179ea83"
+    },
+    {
+      "path": "testing/subsystem3/test_barcode.py",
+      "bytes": 16484,
+      "sha256": "ce058913d44b9d937e86ab9b0b2982e76302f174c8f3f518408b6af85126eaba"
+    }
+  ]
+}

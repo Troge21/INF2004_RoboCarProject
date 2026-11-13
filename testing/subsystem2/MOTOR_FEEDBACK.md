@@ -1,3 +1,11 @@
+# Current build-mode note — 12 November 2026
+
+The powered encoder/PID diagnostic now requires explicit TEST=1
+APP_MODE=encoder. Default APP_MODE=integrated starts the group system;
+TEST=1 integrated is stationary, TEST=0 integrated enables the motor
+controller. The driver/PID gains and calibration below are retained.
+See ../subsystem1/MOTOR_STOP_TEST.md before powered validation.
+
 # Motor feedback, PID and future dashboard reference
 
 This implements S2 motor feedback and speed control only. No Wi-Fi,
@@ -27,13 +35,16 @@ The PID gains and targets were retained during this calibration update.
 Subsequent floor runs are recorded in the validation section below.
 Use USB CDC with `CRASH_REPORT=0`; UART uses the right encoder pins.
 
-The current normal firmware still enters the standalone analog IR function.
-It now requests **35 RPM / 35 RPM** for straight motion and **26 / 35 RPM**
+The 12 November integrated normal firmware starts S1 and the shared controller.
+APP_MODE=ir retains the standalone analog diagnostic explicitly; it is not
+the default startup. The integrated controller
+now requests **35 RPM / 35 RPM** for straight motion and **26 / 35 RPM**
 or **35 / 26 RPM** for steering. The centre/right sensor mapping, both-white
 alignment, both-black straight junction behaviour and barcode-only left
 sensor are preserved. Set `S2_LINE_USE_RPM_CONTROL=0` to use the earlier
-duty-command path. Legacy full-subsystem startup and old digital S3 wiring
-are still inactive; they are not an alternate analog configuration.
+duty-command path. The full lifecycle now uses the S3 AO publication.
+The old digital wiring/capture is inactive. Network STOP is controller-owned;
+standalone benches do not run that path.
 
 ## Motion APIs (no network dependencies)
 
@@ -159,7 +170,7 @@ Simulation does not validate physical PID response.
 From `build_make`, with the Pico SDK configured:
 
 ```sh
-make all TEST=1 CONSOLE=usb_cdc CRASH_REPORT=0 EXE_FILE=mtk3pico_smp1_usb_cdc_wifi_test_s2_pid -j8
+make all TEST=1 APP_MODE=encoder CONSOLE=usb_cdc CRASH_REPORT=0 -j8
 ```
 
 Use `S2_ENCODER_PID_TEST=0` to compare the original open-loop duty trial,

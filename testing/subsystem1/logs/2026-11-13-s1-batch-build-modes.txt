@@ -1,0 +1,7 @@
+PASS: integrated normal actual ARM compilation and startup/motor symbols
+PASS: integrated stationary actual ARM compilation and startup/motor symbols
+PASS: explicit IR bench actual ARM compilation and startup/motor symbols
+PASS: explicit encoder bench actual ARM compilation and startup/motor symbols
+PASS: stationary integrated TEST=1 contains no motor_task; hardware benches require explicit APP_MODE.
+Command: WSL python3 testing/subsystem1/test_build_modes.py testing/subsystem1/logs/2026-11-13-s1-batch-stationary-build.txt
+Result captured from successful tool execution, exit 0.

@@ -126,6 +126,9 @@ typedef SZ		size_t;
 #endif
 
 IMPORT void *Kmalloc( size_t size );
+/* Read-only allocator snapshot, bytes currently free and largest block.
+ * This is instantaneous data, not an allocation-event high-water counter. */
+IMPORT ER Kmeminfo( UW *free_bytes, UW *largest_block );
 IMPORT void *Kcalloc( size_t nmemb, size_t size );
 IMPORT void *Krealloc( void *ptr, size_t size);
 IMPORT void Kfree( void *ptr );

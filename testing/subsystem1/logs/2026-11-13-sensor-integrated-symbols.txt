@@ -1,0 +1,9 @@
+build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt.elf
+1001a14c T subsystem2_set_rpm_x10
+1001bce0 T subsystem5_get_navigation
+1001bd58 T telemetry_get_scan
+build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.elf
+1001bf98 T telemetry_get_scan
+build_make/mtkernel_3/app_program/subsystem5/subsystem5.o
+00000000 T subsystem5_get_navigation
+00000000 T telemetry_get_scan

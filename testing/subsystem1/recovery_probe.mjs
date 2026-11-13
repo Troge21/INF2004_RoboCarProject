@@ -1,7 +1,7 @@
 // Real-car TCP observer. Never stops a broker, changes WiFi, flashes or drives.
 import net from 'node:net';
 import {createInterface} from 'node:readline';
-import {writeFileSync,readFileSync} from 'node:fs';
+import {writeFileSync,readFileSync,readdirSync} from 'node:fs';
 import {createHash,randomBytes} from 'node:crypto';
 import {resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -30,9 +30,12 @@ export function assessTrial(trial) {
   const lower=reply?Math.max(0,elapsed-reply.round_trip_ms-2000):null;
   const upper=reply?elapsed+(trial.baseline.round_trip_ms??0)+2000:null;
   const clockContinuous=reply!==null&&uptimeDelta>=lower&&uptimeDelta<=upper;
-  const functional=trial.telemetry.length>=5&&trial.heartbeats.length>=2&&clockContinuous&&
+  const markerBoot=reply?(reply.uptime_ms-(reply.at_ms-trial.restore_marker_ms))>>>0:null;
+  const fresh=reply?trial.telemetry.filter(t=>t.session_token===reply.session_token&&
+    (((t.uptime_ms-markerBoot)>>>0)<0x80000000)):[];
+  const functional=fresh.length>=5&&trial.heartbeats.length>=2&&clockContinuous&&
     reply.sample_age_ms!==null&&reply.test_build===true;
-  const recovery=trial.telemetry.length?trial.telemetry[0].at_ms-trial.restore_marker_ms:null;
+  const recovery=fresh.length?fresh[0].at_ms-trial.restore_marker_ms:null;
   const intervals=items=>{
     const values=items.slice(1).map((x,i)=>x.at_ms-items[i].at_ms);
     return {count:values.length,min_ms:values.length?Math.min(...values):null,max_ms:values.length?Math.max(...values):null};
@@ -40,7 +43,8 @@ export function assessTrial(trial) {
   return {functional_recovery: Boolean(functional),uptime_continuous:clockContinuous,
     uptime_delta_ms:uptimeDelta,expected_uptime_delta_ms:{min:lower,max:upper},
     recovery_upper_bound_ms:recovery,
-    telemetry_intervals:intervals(trial.telemetry),heartbeat_intervals:intervals(trial.heartbeats),
+    fresh_telemetry_samples:fresh.length,queued_or_other_session_samples:trial.telemetry.length-fresh.length,
+    telemetry_intervals:intervals(fresh),heartbeat_intervals:intervals(trial.heartbeats),
     within_conservative_15s_target:Boolean(functional&&recovery>=0&&recovery<=15000),
     timing_anchor:'Operator marker BEFORE restoring service; includes human, service-start and observer delays. Not isolated Pico WiFi time.'};
 }
@@ -68,10 +72,10 @@ export function runProbe(o) {
     requested_trials:o.trials,topics,local_uf2_sha256:null,
     probe_sha256:createHash('sha256').update(readFileSync(fileURLToPath(import.meta.url))).digest('hex'),
     image_note:'Local file fingerprint only; operator must verify the flashed image.',trials:[],events:[]};
-  try { report.local_uf2_sha256=createHash('sha256').update(readFileSync(new URL('../../build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2',import.meta.url))).digest('hex'); } catch {}
+  try { const dir=new URL('../../build_make/',import.meta.url),names=readdirSync(dir).filter(n=>n.endsWith('.uf2'));if(names.length===1)report.local_uf2_sha256=createHash('sha256').update(readFileSync(new URL(names[0],dir))).digest('hex'); } catch {}
   writeFileSync(o.out,JSON.stringify(report,null,2),{flag:'wx'}); // Never overwrite earlier evidence.
   let socket,reader,ready=false,stopped=false,retry,watchdog,phase='idle',pending=null,trial=null;
-  let telemetryAt=null,heartbeatAt=null,lastSequence=null,lastSendAt=0,pingAt=null;
+  let telemetryAt=null,heartbeatAt=null,lastSequence=null,lastSession=null,lastTelemetrySample=null,lastSendAt=0,pingAt=null;
   const input=createInterface({input:process.stdin,output:process.stdout});
   function save() { writeFileSync(o.out,JSON.stringify(report,null,2)+'\n'); }
   function note(message) {
@@ -127,22 +131,26 @@ export function runProbe(o) {
       if(msg.retained){note('Ignored retained packet');return;}
       const at=now();
       if(msg.topic===topics.telemetry) {
+        if(msg.payload[0]!==0xb4)return; // Scan/resource messages are not cadence samples.
         const sample=decodeTelemetry(msg.payload).sample;
+        if(lastSession!==sample.session_token){lastSession=sample.session_token;lastSequence=null;}
+        lastTelemetrySample=sample;
         if(lastSequence!==null&&!forwardSequence(lastSequence,sample.sequence))return;
         lastSequence=sample.sequence;telemetryAt=at;
-        if(phase==='restoring'&&trial.telemetry.length<600)trial.telemetry.push({at_ms:at,sequence:sample.sequence});
+        if(phase==='restoring'&&trial.telemetry.length<600)trial.telemetry.push({at_ms:at,sequence:sample.sequence,uptime_ms:sample.uptime_ms,session_token:sample.session_token});
       } else if(msg.topic===topics.heartbeat) {
         const counter=decodeHeartbeat(msg.payload);heartbeatAt=at;
         if(phase==='restoring'&&trial.heartbeats.length<60)trial.heartbeats.push({at_ms:at,counter});
       } else if(msg.topic===topics.status) {
+        if(msg.payload[0]!==0xa1)return;
         const reply=decodeStatusReply(msg.payload);
         if(!pending||reply.request_id!==pending.id||at-pending.at_ms>3000)return;
         const purpose=pending.purpose;
         const status={at_ms:at,round_trip_ms:at-pending.at_ms,uptime_ms:reply.uptime_ms,
-          sample_age_ms:reply.sample_age_ms,test_build:reply.test_build};
+          sample_age_ms:reply.sample_age_ms,test_build:reply.test_build,session_token:reply.session_token};
         pending=null;
         if(purpose==='baseline') {
-          if(!baselineReady(at,telemetryAt,heartbeatAt,ready)||reply.sample_age_ms===null||!reply.test_build) {
+          if(!baselineReady(at,telemetryAt,heartbeatAt,ready)||reply.sample_age_ms===null||!reply.test_build||!lastTelemetrySample||lastTelemetrySample.session_token!==reply.session_token||((reply.uptime_ms-lastTelemetrySample.uptime_ms)>>>0)>2000) {
             phase='idle';note('Baseline rejected: need fresh real data and stationary TEST=1 firmware.');return;
           }
           trial={number:report.trials.length+1,baseline:status,loss_marker_ms:at,

@@ -1,0 +1,54 @@
+{
+  "recorded_utc": "2026-11-13T09:19:02.819537+00:00",
+  "parent_record": "2026-11-13-v4-heap-lock-fingerprint.json",
+  "heap_only_live_fix_confirmed": false,
+  "current_live_fix_confirmed": false,
+  "change": "Collector-owned native scan workspace; direct validated packing into protected cache; first fault line PC/LR.",
+  "stack": {
+    "static_collector_chain": 464,
+    "configured_stack": 2048,
+    "runtime_high_water": null,
+    "new_regression_limit": 768
+  },
+  "build": {
+    "profile": "NET=lwip MQTT=1 TEST=1 APP_MODE=integrated",
+    "text": 359316,
+    "data": 108,
+    "bss": 83824,
+    "static_ram": 83932,
+    "exit_code": 0
+  },
+  "focused_checks": "testing/subsystem1/logs/s1-batch-2026-11-13T09-17-08/summary.json",
+  "files": [
+    {
+      "path": "app_program/subsystem1/subsystem1.c",
+      "bytes": 12371,
+      "sha256": "f425b876ef07954474614bde03d4e2e7865fdb5e1a35a7cf8ae952315ad11b1b"
+    },
+    {
+      "path": "kernel/tkernel/memory.c",
+      "bytes": 8687,
+      "sha256": "4635f0ae5037546c16b16dd28939be1b09da82e631d82aa94a6f0c3d91123eca"
+    },
+    {
+      "path": "kernel/sysdepend/cpu/core/armv6m/exc_hdr.c",
+      "bytes": 4463,
+      "sha256": "d1c25931e385b38c0ca1eceae7dcd654abcd8d5bb08e9e035d57dde1c9ba7dad"
+    },
+    {
+      "path": "testing/subsystem1/test_s1_stack_frames.py",
+      "bytes": 1754,
+      "sha256": "d8e46cfc333e10b7adf497008b6fe1f02fa6cd090ec48224d695102f50e03341"
+    },
+    {
+      "path": "build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2",
+      "bytes": 718848,
+      "sha256": "fe80eb5972c21d66adf3ad8908ca7699f4b940a56049b5ae1d59d90dccad084d"
+    },
+    {
+      "path": "build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.elf",
+      "bytes": 3346264,
+      "sha256": "1bd2f4caa59c3c53eae4c6290d5effb2d171b8be3345c4f7d4171b3867bf4035"
+    }
+  ]
+}

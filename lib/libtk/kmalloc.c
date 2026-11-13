@@ -30,6 +30,7 @@ IMPORT void* knl_Imalloc( SZ size );
 IMPORT void* knl_Icalloc( SZ nmemb, SZ size );
 IMPORT void* knl_Irealloc( void *ptr, SZ size );
 IMPORT void  knl_Ifree( void *ptr );
+IMPORT ER knl_Imeminfo( UW *free_bytes, UW *largest_block );
 
 
 /* --------------------------------------------------------------------- */
@@ -39,6 +40,11 @@ IMPORT void  knl_Ifree( void *ptr );
 EXPORT void* Kmalloc( size_t size )
 {
 	return knl_Imalloc(size);
+}
+
+EXPORT ER Kmeminfo( UW *free_bytes, UW *largest_block )
+{
+    return knl_Imeminfo(free_bytes, largest_block);
 }
 
 EXPORT void* Kcalloc( size_t nmemb, size_t size )

@@ -1,0 +1,9 @@
+Actual ARM GCC -fstack-usage analysis of the current S1 translation unit:
+telemetry_task: 440 bytes static
+gather_scan: 1240 bytes static
+collector + largest out-of-line gather frame: 1680 bytes
+configured task stack: 2048 bytes; 368 bytes remain for external calls.
+PASS: this static chain leaves at least 256 bytes.
+External/kernel call frames and actual runtime high-water require later measurement.
+Command: WSL python3 testing/subsystem1/test_s1_stack_frames.py
+Result captured from successful tool execution, exit 0.

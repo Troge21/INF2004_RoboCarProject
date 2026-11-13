@@ -152,6 +152,29 @@ EXPORT void knl_removeAreaQue( QUEUE *aq )
 
 Noinit(EXPORT IMACB *knl_imacb);
 
+/* A direct application caller does not already hold the kernel lock.
+ * Masking this core's interrupts alone cannot exclude allocations on the
+ * other core. Use the same SMP critical section as the allocating syscalls.
+ * Include equal-size buckets; never change allocator metadata. */
+EXPORT ER knl_Imeminfo( UW *free_bytes, UW *largest_block )
+{
+    QUEUE *q, *same;
+    UW total=0,largest=0;
+    ER result=E_OBJ;
+    if(free_bytes==NULL||largest_block==NULL)return E_PAR;
+    BEGIN_CRITICAL_SECTION
+    if(knl_imacb!=NULL) {
+        for(q=knl_imacb->freeque.next;q!=&knl_imacb->freeque;q=q->next) {
+            UW size=(UW)FreeSize(q);
+            total+=size;if(size>largest)largest=size;
+            for(same=(q+1)->next;same!=NULL;same=same->next)total+=size;
+        }
+        *free_bytes=total;*largest_block=largest;result=E_OK;
+    }
+    END_CRITICAL_SECTION
+    return result;
+}
+
 /* ------------------------------------------------------------------------ */
 
 /*

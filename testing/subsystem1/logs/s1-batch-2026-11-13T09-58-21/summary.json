@@ -1,0 +1,29 @@
+{
+  "offline": true,
+  "checks": [
+    {
+      "name": "s5-scan-stationary",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T09-58-21/s5-scan-stationary.txt"
+    },
+    {
+      "name": "s5-scan-normal",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T09-58-21/s5-scan-normal.txt"
+    },
+    {
+      "name": "s1-codec-bridge",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T09-58-21/s1-codec-bridge.txt"
+    },
+    {
+      "name": "actual-motor-stop",
+      "passed": false,
+      "exit_code": 1,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T09-58-21/actual-motor-stop.txt"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+PASS: actual AO task/pins, all patterns, ADC discard/averaging, thresholds, errors, bounds, age/wrap, contention, packed snapshot and no fabricated barcode
+PASS: actual AO task/pins, all patterns, ADC discard/averaging, thresholds, errors, bounds, age/wrap, contention, packed snapshot and no fabricated barcode
+test_actual_capture_driver_with_register_model (__main__.BarcodeTests.test_actual_capture_driver_with_register_model) ... ok
+test_all_invalid_packed_codes (__main__.BarcodeTests.test_all_invalid_packed_codes) ... ok
+test_centre_right_inputs_independent_of_barcode_actual_task (__main__.BarcodeTests.test_centre_right_inputs_independent_of_barcode_actual_task) ... ok
+test_cluster_tolerance_boundaries (__main__.BarcodeTests.test_cluster_tolerance_boundaries) ... ok
+test_early_ink_invalidates_pending_frame (__main__.BarcodeTests.test_early_ink_invalidates_pending_frame) ... ok
+test_entire_alphabet_both_directions_speeds_ratios (__main__.BarcodeTests.test_entire_alphabet_both_directions_speeds_ratios) ... ok
+test_jitter (__main__.BarcodeTests.test_jitter) ... ok
+test_malformed_clusters_guards_gaps_and_quiet (__main__.BarcodeTests.test_malformed_clusters_guards_gaps_and_quiet) ... ok
+test_measured_pdf_stripes_at_multiple_scan_speeds (__main__.BarcodeTests.test_measured_pdf_stripes_at_multiple_scan_speeds) ... ok
+test_partial_and_stuck_signal_timeout (__main__.BarcodeTests.test_partial_and_stuck_signal_timeout) ... ok
+test_recorded_reverse_a_hand_scan (__main__.BarcodeTests.test_recorded_reverse_a_hand_scan) ... ok
+test_recorded_reverse_f_scan (__main__.BarcodeTests.test_recorded_reverse_f_scan) ... ok
+test_resync_discards_capture (__main__.BarcodeTests.test_resync_discards_capture) ... ok
+test_stream_reports_once_after_trailing_quiet (__main__.BarcodeTests.test_stream_reports_once_after_trailing_quiet) ... ok
+test_timer_wrap_and_long_idle (__main__.BarcodeTests.test_timer_wrap_and_long_idle) ... ok
+test_wide_narrow_ratio_boundaries (__main__.BarcodeTests.test_wide_narrow_ratio_boundaries) ... ok
+
+----------------------------------------------------------------------
+Ran 16 tests in 1.175s
+
+OK

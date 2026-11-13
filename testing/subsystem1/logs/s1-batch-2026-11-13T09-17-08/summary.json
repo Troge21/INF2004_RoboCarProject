@@ -1,0 +1,23 @@
+{
+  "offline": true,
+  "checks": [
+    {
+      "name": "current-layout",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T09-17-08/current-layout.txt"
+    },
+    {
+      "name": "s1-codec-bridge",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T09-17-08/s1-codec-bridge.txt"
+    },
+    {
+      "name": "heap-snapshot",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T09-17-08/heap-snapshot.txt"
+    }
+  ]
+}

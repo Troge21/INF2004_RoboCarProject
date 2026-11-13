@@ -1,165 +1,134 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {decodeTelemetry,decodeHeartbeat,packetText,TelemetryStore,encodeStatusRequest,decodeStatusReply} from '../dist/protocol.js';
-import {telemetry,heartbeat,statusReply} from './fixtures.mjs';
-
-test('current C golden vector supplies distance, IR and live IMU without invented feeds',()=>{
-  const bytes=new Uint8Array([12,0,0,0,0xc3,0xe1,0x1b,0x64,0x88,0x14,0]);
-  const {sample,format}=decodeTelemetry(bytes);
-  assert.match(format,/Packed v3/);assert.equal(sample.sequence,12);assert.equal(sample.obstacle_mm,451);
-  assert.deepEqual(sample.ir,[null,1,0]);assert.equal(sample.pitch_deg,15);
-  assert.equal(sample.hump_mm,12);assert.equal(sample.max_hump_mm,34);assert.equal(sample.imu_state,'Monitoring');
-  assert.equal(sample.imu_speed_source,'nominal');assert.equal(sample.imu_flags,0x11);
-  for(const key of ['state','left_mps','right_mps','distance_m','barcode','faults','scan'])assert.equal(sample[key],null);
+import {decodeTelemetry,decodeHeartbeat,decodeScan,decodeDiagnostics,TelemetryStore,packetText} from '../dist/protocol.js';
+import {telemetry,heartbeat,statusReply,scanChunk,diagnostics,putBits,syncStore} from './fixtures.mjs';
+test('v4 real motion preserves signed counts/net distance and separates path length',()=>{
+  const s=decodeTelemetry(telemetry({left:1191,right:-1191,leftCount:2147483647,rightCount:-2147483647,net:-1234,travel:0})).sample;
+  assert.equal(s.left_mps,.1191);assert.equal(s.right_mps,-.1191);
+  assert.equal(s.left_encoder_count,2147483647);assert.equal(s.right_encoder_count,-2147483647);
+  assert.equal(s.net_distance_m,-.1234);assert.equal(s.distance_m,0);
 });
-test('offset byte views decode without using unrelated backing bytes',()=>{
-  const bytes=telemetry(),offset=new Uint8Array([99,...bytes,99]).subarray(1,12);
-  assert.deepEqual(decodeTelemetry(offset),decodeTelemetry(bytes));
+test('zero measurements differ from unavailable sentinels',()=>{
+  const missing=decodeTelemetry(telemetry()).sample;
+  assert.equal(missing.left_mps,null);assert.equal(missing.distance_m,null);
+  const zero=decodeTelemetry(telemetry({left:0,right:0,leftCount:0,rightCount:0,net:0,travel:0})).sample;
+  assert.equal(zero.left_mps,0);assert.equal(zero.left_encoder_count,0);assert.equal(zero.distance_m,0);
 });
-test('obsolete formats are rejected with a clear current-firmware instruction',()=>{
-  const enc=new TextEncoder();
-  for(const bytes of [enc.encode('{"sequence":12}'),new Uint8Array([12,0,0,0,0xc3,0xe1]),
-    new Uint8Array([12,0,0,0,0xc3,0x31]),new Uint8Array(),new Uint8Array(10),new Uint8Array(12)])
-    assert.throws(()=>decodeTelemetry(bytes),/11-byte telemetry/);
+test('independent canonical missing-data byte vector',()=>{
+  const body=[0,0,0,0,0,7,254,255,255,31,0,0,0,16,0,0,0,16,0,0,0,240,255,255,255,31,0,0,0,0,0,0,31];
+  const b=Uint8Array.from([180,1,0,0,0,0,0,0,0,17,0,0,0,...body]);
+  const s=decodeTelemetry(b).sample;
+  assert.equal(s.sequence,1);assert.equal(s.imu_state,null);assert.equal(s.left_mps,null);
+  assert.equal(s.left_encoder_count,null);assert.equal(s.net_distance_m,null);assert.equal(s.distance_m,null);
 });
-test('line readings preserve all patterns and unavailable independently of no echo',()=>{
-  for(const [line,expected] of [[0,[null,null,null]],[4,[null,0,0]],[5,[null,0,1]],[6,[null,1,0]],[7,[null,1,1]]]) {
-    const sample=decodeTelemetry(telemetry({line,distance:0})).sample;
-    assert.deepEqual(sample.ir,expected);assert.equal(sample.line_bits,line);
-    assert.equal(sample.obstacle_valid,false);assert.equal(sample.obstacle_mm,null);
+test('only current v4 telemetry is accepted',()=>{
+  for(const old of [new Uint8Array(6),new Uint8Array(11),new TextEncoder().encode('{"distance":20}')])assert.throws(()=>decodeTelemetry(old),/v4/);
+  const b=telemetry();b[0]=0xb3;assert.throws(()=>decodeTelemetry(b));
+});
+test('all IR codes retain physical left/right roles',()=>{
+  for(const line of [0,4,5,6,7]){
+    const s=decodeTelemetry(telemetry({line})).sample;
+    assert.deepEqual(s.ir,line?[null,(line>>1)&1,line&1]:[null,null,null]);
   }
-  for(const line of [1,2,3])assert.throws(()=>decodeTelemetry(telemetry({line})),/line sensor bits/);
+  assert.throws(()=>decodeTelemetry(telemetry({line:3})));
 });
-test('distance boundary and reserved codes cannot appear as plausible measurements',()=>{
-  for(const distance of [20,4000])assert.equal(decodeTelemetry(telemetry({distance})).sample.obstacle_mm,distance);
-  for(const distance of [1,19,4001,4095])assert.throws(()=>decodeTelemetry(telemetry({distance})),/Obstacle distance/);
+test('malformed ranges, source flags and fault coverage are rejected',()=>{
+  for(const options of [{distance:19},{distance:4001},{pitch:1802},{height:5},{height:80,max:6},{state:7},
+    {known:1,fault:2},{barcode:44},{barcode:0,event:1},{barcode:0,navigation:1},{navigation:5}])
+    assert.throws(()=>decodeTelemetry(telemetry(options)));
+  const b=telemetry();putBits(b.subarray(13),49,14,10001);assert.throws(()=>decodeTelemetry(b));
 });
-test('full signed pitch range and unavailable angle are distinct',()=>{
-  for(const [pitch,expected] of [[0,null],[1,-90],[901,0],[1801,90]])
-    assert.equal(decodeTelemetry(telemetry({pitch})).sample.pitch_deg,expected);
-  assert.throws(()=>decodeTelemetry(telemetry({pitch:1802})));
+test('Code39 character, reversal, event and owner navigation are distinct',()=>{
+  const s=decodeTelemetry(telemetry({barcode:75,event:65535,navigation:1})).sample;
+  assert.equal(s.barcode,'A');assert.equal(s.barcode_reversed,true);
+  assert.equal(s.barcode_navigation,'Turn left');assert.equal(s.barcode_event_sequence,65535);
 });
-test('accepted heights have a bounded range and no-event is not a measured zero',()=>{
-  const empty=decodeTelemetry(telemetry({height:0,max:0})).sample;
-  assert.equal(empty.hump_mm,null);assert.equal(empty.max_hump_mm,null);
-  assert.equal(decodeTelemetry(telemetry({height:80,max:80})).sample.max_hump_mm,80);
-  for(const fields of [{height:5},{height:81,max:81},{height:35,max:34}])
-    assert.throws(()=>decodeTelemetry(telemetry(fields)));
+test('IMU faults and missing pitch never erase independent distance',()=>{
+  const s=decodeTelemetry(telemetry({pitch:0,state:6,flags:32,known:64,fault:64})).sample;
+  assert.equal(s.pitch_deg,null);assert.equal(s.imu_state,'Sensor fault');assert.equal(s.obstacle_mm,451);
+  assert.deepEqual(s.faults,['IMU sensor fault']);
 });
-test('a missing IMU leaves real distance and IR usable',()=>{
-  const sample=decodeTelemetry(telemetry({pitch:0,height:0,max:0,state:7,flags:0})).sample;
-  assert.equal(sample.imu_state,null);assert.equal(sample.pitch_deg,null);assert.equal(sample.max_hump_mm,null);
-  assert.equal(sample.obstacle_mm,451);assert.deepEqual(sample.ir,[null,1,0]);
+test('partial fault knowledge is preserved, not global all-clear',()=>{
+  const s=decodeTelemetry(telemetry({known:128,fault:0})).sample;
+  assert.equal(s.fault_known_mask,128);assert.deepEqual(s.faults,[]);
+  assert.equal(decodeTelemetry(telemetry()).sample.faults,null);
 });
-test('IMU fault invalidates angle while retaining accepted heights',()=>{
-  const sample=decodeTelemetry(telemetry({pitch:0,state:6,flags:32})).sample;
-  assert.equal(sample.imu_state,'Sensor fault');assert.equal(sample.pitch_deg,null);
-  assert.equal(sample.max_hump_mm,34);assert.equal(sample.imu_flags,128);assert.equal(sample.obstacle_mm,451);
+test('clock sync is required before live measurements',()=>{
+  const s=new TelemetryStore();assert.equal(s.ingest(telemetry(),'telemetry',1000),true);
+  assert.equal(s.currentSample(1000),null);assert.equal(s.needsClockSync(1000),true);
+  syncStore(s);assert.equal(s.ingest(telemetry(),'telemetry',1001),true);
+  assert.equal(s.currentSample(1001).obstacle_mm,451);
 });
-test('calibration and speed-source flags are explicit',()=>{
-  assert.equal(decodeTelemetry(telemetry({pitch:0,state:1})).sample.imu_state,'Calibrating');
-  assert.equal(decodeTelemetry(telemetry({flags:17})).sample.imu_speed_source,'supplied');
-  for(const fields of [{state:7},{state:1},{state:6,flags:33},{flags:0}])
-    assert.throws(()=>decodeTelemetry(telemetry(fields)));
+test('delayed frames expire against fresh Pico uptime and live values expire',()=>{
+  const s=syncStore(new TelemetryStore(),{uptime:5000});
+  assert.equal(s.ingest(telemetry({uptime:1000}),'telemetry',1001),false);
+  assert.equal(s.ingest(telemetry({uptime:5000}),'telemetry',1002),true);
+  assert.equal(s.currentSample(3003),null);assert.equal(s.history.length,1);
 });
-test('marker, padding and unavailable-state canonical bits are checked',()=>{
-  const wrong=telemetry();wrong[5]&=127;assert.throws(()=>decodeTelemetry(wrong),/marker/);
-  const reserved=telemetry();reserved[10]|=128;assert.throws(()=>decodeTelemetry(reserved),/reserved/);
-  assert.throws(()=>decodeTelemetry(telemetry({pitch:0,state:7})),/Unavailable/);
+test('sequence duplicate/backward rejection, gaps and wrap',()=>{
+  const s=syncStore(new TelemetryStore());
+  for(const sequence of [0xfffffffe,0xffffffff,0,2])assert.equal(s.ingest(telemetry({sequence}),'telemetry',1001),true);
+  assert.equal(s.sequenceGaps,1);
+  assert.equal(s.ingest(telemetry({sequence:2}),'telemetry',1002),false);
+  assert.equal(s.ingest(telemetry({sequence:1}),'telemetry',1002),false);
 });
-test('binary heartbeats preserve full counters and reject old text',()=>{
-  for(const count of [0,12,0x30206268,0xffffffff])assert.equal(decodeHeartbeat(heartbeat(count)),count);
-  for(const bytes of [new TextEncoder().encode('hb 0'),new TextEncoder().encode('hb 12'),new Uint8Array([128]),
-    new Uint8Array([128,0,0,0,0,0]),new Uint8Array([0,0,0,0,0])])
-    assert.throws(()=>decodeHeartbeat(bytes),/5-byte binary heartbeat/);
+test('heartbeat replay is rejected and wrap does not reset telemetry replay baseline',()=>{
+  const s=syncStore(new TelemetryStore());s.ingest(telemetry({sequence:10}),'telemetry',1001);
+  assert.equal(s.ingest(heartbeat(0xffffffff),'heartbeat',1001),true);
+  assert.equal(s.ingest(heartbeat(0),'heartbeat',1002),true);
+  assert.equal(s.ingest(heartbeat(0),'heartbeat',1003),false);
+  assert.equal(s.ingest(telemetry({sequence:9}),'telemetry',1003),false);
+  assert.equal(decodeHeartbeat(heartbeat(0xffffffff)),0xffffffff);
 });
-test('current values expire and disappear on disconnect without losing history',()=>{
-  const store=new TelemetryStore();store.ingest(telemetry(),'telemetry',1000);
-  assert.equal(store.currentSample(3000,true).pitch_deg,15);
-  assert.equal(store.currentSample(3001,true),null);assert.equal(store.currentSample(1001,false),null);
-  assert.equal(store.currentSample(999,true),null);assert.equal(store.history[0].pitch_deg,15);
+test('fresh new session resets live state, not history',()=>{
+  const s=syncStore(new TelemetryStore());s.ingest(telemetry(),'telemetry',1001);
+  s.beginStatus(2,2000);
+  assert.equal(s.ingest(statusReply({id:2,uptime:10,session:99}),'status',2020),true);
+  assert.equal(s.currentSample(2020),null);assert.equal(s.history.length,1);
+  assert.equal(s.ingest(telemetry({sequence:0,session:99,uptime:10}),'telemetry',2021),true);
 });
-test('retained and rejected data never refresh live values',()=>{
-  const store=new TelemetryStore();store.ingest(telemetry(),'telemetry',1000);
-  assert.equal(store.ingest(telemetry({sequence:13}),'telemetry',2000,true),false);
-  assert.equal(store.ingest(new Uint8Array(6),'telemetry',2200),false);
-  assert.equal(store.lastTelemetry,1000);assert.equal(store.sample.sequence,12);
-  store.ingest(heartbeat(1),'heartbeat',3000,true);assert.equal(store.lastHeartbeat,null);
-  assert.equal(store.rejected,3);
+test('retained packets and lost connections never make measurements current',()=>{
+  const s=syncStore(new TelemetryStore());
+  assert.equal(s.ingest(telemetry(),'telemetry',1001,true),false);
+  s.ingest(telemetry(),'telemetry',1002);s.clearController();
+  assert.equal(s.currentSample(1003,true),null);
 });
-test('sequence wrap, gaps and replay checks apply to the single current format',()=>{
-  const store=new TelemetryStore();store.ingest(telemetry({sequence:0xffffffff}),'telemetry',1000);
-  assert.equal(store.ingest(telemetry({sequence:0}),'telemetry',1500),true);
-  assert.equal(store.ingest(telemetry({sequence:3}),'telemetry',2000),true);assert.equal(store.sequenceGaps,2);
-  assert.equal(store.ingest(telemetry({sequence:3}),'telemetry',2500),false);
-  assert.equal(store.ingest(telemetry({sequence:2}),'telemetry',3000),false);assert.equal(store.lastTelemetry,2000);
+test('history, inspector and activity are bounded',()=>{
+  const s=syncStore(new TelemetryStore());
+  for(let i=0;i<800;i++)s.ingest(telemetry({sequence:i,uptime:1000+i}),'telemetry',1000+i);
+  for(let i=0;i<100;i++)s.ingest(new Uint8Array(),'telemetry',1800);
+  assert.equal(s.history.length,600);assert.equal(s.packets.length,30);assert.equal(s.events.length,80);
+  assert.match(packetText(s.packets[0]),/Rejected/);
 });
-test('a robot heartbeat restart resets the sequence baseline',()=>{
-  const store=new TelemetryStore();store.ingest(telemetry({sequence:100}),'telemetry',1000);
-  store.ingest(heartbeat(8),'heartbeat',1500);store.ingest(heartbeat(0),'heartbeat',2000);
-  assert.equal(store.ingest(telemetry({sequence:0}),'telemetry',2500),true);
+test('barcode events are not duplicated after a brief missing snapshot',()=>{
+  const s=syncStore(new TelemetryStore());
+  s.ingest(telemetry({sequence:1,barcode:11,event:5}),'telemetry',1001);
+  s.ingest(telemetry({sequence:2}),'telemetry',1002);
+  s.ingest(telemetry({sequence:3,barcode:11,event:5}),'telemetry',1003);
+  assert.equal(s.events.filter(e=>e.title==='Barcode decoded').length,1);
 });
-test('inspector uses each packet decoded value and readable hex on rejection',()=>{
-  const store=new TelemetryStore();store.ingest(telemetry(),'telemetry',1000,false,'car/telemetry');
-  const first=store.packets[0];store.ingest(heartbeat(0),'heartbeat',1100);
-  assert.deepEqual(JSON.parse(packetText(store.packets[0])),{counter:0});
-  store.ingest(telemetry({sequence:13,distance:20}),'telemetry',1500);
-  assert.equal(JSON.parse(packetText(first)).obstacle_mm,451);assert.equal(first.topic,'car/telemetry');
-  store.ingest(new Uint8Array([128,0]),'heartbeat',2000);
-  assert.match(packetText(store.packets[0]),/Rejected/);assert.match(packetText(store.packets[0]),/80 00/);
+test('181 point profile reassembles without treating chunks as telemetry samples',()=>{
+  const s=syncStore(new TelemetryStore());
+  for(let start=0;start<181;start+=16)assert.equal(s.ingest(scanChunk({start}),'telemetry',1001+start),true);
+  assert.equal(s.scanProfile.points.length,181);assert.equal(s.scanProfile.points[180].angle,180);
+  assert.equal(s.history.length,0);assert.equal(s.scanPending,null);
 });
-test('browser history and diagnostics remain bounded',()=>{
-  const store=new TelemetryStore();assert.equal(store.currentSample(1000),null);
-  for(let i=0;i<1000;i++){store.ingest(telemetry({sequence:i}),'telemetry',i*500);store.event('test');}
-  assert.equal(store.history.length,600);assert.equal(store.packets.length,30);assert.equal(store.events.length,80);
-  assert.equal(store.telemetryCount,1000);
+test('scan truncation, point ranges, order and reserved bits are rejected',()=>{
+  assert.throws(()=>decodeScan(scanChunk().slice(0,-1)));
+  assert.throws(()=>decodeScan(scanChunk({points:[{angle:181,distance_mm:451}]})));
+  assert.throws(()=>decodeScan(scanChunk({points:[{angle:0,distance_mm:19}]})));
+  assert.throws(()=>decodeScan(scanChunk({points:[{angle:1,distance_mm:451},{angle:0,distance_mm:451}]})));
+  const b=scanChunk({total:1});b[b.length-1]|=128;assert.throws(()=>decodeScan(b));
 });
-
-test('binary STATUS request is five bytes with an independent golden vector',()=>{
-  assert.deepEqual([...encodeStatusRequest(12)],[160,12,0,0,0]);
-  for(const id of [0,-1,1.5,0x100000000,'12'])assert.throws(()=>encodeStatusRequest(id));
+test('resource unknown is distinct from valid zero; capacities are not peaks',()=>{
+  const d=decodeDiagnostics(diagnostics({values:[82596,0,0,0,12288,null]}));
+  assert.equal(d.heap_free_bytes,0);assert.equal(d.stack_high_water_bytes,null);
+  assert.equal(d.task_stack_capacity_bytes,12288);
+  assert.throws(()=>decodeDiagnostics(diagnostics({values:[270337,0,0,0,0,0]})));
 });
-test('STATUS no-sample golden vector preserves ID, uptime and test-build flag',()=>{
-  const reply=decodeStatusReply(new Uint8Array([161,12,0,0,0,4,3,2,1,255,15]));
-  assert.deepEqual(reply,{request_id:12,uptime_ms:0x01020304,test_build:true,sample_age_ms:null,snapshot:null});
-  const max=decodeStatusReply(statusReply({id:0xffffffff,uptime:0xffffffff,age:2000,testBuild:false}));
-  assert.equal(max.request_id,0xffffffff);assert.equal(max.uptime_ms,0xffffffff);assert.equal(max.test_build,false);
-  assert.equal(max.sample_age_ms,2000);assert.equal(max.snapshot.pitch_deg,15);
-});
-test('STATUS decoder rejects malformed metadata, presence, reserved bits and snapshots',()=>{
-  for(const bytes of [new Uint8Array(),statusReply().subarray(0,21),statusReply({id:0}),statusReply({age:2001})])
-    assert.throws(()=>decodeStatusReply(bytes));
-  const reserved=statusReply();reserved[10]|=128;assert.throws(()=>decodeStatusReply(reserved));
-  const missing=statusReply();missing[9]=255;missing[10]=15;assert.throws(()=>decodeStatusReply(missing));
-  const bad=statusReply();bad[16]&=127;assert.throws(()=>decodeStatusReply(bad));
-});
-test('STATUS requires a matching current ID and ignores retained/unsolicited replies',()=>{
-  const store=new TelemetryStore();store.beginStatus(12,1000);
-  assert.equal(store.ingest(statusReply({id:13}),'status',1100),false);assert.ok(store.pendingStatus);
-  assert.equal(store.ingest(statusReply(),'status',1150,true),false);assert.ok(store.pendingStatus);
-  assert.equal(store.ingest(statusReply(),'status',1200),true);assert.equal(store.pendingStatus,null);
-  assert.equal(store.statusReply.round_trip_ms,200);
-  assert.equal(store.ingest(statusReply(),'status',1250),false);
-});
-test('STATUS timeout and disconnect never retry or accept a delayed reply',()=>{
-  const store=new TelemetryStore();store.beginStatus(12,1000);
-  assert.equal(store.expireStatus(3999),false);assert.equal(store.expireStatus(4000),true);
-  assert.equal(store.expireStatus(4500),false);assert.equal(store.ingest(statusReply(),'status',4500),false);
-  store.beginStatus(13,5000);store.cancelStatus();
-  assert.equal(store.ingest(statusReply({id:13}),'status',5100),false);assert.equal(store.statusReply,null);
-});
-test('STATUS has one outstanding request, fresh IDs and browser rate limiting',()=>{
-  const store=new TelemetryStore();store.beginStatus(12,1000);
-  assert.throws(()=>store.beginStatus(13,1100),/pending/);store.cancelStatus();
-  assert.throws(()=>store.beginStatus(13,1100),/Wait briefly/);
-  assert.throws(()=>store.beginStatus(12,1500),/fresh/);store.beginStatus(13,1500);
-  assert.equal(store.pendingStatus.id,13);
-});
-test('STATUS snapshots stay separate from the live stream and inspector keeps each value',()=>{
-  const store=new TelemetryStore();store.ingest(telemetry({sequence:99}),'telemetry',900);
-  store.beginStatus(12,1000);store.ingest(statusReply(),'status',1100,false,'car/status');
-  assert.equal(store.statusReply.snapshot.sequence,12);assert.equal(store.sample.sequence,99);
-  assert.equal(store.history.length,1);assert.equal(store.lastTelemetry,900);
-  assert.equal(JSON.parse(packetText(store.packets[0])).request_id,12);
-  assert.equal(store.packets[0].topic,'car/status');
+test('diagnostic history is bounded and disconnected/stale values unavailable',()=>{
+  const s=syncStore(new TelemetryStore());
+  for(let i=0;i<125;i++)s.ingest(diagnostics({uptime:1000+i}),'telemetry',1000+i);
+  assert.equal(s.diagnosticHistory.length,120);assert.equal(s.currentDiagnostics(8125),null);
+  assert.equal(s.currentDiagnostics(1125,false),null);
 });

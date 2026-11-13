@@ -1,0 +1,55 @@
+﻿all subsystems started
+[TEST] === test run start ===
+[TEST] S1-V4-01 PASS  one packed frame and byte-packed shared snapshot
+[TEST] S1-V4-02 PASS  full sequence and current framing preserved
+[TEST] S1-V4-03 PASS  missing motion is not measured stationary zero
+[TEST] S1-V4-04 PASS  short output rejected without writes
+[TEST] S1-V4-05 PASS  range and validity bounds
+[TEST] S1-V4-06 PASS  IR can expire independently of range
+[TEST] S1-V4-07 PASS  all line combinations
+[TEST] S1-V4-07 PASS  all line combinations
+[TEST] S1-V4-07 PASS  all line combinations
+[TEST] S1-V4-07 PASS  all line combinations
+[TEST] S1-V4-08 PASS  real IMU view can be packed
+[TEST] S1-V4-09 PASS  stale pitch clears independently of retained height/status
+[TEST] S1-V4-10 PASS  measured zero motion stays valid
+[TEST] S1-V4-11 PASS  overflow becomes unavailable, never wraps/clamps
+[TEST] S1-V4-12 PASS  Code39 validity is independent of navigation mapping
+[TEST] S1-V4-13 PASS  barcode A and controller-supplied left intent preserved
+[TEST] S1-V4-14 PASS  faults must be explicitly known before active
+[TEST] S1-V4-15 PASS  current STATUS has canonical snapshot presence
+[TEST] S1-V4-16 PASS  full STOP lease clock preserved
+[TEST] S1-V4-17 PASS  only applied nonfault controller stop can acknowledge success
+[TEST] S1-V4-18 PASS  future controller vocabulary retains latch invariants
+[TEST] S1-V4-19 PASS  181 point profile is bounded into small exact chunks
+[TEST] S1-V4-20 PASS  unsupported high-water stays unavailable
+[CLOCK] tick=22028 timer_us=1034 cpu_wait_us=1000
+[TEST] S1-U43 PASS  microsecond TIMER configured and advancing at 1 MHz
+[TEST] subsystem1 v4 codec and startup clock SUMMARY 24 passed, 0 failed
+[TEST] S2 encoder bench disabled.
+[TEST] S3-U06 PASS  synthetic forward *A*
+[TEST] S3-U07 PASS  synthetic reverse *A*
+[TEST] S3-U08 PASS  short leading quiet rejected
+[TEST] S3-U09 PASS  malformed start rejected
+[TEST] S3-U10 PASS  invalid packed codes rejected
+[TEST] subsystem3 software (sensor not tested) SUMMARY 5 passed, 0 failed
+[TEST] S4-U02a PASS  flat acceleration vector computes 0.0 +/- 0.2 deg
+[TEST] S4-U02b PASS  +15 deg incline vector computes +15.0 +/- 0.5 deg
+[TEST] S4-U02c PASS  -15 deg decline vector computes -15.0 +/- 0.5 deg
+[TEST] S4-U02d PASS  +30 deg steep vector computes +30.0 +/- 1.0 deg
+[TEST] S4-U05a PASS  subsystem4_get_telemetry returns E_OK and valid snapshot
+[S4] RUN RESET: Max hump height cleared to 0 mm for new run.
+[TEST] S4-U06a PASS  subsystem4_reset_run clears run maximum to 0 mm
+[TEST] S4-U07a PASS  mounted sensor front-up gives positive 15 deg
+[TEST] S4-U07b PASS  mounted sensor front-down gives negative 15 deg
+[TEST] S4-U07c PASS  mounted sensor flat gives zero pitch
+[TEST] S4-U07d PASS  side tilt does not produce longitudinal pitch
+[TEST] subsystem4 SUMMARY 10 passed, 0 failed
+[TEST] S5-U03 PASS  echo widths convert to 100 and 1000 mm
+[TEST] S5-U04 PASS  specified 20 to 4000 mm range accepted
+[TEST] S5-U05 PASS  invalid echo widths rejected and distance cleared
+[TEST] subsystem5 conversion (hardware not checked) SUMMARY 3 passed, 0 failed
+[TEST] === test run end ===
+[S4] IMU Hump Task started (priority=18, period=20 ms, I2C1 GP2/GP3)
+[S4] GY-511 sensor detected. Entering stationary calibration...
+[S4] Calibration complete. Baseline pitch: 5.5 deg

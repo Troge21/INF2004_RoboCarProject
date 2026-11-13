@@ -1,0 +1,47 @@
+{
+  "remote": "origin/sensor",
+  "commit": "c8a789b075ba62b714f92b65a8c671cb3767e1cd",
+  "working_files_changed": false,
+  "simulated_merge": [
+    {
+      "path": "app_program/app.h",
+      "local_sha256": "0367390628fbf164124b868276bd4d12639974f6c0497bf0f48eef430361ce47",
+      "sensor_sha256": "7b1be58bcf7b7f7a95edbefcac82b3d9fa7f456e8ff7a391164d4898d325baa9",
+      "merge_exit": 1,
+      "conflict_blocks": 1
+    },
+    {
+      "path": "app_program/app_main.c",
+      "local_sha256": "0a1436b4b3a38abcc207ccfd8507e512c0d611444b7c6cd7ae1fb90b41c59f91",
+      "sensor_sha256": "5f1a7e9a43f03eb894e0e8014b53051808b9003f8c9a76e5c1c4ee5ac8f5b2ff",
+      "merge_exit": 1,
+      "conflict_blocks": 1
+    },
+    {
+      "path": "app_program/subsystem5/subsystem5.c",
+      "local_sha256": "45a72e3ae7c81a6a9f0e24a67c0042e621c42ccb88b39e81fcb57b4c4bc5bee8",
+      "sensor_sha256": "6871a589346a887e63b8495473b4c3336693040a9bb4a1134f906add6c77ff2a",
+      "merge_exit": 1,
+      "conflict_blocks": 1
+    },
+    {
+      "path": "app_program/subsystem5/subsystem5.h",
+      "local_sha256": "fe4538ddf2f8ad9303ba546804f2e0148eb840b37740073106c3adb196412bf0",
+      "sensor_sha256": "237dc353eed1fdbf037ab3cf06701e1a746e9315f45e2f1cac621e4c874e17bb",
+      "merge_exit": 0,
+      "conflict_blocks": 0
+    },
+    {
+      "path": "app_program/subsystem5/subsystem5_test.c",
+      "local_sha256": "a9484230bc12973a0220ff36b2ffe67d03c8a04d77de449dbe8c2ad0fc2f797c",
+      "sensor_sha256": "7f1d21588105182bb6a5a939505c3bab183c09686dfff072946e545a35b2e50d",
+      "merge_exit": 0,
+      "conflict_blocks": 0
+    }
+  ],
+  "working_files_preserved_verified": true,
+  "current_branch": "main",
+  "current_HEAD": "f37055f567d46d4f2465725e1af46082b880ba29",
+  "current_UF2_sha256": "390c589344927280ab77175a1cee2d04a07beacad2d522d63760146ad30f6f55",
+  "fetched_not_merged": true
+}

@@ -1,0 +1,11 @@
+{
+  "offline": true,
+  "checks": [
+    {
+      "name": "s1-codec-bridge",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T09-21-27/s1-codec-bridge.txt"
+    }
+  ]
+}

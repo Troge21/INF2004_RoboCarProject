@@ -7,7 +7,7 @@
 
 /* Standalone encoder bench, built with TEST=1 and USB/CRASH_REPORT=0.
  * Runs before the IR test and other normal subsystems. */
-#define S2_ENCODER_CALIBRATION 1
+#define S2_ENCODER_CALIBRATION (APP_BENCH_MODE == 2)
 /* 0: hand-turn only; 1: countdown, fixed-duty powered run, automatic stop.
  * Powered mode uses the existing motor task and its command watchdog. */
 #define S2_ENCODER_POWERED_TEST 1

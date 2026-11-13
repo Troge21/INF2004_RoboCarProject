@@ -91,6 +91,21 @@ ifeq ($(TEST),1)
 TEST_SUFFIX := _test
 endif
 
+# Never silently enter a standalone powered encoder/IR bench in normal use.
+APP_MODE ?= integrated
+ifeq ($(APP_MODE),integrated)
+APP_BENCH_VALUE := 0
+else ifeq ($(APP_MODE),ir)
+APP_BENCH_VALUE := 1
+else ifeq ($(APP_MODE),encoder)
+APP_BENCH_VALUE := 2
+ifneq ($(TEST),1)
+$(error APP_MODE=encoder requires TEST=1)
+endif
+else
+$(error Unknown APP_MODE '$(APP_MODE)'; use integrated, ir or encoder)
+endif
+
 # CRASH_REPORT=1 also copies every console line to UART0 on GP0 (TX) /
 # GP1 (RX), 115200 8N1.  UART output is sent immediately, so it still shows
 # the last messages and the kernel's crash report after a crash, when the
@@ -177,6 +192,7 @@ CFLAGS  += -DCNF_SMP=1
 ASFLAGS += -DCNF_SMP=1
 endif
 CFLAGS  += -DAPP_TEST=$(TEST)
+CFLAGS  += -DAPP_BENCH_MODE=$(APP_BENCH_VALUE)
 CFLAGS  += -DTM_CONSOLE_UART=$(CRASH_REPORT)
 ifeq ($(CRASH_REPORT),0)
 CFLAGS  += -DBOARD_UART0_FREE=1
@@ -209,7 +225,7 @@ endif
 # before any recipe executes.
 ################################################################################
 
-PROFILE_ID := smp$(SMP)-$(CONSOLE)-wifi$(WIFI)-net$(NET)-mqtt$(MQTT)-crash$(CRASH_REPORT)-test$(TEST)
+PROFILE_ID := smp$(SMP)-$(CONSOLE)-wifi$(WIFI)-net$(NET)-mqtt$(MQTT)-crash$(CRASH_REPORT)-test$(TEST)-app$(APP_MODE)
 PROFILE_FILE := .build_profile
 
 ifneq ($(strip $(shell cat $(PROFILE_FILE) 2>/dev/null)),$(PROFILE_ID))

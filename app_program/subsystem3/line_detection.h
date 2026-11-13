@@ -6,8 +6,8 @@
 
 ER s3_line_init(void);
 ER s3_line_configure(void);
-/* Read the sensors and publish a snapshot. The task supplies a non-NULL
- * destination, which also receives the local reading for diagnostics. */
+/* S3 owner only: sample AO channels and publish the packed raw/validity
+ * record. Other tasks only use subsystem3_get_line(), without driver calls. */
 void s3_line_sample(S3_LINE_DATA *sample);
 
 #endif /* LINE_DETECTION_H */

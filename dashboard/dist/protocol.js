@@ -1,59 +1,103 @@
-// Current firmware contract only: 11-byte telemetry and 5-byte heartbeat.
-export const IMU_STATES = ['Initializing','Calibrating','Monitoring','Ascending hump','Descending hump','Validating hump','Sensor fault'];
-
-export function decodeTelemetry(payload) {
-  const bytes=payload instanceof Uint8Array?payload:new Uint8Array(payload);
-  if(bytes.length!==11) throw new Error('Expected 11-byte telemetry (Packed v3); flash the current UF2');
-  const view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
-  const base=view.getUint16(4,true),distance=base&4095,line=(base>>>12)&7;
-  if(!(base&0x8000)) throw new Error('Unsupported telemetry format marker');
-  if(distance!==0&&(distance<20||distance>4000)) throw new Error('Obstacle distance outside 20-4000 mm');
-  if(line!==0&&(line<4||line>7)) throw new Error('Invalid line sensor bits');
-  const sample={sequence:view.getUint32(0,true),obstacle_valid:distance!==0,obstacle_mm:distance||null,
-    line_bits:line,ir:line?[null,(line>>1)&1,line&1]:[null,null,null],
-    pitch_deg:null,hump_mm:null,max_hump_mm:null,imu_state:null,imu_flags:null,imu_speed_source:null,
-    state:null,left_mps:null,right_mps:null,distance_m:null,barcode:null,faults:null,scan:null};
-  let word=0n;
-  for(let i=0;i<5;i++) word|=BigInt(bytes[6+i])<<BigInt(i*8);
-  const pitch=Number(word&2047n),height=Number((word>>11n)&127n),max=Number((word>>18n)&127n);
-  const state=Number((word>>25n)&7n),flags=Number((word>>28n)&63n);
+// One current Packed v4 contract. No v1/v2/v3/JSON compatibility path.
+export const FRAME_BYTES=46, STATUS_HEADER_BYTES=16;
+export const IMU_STATES=['Initializing','Calibrating','Monitoring','Ascending hump','Descending hump','Validating hump','Sensor fault'];
+export const CONTROLLER_STATES=['Unavailable','Control disabled','Starting','Following line','Recovering line','Waiting for line','Stop latched','Controller fault','Ready','Turning left','Turning right','Scanning obstacle','Avoiding obstacle','Stopped'];
+export const STOP_RESULTS=['Stop latched','Request expired','Robot session changed','Duplicate request','Controller busy','Controller fault'];
+export const FAULT_NAMES=['Encoder input fault','Motor timing fault','Left wheel stall','Right wheel stall','Left encoder direction','Right encoder direction','IMU sensor fault','Controller fault','Ultrasonic fault','Barcode input fault','Scan fault'];
+const ALPHABET='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-. $/+%';
+const bytesOf=p=>p instanceof Uint8Array?p:new Uint8Array(p);
+const viewOf=b=>new DataView(b.buffer,b.byteOffset,b.byteLength);
+function bits(b,offset,width){let n=0;for(let i=0;i<width;i++)n+=((b[(offset+i)>>3]>>((offset+i)&7))&1)*2**i;return n;}
+function signed(n){return n===0x80000000?null:n>=0x80000000?n-0x100000000:n;}
+export function decodeControlWord(word){
+  const state=word&15,latch=Boolean(word&16);
+  if(!Number.isInteger(word)||word<0||word>63||state>13||(state===6&&!latch)||(latch&&![1,6,7].includes(state)))throw new Error('Invalid controller state/flags');
+  return {controller_word:word,controller_state_code:state,controller_state:CONTROLLER_STATES[state],controller_valid:state!==0,stop_latched:latch,test_build:Boolean(word&32)};
+}
+export function decodeTelemetry(payload){
+  const b=bytesOf(payload),v=viewOf(b);
+  if(b.length!==FRAME_BYTES||b[0]!==0xb4)throw new Error('Expected current 46-byte Packed v4 firmware');
+  const session=v.getUint32(9,true),body=b.subarray(13),get=(o,n)=>bits(body,o,n);
+  if(!session)throw new Error('Invalid telemetry session/reserved bits');
+  const distance=get(0,12),line=get(12,3),left=get(49,14),right=get(63,14),bc=get(227,7);
+  const known=get(205,11),fault=get(216,11),mode=get(256,2),reason=get(258,3),navigation=get(261,3);
+  if((distance&&(distance<20||distance>4000))||(line&&line<4)||
+    (left>10000&&left!==16383)||(right>10000&&right!==16383)||
+    (bc&&((bc&63)<1||(bc&63)>43))||(!bc&&get(234,16))||navigation>4||(!bc&&navigation)||(fault&~known)||(reason>5&&reason!==7))throw new Error('Invalid telemetry field range');
+  const sample={sequence:v.getUint32(1,true),uptime_ms:v.getUint32(5,true),session_token:session,...decodeControlWord(get(250,6)),
+    obstacle_valid:distance!==0,obstacle_mm:distance||null,line_bits:line,ir:line?[null,(line>>1)&1,line&1]:[null,null,null],
+    left_mps:left===16383?null:(left-5000)/10000,right_mps:right===16383?null:(right-5000)/10000,
+    left_encoder_count:signed(get(77,32)),right_encoder_count:signed(get(109,32)),
+    net_distance_m:signed(get(141,32))===null?null:signed(get(141,32))/10000,
+    distance_m:get(173,32)===0xffffffff?null:get(173,32)/1000,
+    motor_mode:mode===3?null:['Stopped','Duty','RPM'][mode],motor_stop_reason:reason===7?null:['Requested','None','Command timeout','Command busy','Motor fault','Feedback wait'][reason],
+    fault_known_mask:known,fault_mask:fault,faults:known?FAULT_NAMES.filter((_,i)=>fault&(1<<i)):null,
+    barcode:bc?ALPHABET[(bc&63)-1]:null,barcode_navigation:navigation?[null,'Turn left','Turn right','Go straight','U-turn'][navigation]:null,barcode_reversed:bc?Boolean(bc&64):null,barcode_event_sequence:bc?get(234,16):null,
+    pitch_deg:null,hump_mm:null,max_hump_mm:null,imu_state:null,imu_flags:null,imu_speed_source:null,scan:null};
+  const pitch=get(15,11),height=get(26,7),max=get(33,7),state=get(40,3),flags=get(43,6);
   const heightOK=x=>x===0||(x>=6&&x<=80);
-  if((word>>34n)!==0n||pitch>1801||!heightOK(height)||!heightOK(max)||height>max)
-    throw new Error('Invalid packed IMU field range or reserved bits');
-  if(state===7) {
-    if(word!==(7n<<25n)) throw new Error('Unavailable IMU must clear measurement fields');
-  } else {
-    if(((flags&1)&&(flags&32))||(pitch&&(!(flags&1)||(flags&32)||state<2||state>5)))
-      throw new Error('Invalid packed IMU validity/state');
-    Object.assign(sample,{pitch_deg:pitch?(pitch-901)/10:null,hump_mm:height||null,max_hump_mm:max||null,
-      imu_state:IMU_STATES[state],imu_flags:(flags&15)|((flags&16)<<1)|((flags&32)<<2)|(pitch?16:0),
-      imu_speed_source:flags&16?'supplied':'nominal'});
+  if(pitch>1801||!heightOK(height)||!heightOK(max)||height>max)throw new Error('Invalid IMU field range');
+  if(state===7){if(pitch||height||max||flags)throw new Error('Unavailable IMU must clear fields');}
+  else {
+    if(((flags&1)&&(flags&32))||(pitch&&(!(flags&1)||(flags&32)||state<2||state>5)))throw new Error('Invalid IMU validity/state');
+    Object.assign(sample,{pitch_deg:pitch?(pitch-901)/10:null,hump_mm:height||null,max_hump_mm:max||null,imu_state:IMU_STATES[state],imu_flags:(flags&15)|((flags&16)<<1)|((flags&32)<<2)|(pitch?16:0),imu_speed_source:flags&16?'supplied':'nominal'});
   }
-  return {sample,format:'Packed v3 - distance + line IR + IMU'};
+  sample.state=sample.controller_valid?sample.controller_state:null;
+  return {sample,format:'Packed v4'};
 }
-export function decodeHeartbeat(payload) {
-  const bytes=payload instanceof Uint8Array?payload:new Uint8Array(payload);
-  if(bytes.length!==5||bytes[0]!==0x80) throw new Error('Expected 5-byte binary heartbeat');
-  return new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength).getUint32(1,true);
+export function decodeScan(payload){
+  const b=bytesOf(payload),v=viewOf(b);
+  if(b.length<19||b.length>56||b[0]!==0xb5)throw new Error('Invalid scan chunk');
+  const session=v.getUint32(1,true),total=b[13],start=b[14],count=b[15];
+  if(!session||!total||total>181||!count||count>16||start+count>total||b.length!==16+Math.ceil(count*20/8))throw new Error('Invalid scan framing');
+  if(count*20%8&&b.at(-1)>>>(count*20%8))throw new Error('Reserved scan bits must be zero');
+  const points=[];
+  for(let i=0;i<count;i++){
+    const angle=bits(b.subarray(16),20*i,8),distance=bits(b.subarray(16),20*i+8,12);
+    if(angle>180||(i&&angle<=points[i-1].angle)||(distance&&(distance<20||distance>4000)))throw new Error('Invalid scan point');
+    points.push({angle,distance_mm:distance||null});
+  }
+  return {session_token:session,scan_sequence:v.getUint32(5,true),uptime_ms:v.getUint32(9,true),total,start,points};
 }
-export function encodeStatusRequest(id) {
+export function decodeDiagnostics(payload){
+  const b=bytesOf(payload),v=viewOf(b);
+  if(b.length!==40||b[0]!==0xb6||!v.getUint32(1,true)||(b[23]&252))throw new Error('Invalid diagnostics packet');
+  const result={session_token:v.getUint32(1,true),uptime_ms:v.getUint32(5,true)};
+  ['static_ram_bytes','heap_free_bytes','largest_free_block_bytes','sampled_min_heap_free_bytes','task_stack_capacity_bytes','stack_high_water_bytes'].forEach((key,i)=>{
+    const n=bits(b.subarray(9,24),19*i,19);if(n>270336&&n!==0x7ffff)throw new Error('Invalid resource value');result[key]=n===0x7ffff?null:n;
+  });
+  ['publish_errors','rejected_commands','mqtt_connections','snapshot_contention'].forEach((key,i)=>result[key]=v.getUint32(24+4*i,true));
+  return result;
+}
+export function decodeHeartbeat(payload){const b=bytesOf(payload);if(b.length!==5||b[0]!==0x80)throw new Error('Expected 5-byte binary heartbeat');return viewOf(b).getUint32(1,true);}
+export function encodeStatusRequest(id){
   if(!Number.isInteger(id)||id<1||id>0xffffffff)throw new Error('Invalid STATUS request ID');
-  const bytes=new Uint8Array([0xa0,0,0,0,0]);
-  new DataView(bytes.buffer).setUint32(1,id,true);return bytes;
+  const b=new Uint8Array(5);b[0]=0xa0;viewOf(b).setUint32(1,id,true);return b;
 }
-export function decodeStatusReply(payload) {
-  const bytes=payload instanceof Uint8Array?payload:new Uint8Array(payload);
-  if(![11,22].includes(bytes.length)||bytes[0]!==0xa1)throw new Error('Invalid STATUS reply header/length');
-  const view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength),id=view.getUint32(1,true);
-  const word=view.getUint16(9,true),age=word&2047;
-  if(!id||(word&0xf000)||(age>2000&&age!==2047))throw new Error('Invalid STATUS reply fields');
-  if(bytes.length!==(age===2047?11:22))throw new Error('STATUS sample presence/age mismatch');
-  return {request_id:id,uptime_ms:view.getUint32(5,true),test_build:Boolean(word&2048),
-    sample_age_ms:age===2047?null:age,snapshot:age===2047?null:decodeTelemetry(bytes.subarray(11)).sample};
+export function decodeStatusReply(payload){
+  const b=bytesOf(payload),v=viewOf(b);
+  if(![16,62].includes(b.length)||b[0]!==0xa1)throw new Error('Expected current Packed v4 STATUS firmware (16/62 bytes)');
+  const id=v.getUint32(1,true),uptime=v.getUint32(5,true),meta=b[9]|(b[10]<<8)|(b[11]<<16),age=meta&2047,session=v.getUint32(12,true),control=decodeControlWord(meta>>>11);
+  if(!id||!session||(meta>>>17)||(age>2000&&age!==2047)||b.length!==(age===2047?16:62))throw new Error('Invalid STATUS fields');
+  const snapshot=age===2047?null:decodeTelemetry(b.subarray(16)).sample;
+  if(snapshot&&(snapshot.session_token!==session||snapshot.uptime_ms!==uptime||snapshot.controller_word!==control.controller_word))throw new Error('STATUS snapshot/session mismatch');
+  return {request_id:id,uptime_ms:uptime,session_token:session,...control,sample_age_ms:age===2047?null:age,snapshot};
 }
+export function encodeStopRequest(id,session,deadline){
+  for(const [value,min] of [[id,1],[session,1],[deadline,0]])if(!Number.isInteger(value)||value<min||value>0xffffffff)throw new Error('Invalid STOP request field');
+  const b=new Uint8Array(13),v=viewOf(b);b[0]=0xa2;v.setUint32(1,id,true);v.setUint32(5,session,true);v.setUint32(9,deadline,true);return b;
+}
+export function decodeStopReply(payload){
+  const b=bytesOf(payload),v=viewOf(b);
+  if(b.length!==11||b[0]!==0xa4)throw new Error('Invalid STOP reply');
+  const id=v.getUint32(1,true),session=v.getUint32(5,true),word=v.getUint16(9,true),result=word>>>6,control=decodeControlWord(word&63);
+  if(!id||!session||(word>>>9)||result>5||(result===0&&(!control.stop_latched||control.controller_state_code===7)))throw new Error('Invalid STOP result');
+  return {request_id:id,session_token:session,result,result_name:STOP_RESULTS[result],...control};
+}
+
 export function hex(bytes) { return [...bytes].map(x => x.toString(16).padStart(2,'0')).join(' '); }
 export function packetText(packet) {
-  if (!packet) return 'Waiting for a message…';
+  if (!packet) return 'Waiting for a messageâ€¦';
   if (packet.accepted && packet.decoded !== null)
     return JSON.stringify(packet.decoded,null,2);
   return `${packet.accepted?'Accepted':'Rejected'}: ${packet.detail}\n\n${hex(packet.bytes)}`;
@@ -61,32 +105,122 @@ export function packetText(packet) {
 
 export class TelemetryStore {
   constructor() { this.reset(); }
+  needsClockSync(at=Date.now()) {
+    return this.seenSession!==null&&!this.pendingStatus&&!this.pendingStop&&
+      (!this.clockAnchor||this.clockAnchor.session!==this.seenSession||at<this.clockAnchor.at||at-this.clockAnchor.at>=10000);
+  }
+  packetAge(value,at,limit=2000) {
+    const a=this.clockAnchor;
+    if(!a||a.session!==value.session_token||at<a.at||at-a.at>30000)return null;
+    const estimated=(a.boot+at-a.at)>>>0,delta=(estimated-value.uptime_ms)>>>0;
+    if(delta>0x7fffffff){if(((value.uptime_ms-estimated)>>>0)>a.rtt+250)throw new Error('Robot clock changed; awaiting fresh STATUS');return 0;}
+    if(delta>limit)throw new Error('Delayed telemetry expired against Pico STATUS clock');
+    return delta;
+  }
+  currentDiagnostics(at=Date.now(),connected=true) {
+    return connected&&this.clockAnchor&&this.diagnostics?.session_token===this.clockAnchor.session&&at>=this.diagnostics.at&&at-this.diagnostics.at<=7000?this.diagnostics:null;
+  }
+  ingestAux(bytes,at,packet) {
+    const value=bytes[0]===0xb5?decodeScan(bytes):decodeDiagnostics(bytes);
+    this.seenSession=value.session_token;
+    const age=this.packetAge(value,at,bytes[0]===0xb5?10000:7000);
+    packet.accepted=true;packet.decoded=value;
+    if(age===null){packet.detail='Waiting for fresh Pico STATUS clock sync';return true;}
+    if(bytes[0]===0xb6){this.diagnostics={...value,at};this.diagnosticHistory.push(this.diagnostics);if(this.diagnosticHistory.length>120)this.diagnosticHistory.shift();packet.detail='Runtime diagnostics';return true;}
+    if(this.scanProfile?.session_token===value.session_token&&this.scanProfile.sequence===value.scan_sequence){packet.detail='Completed scan duplicate ignored';return true;}
+    let p=this.scanPending;
+    const key=value.session_token+'/'+value.scan_sequence;
+    if(!p||p.key!==key||at-p.at>10000){
+      if(value.start!==0){packet.detail='Waiting for scan start chunk';return true;}
+      p=this.scanPending={key,total:value.total,source:value.uptime_ms,points:new Array(value.total),received:0,at};
+    }
+    if(p.total!==value.total||p.source!==value.uptime_ms)throw new Error('Scan metadata changed mid-profile');
+    value.points.forEach((point,i)=>{
+      const old=p.points[value.start+i];
+      if(old&&(old.angle!==point.angle||old.distance_mm!==point.distance_mm))throw new Error('Conflicting scan chunk');
+    });
+    value.points.forEach((point,i)=>{const index=value.start+i;if(!p.points[index]){p.points[index]=point;p.received++;}});
+    if(p.received===p.total){
+      if(p.points.some((point,i)=>i&&point.angle<=p.points[i-1].angle))throw new Error('Scan angles are not increasing');
+      this.scanProfile={sequence:value.scan_sequence,session_token:value.session_token,uptime_ms:value.uptime_ms,points:p.points,at};this.scanPending=null;
+      this.event('Scan profile received',p.total+' measured angles','neutral',at);
+    }
+    packet.detail='Scan chunk '+(value.start+1)+'?'+(value.start+value.points.length)+' / '+value.total;return true;
+  }
   currentSample(now = Date.now(), connected = true) {
     const age = this.lastTelemetry === null ? Infinity : now - this.lastTelemetry;
-    return connected && age >= 0 && age <= 2000 ? this.sample : null;
+    return connected && this.clockAnchor && this.sample?.session_token===this.clockAnchor.session && age >= 0 && age + (this.sample?.transport_age_ms??0) <= 2000 ? this.sample : null;
   }
   reset() {
     this.history=[]; this.events=[]; this.packets=[]; this.sample=null;
     this.lastTelemetry=null; this.lastHeartbeat=null; this.lastSequence=null; this.lastHeartbeatCounter=null;
     this.messageCount=0; this.telemetryCount=0; this.rejected=0; this.sequenceGaps=0;
-    this.totalBytes=0; this.lastPayloadBytes=0; this.lastInterval=null; this.format='—';
+    this.totalBytes=0; this.lastPayloadBytes=0; this.lastInterval=null; this.format='â€”';
+    this.clockAnchor=null;this.seenSession=null;this.scanProfile=null;this.scanPending=null;this.diagnostics=null;this.diagnosticHistory=[];this.heartbeatIntervals=[];this.lastBarcodeEvent=null;
     this.pendingStatus=null;this.statusReply=null;this.lastStatusId=0;this.statusLastSentAt=null;
-    this.statusNotice='STATUS is read-only. STOP awaits controller integration.';
+    this.statusNotice='Controller status is read-only. Stop stays latched until the Pico restarts.';
+    this.controller=null;this.pendingStop=null;this.stopReply=null;this.stopNotice='Waiting for current controller status.';
   }
-  beginStatus(id,at=Date.now()) {
+  beginStatus(id,at=Date.now(),forStop=false,purpose='user') {
+    if(this.pendingStop&&!forStop)throw new Error('A stop request is pending');
     if(this.pendingStatus)throw new Error('A STATUS request is already pending');
     if(this.statusLastSentAt!==null&&at-this.statusLastSentAt<250)throw new Error('Wait briefly before requesting STATUS again');
     const bytes=encodeStatusRequest(id);
     if(id===this.lastStatusId)throw new Error('Use a fresh STATUS request ID');
-    this.pendingStatus={id,at,deadline:at+3000};this.lastStatusId=id;this.statusLastSentAt=at;
+    this.pendingStatus={id,at,deadline:at+3000,purpose};this.lastStatusId=id;this.statusLastSentAt=at;
     this.statusNotice='Waiting for the Pico STATUS reply...';return bytes;
   }
   cancelStatus(reason='Connection changed; STATUS request cancelled.') {
     if(this.pendingStatus){this.pendingStatus=null;this.statusNotice=reason;}
+    if(this.pendingStop){this.pendingStop=null;this.stopNotice=reason;}
+  }
+  clearController(reason='Connection changed; pending commands cancelled.') {
+    this.cancelStatus(reason);this.controller=null;this.clockAnchor=null;this.seenSession=null;this.scanPending=null;this.lastSequence=null;this.lastHeartbeatCounter=null;this.lastHeartbeat=null;
+  }
+  currentController(now=Date.now(),connected=true) {
+    return connected&&this.controller?.controller_valid&&now>=this.controller.at&&now-this.controller.at<=2000?this.controller:null;
+  }
+  observeController(value,at) {
+    const old=this.controller;
+    if(old&&old.session_token!==value.session_token) {
+      this.cancelStatus('Robot session changed; pending commands cancelled.');this.lastSequence=null;this.sample=null;this.lastTelemetry=null;this.scanPending=null;this.diagnostics=null;this.lastHeartbeatCounter=null;
+      this.event('Controller session changed','Fresh requests are required','neutral',at);
+    }
+    this.controller={...value,at};
+    if(!old||old.controller_word!==value.controller_word)
+      this.event(value.controller_state,value.stop_latched?'Controller stop inhibit is latched':'Controller publication',value.controller_state_code===7?'warning':'neutral',at);
+  }
+  beginStop(id,at=Date.now()) {
+    const control=this.currentController(at);
+    if(!control)throw new Error('Wait for current controller status');
+    if(control.stop_latched)throw new Error('Stop is already latched; restart the Pico for a new run');
+    if(this.pendingStop||this.pendingStatus)throw new Error('A request is already pending');
+    const bytes=this.beginStatus(id,at,true);
+    this.pendingStop={phase:'checking',status_id:id,at,deadline:at+3000};
+    this.stopNotice='Checking fresh Pico status before sending STOP...';return bytes;
+  }
+  beginStopCommand(id,at=Date.now()) {
+    const p=this.pendingStop,c=this.currentController(at);
+    if(!p||p.phase!=='ready'||!c||c.session_token!==p.session||at>=p.valid_until)
+      throw new Error('STOP lease expired or session changed; request again');
+    if(id===p.status_id)throw new Error('Use a distinct STOP correlation ID');
+    const bytes=encodeStopRequest(id,p.session,p.boot_deadline);
+    Object.assign(p,{phase:'waiting',command_id:id,sent_at:at,deadline:at+3000});
+    this.stopNotice='STOP submitted; waiting for the controller result...';return bytes;
+  }
+  expireCommands(at=Date.now()) {
+    this.expireStatus(at);
+    const p=this.pendingStop;if(!p)return;
+    if((p.phase==='ready'&&at>=p.valid_until)||at>=p.deadline) {
+      this.pendingStop=null;
+      this.stopNotice=p.phase==='waiting'?'No matching STOP reply; outcome unknown. Check controller state.':'No STOP sent; fresh-status check expired.';
+      this.event('STOP request expired',this.stopNotice,'warning',at);
+    }
   }
   expireStatus(at=Date.now()) {
     if(!this.pendingStatus||at<this.pendingStatus.deadline)return false;
     this.pendingStatus=null;this.statusNotice='No STATUS reply within 3 seconds. Check Pico firmware and command/status topics.';
+    if(this.pendingStop?.phase==='checking'){this.pendingStop=null;this.stopNotice='No STOP sent; status handshake timed out.';}
     this.event('STATUS timed out','No automatic retry; request again after checking the robot','warning',at);return true;
   }
   event(title, detail='', tone='neutral', at=Date.now()) {
@@ -98,27 +232,55 @@ export class TelemetryStore {
     this.packets.unshift(packet); this.packets.length=Math.min(this.packets.length,30);
     try {
       if (retained) throw new Error('Retained message ignored; waiting for a fresh sample');
+      if(kind==='telemetry'&&(bytes[0]===0xb5||bytes[0]===0xb6))return this.ingestAux(bytes,at,packet);
       if(kind==='status') {
+        if(bytes[0]===0xa4) {
+          const reply=decodeStopReply(bytes),p=this.pendingStop;
+          this.expireCommands(at);
+          if(!p||this.pendingStop!==p||p.phase!=='waiting'||reply.request_id!==p.command_id||at<p.sent_at||
+             (reply.session_token!==p.session&&reply.result!==2))throw new Error('Unmatched or expired STOP reply ignored');
+          this.pendingStop=null;this.stopReply={...reply,received_at:at,round_trip_ms:at-p.sent_at};
+          this.observeController(reply,at);
+          this.stopNotice=reply.result===0?(reply.controller_state_code===1?'Controller stop latch confirmed; motor control is disabled in this build.':'Controller stop latch confirmed; zero-duty request submitted. Physical standstill is not measured.'):`STOP not confirmed: ${reply.result_name}.`;
+          this.event(reply.result===0?'Controller stop confirmed':'STOP rejected',this.stopNotice,reply.result===0?'success':'warning',at);
+          packet.accepted=true;packet.decoded=reply;packet.detail='Controller STOP result';return true;
+        }
         const reply=decodeStatusReply(bytes);
         this.expireStatus(at);
         if(!this.pendingStatus||reply.request_id!==this.pendingStatus.id||at<this.pendingStatus.at)
           throw new Error('Unmatched or expired STATUS reply ignored');
-        const elapsed=at-this.pendingStatus.at;
+        const elapsed=at-this.pendingStatus.at,purpose=this.pendingStatus.purpose;
+        this.clockAnchor={session:reply.session_token,boot:reply.uptime_ms,at,rtt:elapsed};this.seenSession=reply.session_token;
         this.pendingStatus=null;this.statusReply={...reply,received_at:at,round_trip_ms:elapsed};
-        this.statusNotice=`Pico STATUS reply confirmed in ${elapsed} ms. STOP awaits controller integration.`;
-        this.event('STATUS reply confirmed',`Pico uptime ${Math.floor(reply.uptime_ms/1000)} s`,'success',at);
+        this.observeController(reply,at);
+        this.statusNotice=`Pico STATUS reply confirmed in ${elapsed} ms.`;
+        if(this.pendingStop?.phase==='checking'&&this.pendingStop.status_id===reply.request_id) {
+          if(!reply.controller_valid||reply.stop_latched||elapsed>=2000) {
+            this.pendingStop=null;this.stopNotice=reply.stop_latched?'Controller already reports stop latched.':'No STOP sent; controller unavailable or status reply too old.';
+          } else {
+            Object.assign(this.pendingStop,{phase:'ready',session:reply.session_token,
+              boot_deadline:(reply.uptime_ms+2000)>>>0,valid_until:at+2000-elapsed});
+          }
+        }
+        if(purpose!=='clock')this.event('STATUS reply confirmed',`Pico uptime ${Math.floor(reply.uptime_ms/1000)} s`,'success',at);
         packet.accepted=true;packet.decoded=reply;packet.detail='STATUS reply';return true;
       }
       if (kind==='heartbeat') {
         const count=decodeHeartbeat(bytes);
-        if(this.lastHeartbeatCounter!==null && count<this.lastHeartbeatCounter) {
-          this.lastSequence=null;
-          this.event('Heartbeat counter restarted','Sequence baseline reset; the robot may have rebooted','neutral',at);
+        if(this.lastHeartbeatCounter!==null){
+          const delta=(count-this.lastHeartbeatCounter)>>>0;
+          if(delta===0||delta>0x7fffffff)throw new Error('Duplicate or backward heartbeat counter');
         }
+        if(this.lastHeartbeat!==null&&at>=this.lastHeartbeat){this.heartbeatIntervals.push(at-this.lastHeartbeat);if(this.heartbeatIntervals.length>120)this.heartbeatIntervals.shift();}
         this.lastHeartbeatCounter=count; this.lastHeartbeat=at; packet.accepted=true;
         packet.decoded={counter:count};packet.detail='Binary heartbeat';return true;
       }
       const decoded=decodeTelemetry(bytes), sample=decoded.sample;
+      this.seenSession=sample.session_token;
+      const transportAge=this.packetAge(sample,at);
+      if(transportAge===null){packet.accepted=true;packet.decoded=sample;packet.detail='Waiting for fresh Pico STATUS clock sync';return true;}
+      sample.transport_age_ms=transportAge;
+      this.observeController(sample,at);
       if (this.lastSequence!==null) {
         const delta=(sample.sequence-this.lastSequence)>>>0;
         if (delta===0 || delta>0x7fffffff) throw new Error('Duplicate or out-of-order sequence');
@@ -127,9 +289,10 @@ export class TelemetryStore {
       this.lastSequence=sample.sequence;
       this.lastInterval=this.lastTelemetry===null ? null : at-this.lastTelemetry;
       if (sample.state && sample.state!==this.sample?.state) this.event(sample.state,'Vehicle state changed','neutral',at);
-      if (sample.barcode && sample.barcode!==this.sample?.barcode) this.event('Barcode decoded',sample.barcode,'success',at);
+      const barcodeKey=sample.barcode?sample.session_token+'/'+sample.barcode_event_sequence+'/'+sample.barcode:null;
+      if(barcodeKey&&barcodeKey!==this.lastBarcodeEvent){this.lastBarcodeEvent=barcodeKey;this.event('Barcode decoded',sample.barcode,'success',at);}
       if(sample.imu_state && sample.imu_state!==this.sample?.imu_state)
-        this.event(`IMU · ${sample.imu_state}`,sample.imu_speed_source==='nominal'?'Height uses nominal speed; accuracy not verified':'External speed supplied; validate height on the course',sample.imu_state==='Sensor fault'?'warning':'neutral',at);
+        this.event(`IMU Â· ${sample.imu_state}`,sample.imu_speed_source==='nominal'?'Height uses nominal speed; accuracy not verified':'External speed supplied; validate height on the course',sample.imu_state==='Sensor fault'?'warning':'neutral',at);
       if (!sample.obstacle_valid && this.sample?.obstacle_valid!==false) this.event('Range unavailable','No valid ultrasonic measurement','warning',at);
       this.sample=sample; this.lastTelemetry=at; this.telemetryCount++; this.lastPayloadBytes=bytes.length; this.format=decoded.format;
       this.history.push({...sample,at,interval:this.lastInterval,bytes:bytes.length});

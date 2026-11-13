@@ -24,7 +24,7 @@
 #include "mqtt_utk.h"
 #include <tm/tmonitor.h>
 
-#define MQTT_UTK_HEARTBEAT_MS   5000
+#define MQTT_UTK_HEARTBEAT_MS   4000
 #define MQTT_UTK_KEEPALIVE_S    5
 #define MQTT_UTK_RETRY_MS       3000
 #define MQTT_UTK_CONNECT_DEADLINE_MS 5000
@@ -38,22 +38,21 @@
 #ifndef MQTT_STATUS_TOPIC
 #define MQTT_STATUS_TOPIC MQTT_CLIENT_ID "/status"
 #endif
-/* One five-byte slot, owned exclusively by the network task. Low three
- * bits hold receive length 0..5, or 7 while WiFi is unavailable; the
- * remaining flags share the same byte. */
-#define CMD_LENGTH 7U
-#define CMD_LINK_DOWN 7U /* Reserved receive-length code; no extra flag. */
-#define CMD_COLLECTING 8U
-#define CMD_PENDING 16U
-#define CMD_SUBSCRIBED 32U
-#define CMD_RATE_SEEN 64U
+/* One bounded union slot. Low four bits hold remaining bytes 0..13,
+ * or 15 while WiFi is unavailable. Four flags fill the other half byte. */
+#define CMD_LENGTH 15U
+#define CMD_LINK_DOWN 15U
+#define CMD_COLLECTING 16U
+#define CMD_PENDING 32U
+#define CMD_SUBSCRIBED 64U
 #define CMD_CONNECTING 128U
 #define STATUS_MIN_INTERVAL_MS 250U
+static u32_t network_counters[3]; /* publish errors, rejected requests, connections */
 static mqtt_client_t *client;
 static ip_addr_t broker_addr;
 static u8_t command_state = CMD_LINK_DOWN;
-static u8_t command_bytes[S1_STATUS_REQUEST_BYTES];
-static u32_t last_status_ms;
+static u8_t command_bytes[S1_COMMAND_MAX_BYTES];
+static u32_t last_status_ms,last_stop_ms,session_nonce,last_stop_id;
 
 static void heartbeat_timeout(void *arg);
 static void publish_done_cb(void *arg, err_t result);
@@ -87,31 +86,80 @@ void mqtt_utk_set_link(unsigned int available)
     if(client != NULL) mqtt_disconnect(client);
 }
 
+static unsigned command_length(unsigned marker)
+{
+    return marker==0xa0U?S1_STATUS_REQUEST_BYTES:marker==0xa2U?S1_STOP_REQUEST_BYTES:0U;
+}
+static err_t publish_packet(mqtt_client_t *c,const char *topic,const void *payload,
+                            u16_t length,u8_t qos,u8_t retain,mqtt_request_cb_t cb,void *arg)
+{
+    err_t er=mqtt_publish(c,topic,payload,length,qos,retain,cb,arg);
+    if(er!=ERR_OK)++network_counters[0];
+    return er;
+}
+
+static void stop_result(uint32_t id,unsigned result)
+{
+    UB bytes[S1_STOP_REPLY_BYTES];
+    if(result!=APP_STOP_LATCHED)++network_counters[1];
+    int len=s1_pack_stop_reply(id,session_nonce,result,s1_network_controller_word(),bytes,sizeof(bytes));
+    if(len>0)(void)publish_packet(client,MQTT_STATUS_TOPIC,bytes,(u16_t)len,0,0,publish_done_cb,NULL);
+}
 void mqtt_utk_poll(void)
 {
-    UB payload[S1_FRAME_BYTES];
-    int len = s1_network_poll(payload, sizeof(payload));
+    UB payload[S1_TX_CAPACITY];
+    UB completed[10];
+    int reply_len=s1_network_stop_reply(completed);
+    int len;
     err_t err;
-    /* Drain old telemetry while disconnected; STATUS also uses this fresh
-     * network-owned cache, without calling drivers or waiting on sensors. */
+    /* No offline queue to replay. Snapshot/clock reads are nonblocking;
+     * the network owner never calls a sensor driver. */
     if(!link_available() || client == NULL || !mqtt_client_is_connected(client)) {
         command_state &= (u8_t)~(CMD_COLLECTING | CMD_PENDING | CMD_SUBSCRIBED);
         return;
     }
-    if(len > 0) {
-        err = mqtt_publish(client, MQTT_TELEMETRY_TOPIC, payload, (u16_t)len,
-                           0, 0, publish_done_cb, NULL);
-        if(err != ERR_OK) tm_printf((UB*)"mqtt: telemetry dropped, err=%d\n", (int)err);
-    }
+    len = s1_network_poll(payload, sizeof(payload), session_nonce);
     if(command_state & CMD_PENDING) {
-        UB reply[S1_STATUS_MAX_BYTES];
         command_state &= (u8_t)~CMD_PENDING;
-        len = s1_network_status(command_bytes, sizeof(command_bytes), reply, sizeof(reply));
-        if(len > 0) {
-            err = mqtt_publish(client, MQTT_STATUS_TOPIC, reply, (u16_t)len,
-                               0, 0, publish_done_cb, NULL);
-            tm_printf((UB*)"mqtt: STATUS reply %u bytes, result=%d\n",
-                      (unsigned)len, (int)err);
+        if(command_bytes[0]==0xa0U) {
+            UB reply[S1_STATUS_MAX_BYTES];
+            int size=s1_network_status(command_bytes,S1_STATUS_REQUEST_BYTES,reply,sizeof(reply),session_nonce);
+            if(size>0)(void)publish_packet(client,MQTT_STATUS_TOPIC,reply,(u16_t)size,0,0,publish_done_cb,NULL);
+        } else {
+            uint32_t id,token,deadline,now;
+            if(s1_parse_stop_request(command_bytes,S1_STOP_REQUEST_BYTES,&id,&token,&deadline)==S1_CODEC_OK) {
+                unsigned word=s1_network_controller_word();
+                if(token!=session_nonce)stop_result(id,APP_STOP_SESSION);
+                else if(id==last_stop_id)stop_result(id,APP_STOP_REPLAY);
+                else if(s1_network_uptime(&now)!=0||(uint32_t)(deadline-now)==0U||
+                        (uint32_t)(deadline-now)>APP_CTRL_STOP_LEASE_MS)stop_result(id,APP_STOP_EXPIRED);
+                else if(!(word&APP_CTRL_STATE_MASK))stop_result(id,APP_STOP_FAULT);
+                else if((word&APP_CTRL_STATE_MASK)==APP_CTRL_FAULT)stop_result(id,APP_STOP_FAULT);
+                else if(word&APP_CTRL_LATCH)stop_result(id,APP_STOP_LATCHED); /* Already applied; no new action. */
+                else {
+                    int result=s1_network_submit_stop(id,token,deadline);
+                    if(result==0)last_stop_id=id; /* Controller sends the final result later. */
+                    else stop_result(id,result==-50?APP_STOP_BUSY:APP_STOP_FAULT);
+                }
+            }
+        }
+    }
+    if(reply_len==10&&s1_read_u32(completed+4)==session_nonce&&s1_read_u32(completed)==last_stop_id) {
+        UB reply[S1_STOP_REPLY_BYTES];
+        unsigned word=completed[8]|((unsigned)completed[9]<<8);
+        int size=s1_pack_stop_reply(last_stop_id,session_nonce,word>>6,
+                                    word&APP_CTRL_WORD_MASK,reply,sizeof(reply));
+        if(size>0)(void)publish_packet(client,MQTT_STATUS_TOPIC,reply,(u16_t)size,0,0,publish_done_cb,NULL);
+    }
+    if(len > 0) {
+        err = publish_packet(client, MQTT_TELEMETRY_TOPIC, payload, (u16_t)len,0,0,publish_done_cb,NULL);
+        if(err != ERR_OK)tm_printf((UB*)"mqtt: telemetry dropped, err=%d\n",(int)err);
+    }
+    if(len<=0) {
+        int size=s1_network_aux(payload,sizeof(payload),session_nonce,network_counters);
+        if(size>0) {
+            err=publish_packet(client,MQTT_TELEMETRY_TOPIC,payload,(u16_t)size,0,0,publish_done_cb,NULL);
+            s1_network_aux_result(payload[0],err==ERR_OK);
         }
     }
 }
@@ -120,32 +168,47 @@ static void incoming_publish_cb(void *arg, const char *topic, u32_t total_len)
 {
     (void)arg;
     if(!link_available()) return;
+    if(command_state&CMD_PENDING){if(strcmp(topic,MQTT_COMMAND_TOPIC)==0)++network_counters[1];return;}
     command_state &= (u8_t)~(CMD_LENGTH | CMD_COLLECTING);
     if((command_state & CMD_SUBSCRIBED) && !(command_state & CMD_PENDING) &&
-        total_len == S1_STATUS_REQUEST_BYTES && strcmp(topic, MQTT_COMMAND_TOPIC) == 0)
-        command_state |= CMD_COLLECTING;
+        (total_len==S1_STATUS_REQUEST_BYTES||total_len==S1_STOP_REQUEST_BYTES)&&strcmp(topic,MQTT_COMMAND_TOPIC)==0) {
+        command_bytes[0]=0;
+        command_state|=(u8_t)(CMD_COLLECTING|total_len);
+    } else if(strcmp(topic,MQTT_COMMAND_TOPIC)==0)++network_counters[1];
 }
 static void incoming_data_cb(void *arg, const u8_t *data, u16_t len, u8_t flags)
 {
-    unsigned count = command_state & CMD_LENGTH, i;
-    uint32_t id;
+    unsigned remaining=command_state&CMD_LENGTH,total,i;
+    uint32_t id,token,deadline;
     u32_t now;
     (void)arg;
     if(!link_available() || !(command_state & CMD_COLLECTING)) return;
-    if(len > S1_STATUS_REQUEST_BYTES - count) {
-        command_state &= (u8_t)~CMD_COLLECTING;
-        return;
+    if(!command_bytes[0]&&len) {
+        if(command_length(data[0])!=remaining){command_state&=(u8_t)~CMD_COLLECTING;++network_counters[1];return;}
+        command_bytes[0]=data[0];
     }
-    for(i = 0; i < len; ++i) command_bytes[count++] = data[i];
-    command_state = (u8_t)((command_state & (u8_t)~CMD_LENGTH) | count);
+    total=command_length(command_bytes[0]);
+    if(!total||remaining>total||len>remaining) {
+        command_state &= (u8_t)~CMD_COLLECTING;
+        ++network_counters[1];return;
+    }
+    for(i=0;i<len;++i)command_bytes[total-remaining+i]=data[i];
+    remaining-=len;
+    command_state=(u8_t)((command_state&(u8_t)~CMD_LENGTH)|remaining);
     if(!(flags & MQTT_DATA_FLAG_LAST)) return;
     command_state &= (u8_t)~CMD_COLLECTING;
-    if(s1_parse_status_request(command_bytes, count, &id) != S1_CODEC_OK) return;
+    if(remaining){++network_counters[1];return;}
     now = sys_now();
-    if((command_state & CMD_RATE_SEEN) && (u32_t)(now - last_status_ms) < STATUS_MIN_INTERVAL_MS)
-        return;
-    last_status_ms = now;
-    command_state |= CMD_PENDING | CMD_RATE_SEEN;
+    if(total==S1_STATUS_REQUEST_BYTES) {
+        if(s1_parse_status_request(command_bytes,total,&id)!=S1_CODEC_OK||
+           (u32_t)(now-last_status_ms)<STATUS_MIN_INTERVAL_MS){++network_counters[1];return;}
+        last_status_ms=now;
+    } else {
+        if(s1_parse_stop_request(command_bytes,total,&id,&token,&deadline)!=S1_CODEC_OK||
+           (u32_t)(now-last_stop_ms)<STATUS_MIN_INTERVAL_MS){++network_counters[1];return;}
+        last_stop_ms=now;
+    }
+    command_state|=CMD_PENDING;
 }
 static void subscribe_done_cb(void *arg, err_t result)
 {
@@ -153,7 +216,7 @@ static void subscribe_done_cb(void *arg, err_t result)
     if(!link_available()) return;
     if(result == ERR_OK) {
         command_state |= CMD_SUBSCRIBED;
-        tm_printf((UB*)"mqtt: subscribed to " MQTT_COMMAND_TOPIC " (read-only STATUS)\n");
+        tm_printf((UB*)"mqtt: subscribed to " MQTT_COMMAND_TOPIC " (STATUS / controller STOP)\n");
     } else {
         command_state &= (u8_t)~CMD_SUBSCRIBED;
         sys_untimeout(subscribe_commands, NULL);
@@ -176,6 +239,7 @@ static void publish_done_cb(void *arg, err_t result)
 {
 	(void)arg;
 	if(result != ERR_OK) {
+        ++network_counters[0];
 		tm_printf((UB*)"mqtt: publish failed, err=%d\n", (int)result);
 	}
 }
@@ -193,7 +257,7 @@ static void heartbeat_timeout(void *arg)
 		len = s1_pack_heartbeat(count++, payload, sizeof(payload));
 		tm_printf((UB*)"mqtt: TX [" MQTT_TOPIC "] %u binary bytes\n",
 		          (unsigned int)len);
-		(void)mqtt_publish(client, MQTT_TOPIC, payload, (u16_t)len,
+		(void)publish_packet(client, MQTT_TOPIC, payload, (u16_t)len,
 				   0 /* qos */, 0 /* retain */,
 				   publish_done_cb, NULL);
 	}
@@ -239,6 +303,13 @@ static void connection_cb(mqtt_client_t *c, void *arg, mqtt_connection_status_t 
 		tm_printf((UB*)"mqtt: connected to " MQTT_BROKER_IP "\n");
 
         command_state = 0;
+        {
+            u32_t next=mqtt_utk_session_entropy();
+            if(!next||next==session_nonce){next=session_nonce+1U;if(!next)next=1U;}
+            session_nonce=next;last_stop_id=0;
+            last_status_ms=last_stop_ms=sys_now()-STATUS_MIN_INTERVAL_MS;
+            ++network_counters[2];
+        }
         mqtt_set_inpub_callback(client, incoming_publish_cb, incoming_data_cb, NULL);
         sys_untimeout(subscribe_commands, NULL);
         subscribe_commands(NULL);

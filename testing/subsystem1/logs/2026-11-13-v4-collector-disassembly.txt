@@ -1,0 +1,427 @@
+
+build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.elf:     file format elf32-littlearm
+
+
+Disassembly of section .text:
+
+100187a0 <telemetry_task>:
+100187a0:	b5f0      	push	{r4, r5, r6, r7, lr}
+100187a2:	46de      	mov	lr, fp
+100187a4:	4645      	mov	r5, r8
+100187a6:	4657      	mov	r7, sl
+100187a8:	464e      	mov	r6, r9
+100187aa:	b5e0      	push	{r5, r6, r7, lr}
+100187ac:	b0e5      	sub	sp, #404	@ 0x194
+100187ae:	ad46      	add	r5, sp, #280	@ 0x118
+100187b0:	2208      	movs	r2, #8
+100187b2:	2100      	movs	r1, #0
+100187b4:	0028      	movs	r0, r5
+100187b6:	f003 fbd5 	bl	1001bf64 <memset>
+100187ba:	0028      	movs	r0, r5
+100187bc:	f7eb fb80 	bl	10003ec0 <tk_get_tim>
+100187c0:	4adb      	ldr	r2, [pc, #876]	@ (10018b30 <telemetry_task+0x390>)
+100187c2:	686b      	ldr	r3, [r5, #4]
+100187c4:	4694      	mov	ip, r2
+100187c6:	a833      	add	r0, sp, #204	@ 0xcc
+100187c8:	4463      	add	r3, ip
+100187ca:	2100      	movs	r1, #0
+100187cc:	9304      	str	r3, [sp, #16]
+100187ce:	f7fe fbdd 	bl	10016f8c <s1_snapshot_init>
+100187d2:	4ad8      	ldr	r2, [pc, #864]	@ (10018b34 <telemetry_task+0x394>)
+100187d4:	4bd8      	ldr	r3, [pc, #864]	@ (10018b38 <telemetry_task+0x398>)
+100187d6:	af1a      	add	r7, sp, #104	@ 0x68
+100187d8:	189b      	adds	r3, r3, r2
+100187da:	4ad8      	ldr	r2, [pc, #864]	@ (10018b3c <telemetry_task+0x39c>)
+100187dc:	189b      	adds	r3, r3, r2
+100187de:	4ad8      	ldr	r2, [pc, #864]	@ (10018b40 <telemetry_task+0x3a0>)
+100187e0:	1a9b      	subs	r3, r3, r2
+100187e2:	4ad8      	ldr	r2, [pc, #864]	@ (10018b44 <telemetry_task+0x3a4>)
+100187e4:	1a9b      	subs	r3, r3, r2
+100187e6:	4ad8      	ldr	r2, [pc, #864]	@ (10018b48 <telemetry_task+0x3a8>)
+100187e8:	1a9b      	subs	r3, r3, r2
+100187ea:	9306      	str	r3, [sp, #24]
+100187ec:	ab16      	add	r3, sp, #88	@ 0x58
+100187ee:	469a      	mov	sl, r3
+100187f0:	ab20      	add	r3, sp, #128	@ 0x80
+100187f2:	4698      	mov	r8, r3
+100187f4:	4bd5      	ldr	r3, [pc, #852]	@ (10018b4c <telemetry_task+0x3ac>)
+100187f6:	4650      	mov	r0, sl
+100187f8:	469b      	mov	fp, r3
+100187fa:	4bd5      	ldr	r3, [pc, #852]	@ (10018b50 <telemetry_task+0x3b0>)
+100187fc:	9308      	str	r3, [sp, #32]
+100187fe:	4bd5      	ldr	r3, [pc, #852]	@ (10018b54 <telemetry_task+0x3b4>)
+10018800:	9309      	str	r3, [sp, #36]	@ 0x24
+10018802:	4bd5      	ldr	r3, [pc, #852]	@ (10018b58 <telemetry_task+0x3b8>)
+10018804:	9305      	str	r3, [sp, #20]
+10018806:	4bd5      	ldr	r3, [pc, #852]	@ (10018b5c <telemetry_task+0x3bc>)
+10018808:	9307      	str	r3, [sp, #28]
+1001880a:	f003 f943 	bl	1001ba94 <subsystem5_get_range>
+1001880e:	2800      	cmp	r0, #0
+10018810:	d100      	bne.n	10018814 <telemetry_task+0x74>
+10018812:	e0a4      	b.n	1001895e <telemetry_task+0x1be>
+10018814:	a80f      	add	r0, sp, #60	@ 0x3c
+10018816:	f001 fc25 	bl	1001a064 <subsystem3_get_line>
+1001881a:	2800      	cmp	r0, #0
+1001881c:	d100      	bne.n	10018820 <telemetry_task+0x80>
+1001881e:	e0af      	b.n	10018980 <telemetry_task+0x1e0>
+10018820:	0038      	movs	r0, r7
+10018822:	f002 fd9d 	bl	1001b360 <subsystem4_get_telemetry>
+10018826:	2800      	cmp	r0, #0
+10018828:	d100      	bne.n	1001882c <telemetry_task+0x8c>
+1001882a:	e0b7      	b.n	1001899c <telemetry_task+0x1fc>
+1001882c:	0028      	movs	r0, r5
+1001882e:	f001 f9e7 	bl	10019c00 <subsystem2_get_motion>
+10018832:	2800      	cmp	r0, #0
+10018834:	d100      	bne.n	10018838 <telemetry_task+0x98>
+10018836:	e0c6      	b.n	100189c6 <telemetry_task+0x226>
+10018838:	a812      	add	r0, sp, #72	@ 0x48
+1001883a:	f7ff fecb 	bl	100185d4 <telemetry_get_travel>
+1001883e:	2800      	cmp	r0, #0
+10018840:	d100      	bne.n	10018844 <telemetry_task+0xa4>
+10018842:	e102      	b.n	10018a4a <telemetry_task+0x2aa>
+10018844:	a80b      	add	r0, sp, #44	@ 0x2c
+10018846:	f7ff febd 	bl	100185c4 <telemetry_get_barcode>
+1001884a:	2800      	cmp	r0, #0
+1001884c:	d100      	bne.n	10018850 <telemetry_task+0xb0>
+1001884e:	e109      	b.n	10018a64 <telemetry_task+0x2c4>
+10018850:	a80d      	add	r0, sp, #52	@ 0x34
+10018852:	f7ff fec7 	bl	100185e4 <telemetry_get_faults>
+10018856:	2800      	cmp	r0, #0
+10018858:	d100      	bne.n	1001885c <telemetry_task+0xbc>
+1001885a:	e114      	b.n	10018a86 <telemetry_task+0x2e6>
+1001885c:	465b      	mov	r3, fp
+1001885e:	2200      	movs	r2, #0
+10018860:	2101      	movs	r1, #1
+10018862:	6818      	ldr	r0, [r3, #0]
+10018864:	f7e9 ff98 	bl	10002798 <tk_wai_sem>
+10018868:	2800      	cmp	r0, #0
+1001886a:	d100      	bne.n	1001886e <telemetry_task+0xce>
+1001886c:	e11c      	b.n	10018aa8 <telemetry_task+0x308>
+1001886e:	2208      	movs	r2, #8
+10018870:	2100      	movs	r1, #0
+10018872:	0028      	movs	r0, r5
+10018874:	f003 fb76 	bl	1001bf64 <memset>
+10018878:	0028      	movs	r0, r5
+1001887a:	f7eb fb21 	bl	10003ec0 <tk_get_tim>
+1001887e:	9a04      	ldr	r2, [sp, #16]
+10018880:	686b      	ldr	r3, [r5, #4]
+10018882:	1a9b      	subs	r3, r3, r2
+10018884:	22fa      	movs	r2, #250	@ 0xfa
+10018886:	0092      	lsls	r2, r2, #2
+10018888:	4293      	cmp	r3, r2
+1001888a:	d35f      	bcc.n	1001894c <telemetry_task+0x1ac>
+1001888c:	2208      	movs	r2, #8
+1001888e:	2100      	movs	r1, #0
+10018890:	0028      	movs	r0, r5
+10018892:	f003 fb67 	bl	1001bf64 <memset>
+10018896:	0028      	movs	r0, r5
+10018898:	f7eb fb12 	bl	10003ec0 <tk_get_tim>
+1001889c:	686b      	ldr	r3, [r5, #4]
+1001889e:	9304      	str	r3, [sp, #16]
+100188a0:	f7ff feda 	bl	10018658 <gather_scan>
+100188a4:	2213      	movs	r2, #19
+100188a6:	2100      	movs	r1, #0
+100188a8:	9805      	ldr	r0, [sp, #20]
+100188aa:	f7fe fb2f 	bl	10016f0c <s1_get_bits>
+100188ae:	2213      	movs	r2, #19
+100188b0:	0004      	movs	r4, r0
+100188b2:	2100      	movs	r1, #0
+100188b4:	0038      	movs	r0, r7
+100188b6:	f003 fb55 	bl	1001bf64 <memset>
+100188ba:	2301      	movs	r3, #1
+100188bc:	425b      	negs	r3, r3
+100188be:	606b      	str	r3, [r5, #4]
+100188c0:	60ab      	str	r3, [r5, #8]
+100188c2:	60eb      	str	r3, [r5, #12]
+100188c4:	612b      	str	r3, [r5, #16]
+100188c6:	616b      	str	r3, [r5, #20]
+100188c8:	9b06      	ldr	r3, [sp, #24]
+100188ca:	4640      	mov	r0, r8
+100188cc:	602b      	str	r3, [r5, #0]
+100188ce:	f7ff fe99 	bl	10018604 <telemetry_get_resources>
+100188d2:	2800      	cmp	r0, #0
+100188d4:	d100      	bne.n	100188d8 <telemetry_task+0x138>
+100188d6:	e0fe      	b.n	10018ad6 <telemetry_task+0x336>
+100188d8:	2384      	movs	r3, #132	@ 0x84
+100188da:	02db      	lsls	r3, r3, #11
+100188dc:	002e      	movs	r6, r5
+100188de:	2400      	movs	r4, #0
+100188e0:	4699      	mov	r9, r3
+100188e2:	6833      	ldr	r3, [r6, #0]
+100188e4:	454b      	cmp	r3, r9
+100188e6:	d900      	bls.n	100188ea <telemetry_task+0x14a>
+100188e8:	4b9d      	ldr	r3, [pc, #628]	@ (10018b60 <telemetry_task+0x3c0>)
+100188ea:	0021      	movs	r1, r4
+100188ec:	2213      	movs	r2, #19
+100188ee:	0038      	movs	r0, r7
+100188f0:	3413      	adds	r4, #19
+100188f2:	f7fe fb29 	bl	10016f48 <s1_set_bits>
+100188f6:	3604      	adds	r6, #4
+100188f8:	2c72      	cmp	r4, #114	@ 0x72
+100188fa:	d1f2      	bne.n	100188e2 <telemetry_task+0x142>
+100188fc:	2208      	movs	r2, #8
+100188fe:	2100      	movs	r1, #0
+10018900:	4650      	mov	r0, sl
+10018902:	f003 fb2f 	bl	1001bf64 <memset>
+10018906:	4650      	mov	r0, sl
+10018908:	f7eb fada 	bl	10003ec0 <tk_get_tim>
+1001890c:	4653      	mov	r3, sl
+1001890e:	aa06      	add	r2, sp, #24
+10018910:	4694      	mov	ip, r2
+10018912:	6859      	ldr	r1, [r3, #4]
+10018914:	235f      	movs	r3, #95	@ 0x5f
+10018916:	4463      	add	r3, ip
+10018918:	0018      	movs	r0, r3
+1001891a:	f7fe faef 	bl	10016efc <s1_write_u32>
+1001891e:	465b      	mov	r3, fp
+10018920:	2200      	movs	r2, #0
+10018922:	2101      	movs	r1, #1
+10018924:	6818      	ldr	r0, [r3, #0]
+10018926:	f7e9 ff37 	bl	10002798 <tk_wai_sem>
+1001892a:	2800      	cmp	r0, #0
+1001892c:	d10e      	bne.n	1001894c <telemetry_task+0x1ac>
+1001892e:	2301      	movs	r3, #1
+10018930:	9907      	ldr	r1, [sp, #28]
+10018932:	204f      	movs	r0, #79	@ 0x4f
+10018934:	aa06      	add	r2, sp, #24
+10018936:	1812      	adds	r2, r2, r0
+10018938:	5cd2      	ldrb	r2, [r2, r3]
+1001893a:	54ca      	strb	r2, [r1, r3]
+1001893c:	3301      	adds	r3, #1
+1001893e:	2b14      	cmp	r3, #20
+10018940:	d1f7      	bne.n	10018932 <telemetry_task+0x192>
+10018942:	465b      	mov	r3, fp
+10018944:	2101      	movs	r1, #1
+10018946:	6818      	ldr	r0, [r3, #0]
+10018948:	f7e9 feac 	bl	100026a4 <tk_sig_sem>
+1001894c:	2028      	movs	r0, #40	@ 0x28
+1001894e:	f7eb f9fd 	bl	10003d4c <tk_dly_tsk>
+10018952:	4650      	mov	r0, sl
+10018954:	f003 f89e 	bl	1001ba94 <subsystem5_get_range>
+10018958:	2800      	cmp	r0, #0
+1001895a:	d000      	beq.n	1001895e <telemetry_task+0x1be>
+1001895c:	e75a      	b.n	10018814 <telemetry_task+0x74>
+1001895e:	4652      	mov	r2, sl
+10018960:	68d2      	ldr	r2, [r2, #12]
+10018962:	4653      	mov	r3, sl
+10018964:	1e51      	subs	r1, r2, #1
+10018966:	418a      	sbcs	r2, r1
+10018968:	4651      	mov	r1, sl
+1001896a:	681b      	ldr	r3, [r3, #0]
+1001896c:	6889      	ldr	r1, [r1, #8]
+1001896e:	a833      	add	r0, sp, #204	@ 0xcc
+10018970:	f7fe fbd2 	bl	10017118 <s1_set_range>
+10018974:	a80f      	add	r0, sp, #60	@ 0x3c
+10018976:	f001 fb75 	bl	1001a064 <subsystem3_get_line>
+1001897a:	2800      	cmp	r0, #0
+1001897c:	d000      	beq.n	10018980 <telemetry_task+0x1e0>
+1001897e:	e74f      	b.n	10018820 <telemetry_task+0x80>
+10018980:	9a11      	ldr	r2, [sp, #68]	@ 0x44
+10018982:	9b10      	ldr	r3, [sp, #64]	@ 0x40
+10018984:	1e51      	subs	r1, r2, #1
+10018986:	418a      	sbcs	r2, r1
+10018988:	a833      	add	r0, sp, #204	@ 0xcc
+1001898a:	990f      	ldr	r1, [sp, #60]	@ 0x3c
+1001898c:	f7fe fc00 	bl	10017190 <s1_set_line>
+10018990:	0038      	movs	r0, r7
+10018992:	f002 fce5 	bl	1001b360 <subsystem4_get_telemetry>
+10018996:	2800      	cmp	r0, #0
+10018998:	d000      	beq.n	1001899c <telemetry_task+0x1fc>
+1001899a:	e747      	b.n	1001882c <telemetry_task+0x8c>
+1001899c:	2000      	movs	r0, #0
+1001899e:	5e39      	ldrsh	r1, [r7, r0]
+100189a0:	6978      	ldr	r0, [r7, #20]
+100189a2:	88fb      	ldrh	r3, [r7, #6]
+100189a4:	88ba      	ldrh	r2, [r7, #4]
+100189a6:	9003      	str	r0, [sp, #12]
+100189a8:	6938      	ldr	r0, [r7, #16]
+100189aa:	9002      	str	r0, [sp, #8]
+100189ac:	7a78      	ldrb	r0, [r7, #9]
+100189ae:	9001      	str	r0, [sp, #4]
+100189b0:	7a38      	ldrb	r0, [r7, #8]
+100189b2:	9000      	str	r0, [sp, #0]
+100189b4:	a833      	add	r0, sp, #204	@ 0xcc
+100189b6:	f7fe fc1d 	bl	100171f4 <s1_set_imu>
+100189ba:	0028      	movs	r0, r5
+100189bc:	f001 f920 	bl	10019c00 <subsystem2_get_motion>
+100189c0:	2800      	cmp	r0, #0
+100189c2:	d000      	beq.n	100189c6 <telemetry_task+0x226>
+100189c4:	e738      	b.n	10018838 <telemetry_task+0x98>
+100189c6:	9b48      	ldr	r3, [sp, #288]	@ 0x120
+100189c8:	9a47      	ldr	r2, [sp, #284]	@ 0x11c
+100189ca:	6ae8      	ldr	r0, [r5, #44]	@ 0x2c
+100189cc:	9220      	str	r2, [sp, #128]	@ 0x80
+100189ce:	9321      	str	r3, [sp, #132]	@ 0x84
+100189d0:	4a64      	ldr	r2, [pc, #400]	@ (10018b64 <telemetry_task+0x3c4>)
+100189d2:	2300      	movs	r3, #0
+100189d4:	17c1      	asrs	r1, r0, #31
+100189d6:	f003 fd61 	bl	1001c49c <__aeabi_lmul>
+100189da:	2300      	movs	r3, #0
+100189dc:	4a62      	ldr	r2, [pc, #392]	@ (10018b68 <telemetry_task+0x3c8>)
+100189de:	f003 fd39 	bl	1001c454 <__aeabi_ldivmod>
+100189e2:	4643      	mov	r3, r8
+100189e4:	6098      	str	r0, [r3, #8]
+100189e6:	60d9      	str	r1, [r3, #12]
+100189e8:	6b28      	ldr	r0, [r5, #48]	@ 0x30
+100189ea:	2300      	movs	r3, #0
+100189ec:	4a5d      	ldr	r2, [pc, #372]	@ (10018b64 <telemetry_task+0x3c4>)
+100189ee:	17c1      	asrs	r1, r0, #31
+100189f0:	f003 fd54 	bl	1001c49c <__aeabi_lmul>
+100189f4:	2300      	movs	r3, #0
+100189f6:	4a5c      	ldr	r2, [pc, #368]	@ (10018b68 <telemetry_task+0x3c8>)
+100189f8:	f003 fd2c 	bl	1001c454 <__aeabi_ldivmod>
+100189fc:	4643      	mov	r3, r8
+100189fe:	6118      	str	r0, [r3, #16]
+10018a00:	6159      	str	r1, [r3, #20]
+10018a02:	6caa      	ldr	r2, [r5, #72]	@ 0x48
+10018a04:	6ceb      	ldr	r3, [r5, #76]	@ 0x4c
+10018a06:	4641      	mov	r1, r8
+10018a08:	618a      	str	r2, [r1, #24]
+10018a0a:	61cb      	str	r3, [r1, #28]
+10018a0c:	6d2a      	ldr	r2, [r5, #80]	@ 0x50
+10018a0e:	6d6b      	ldr	r3, [r5, #84]	@ 0x54
+10018a10:	620a      	str	r2, [r1, #32]
+10018a12:	624b      	str	r3, [r1, #36]	@ 0x24
+10018a14:	6eaa      	ldr	r2, [r5, #104]	@ 0x68
+10018a16:	6eeb      	ldr	r3, [r5, #108]	@ 0x6c
+10018a18:	628a      	str	r2, [r1, #40]	@ 0x28
+10018a1a:	62cb      	str	r3, [r1, #44]	@ 0x2c
+10018a1c:	692b      	ldr	r3, [r5, #16]
+10018a1e:	a833      	add	r0, sp, #204	@ 0xcc
+10018a20:	1e5a      	subs	r2, r3, #1
+10018a22:	4193      	sbcs	r3, r2
+10018a24:	630b      	str	r3, [r1, #48]	@ 0x30
+10018a26:	696b      	ldr	r3, [r5, #20]
+10018a28:	1e5a      	subs	r2, r3, #1
+10018a2a:	4193      	sbcs	r3, r2
+10018a2c:	634b      	str	r3, [r1, #52]	@ 0x34
+10018a2e:	6a2b      	ldr	r3, [r5, #32]
+10018a30:	638b      	str	r3, [r1, #56]	@ 0x38
+10018a32:	7f2b      	ldrb	r3, [r5, #28]
+10018a34:	63cb      	str	r3, [r1, #60]	@ 0x3c
+10018a36:	7f6b      	ldrb	r3, [r5, #29]
+10018a38:	640b      	str	r3, [r1, #64]	@ 0x40
+10018a3a:	f7fe fcb5 	bl	100173a8 <s1_set_motion>
+10018a3e:	a812      	add	r0, sp, #72	@ 0x48
+10018a40:	f7ff fdc8 	bl	100185d4 <telemetry_get_travel>
+10018a44:	2800      	cmp	r0, #0
+10018a46:	d000      	beq.n	10018a4a <telemetry_task+0x2aa>
+10018a48:	e6fc      	b.n	10018844 <telemetry_task+0xa4>
+10018a4a:	9a14      	ldr	r2, [sp, #80]	@ 0x50
+10018a4c:	9b15      	ldr	r3, [sp, #84]	@ 0x54
+10018a4e:	9912      	ldr	r1, [sp, #72]	@ 0x48
+10018a50:	a833      	add	r0, sp, #204	@ 0xcc
+10018a52:	9100      	str	r1, [sp, #0]
+10018a54:	f7fe fde2 	bl	1001761c <s1_set_travel>
+10018a58:	a80b      	add	r0, sp, #44	@ 0x2c
+10018a5a:	f7ff fdb3 	bl	100185c4 <telemetry_get_barcode>
+10018a5e:	2800      	cmp	r0, #0
+10018a60:	d000      	beq.n	10018a64 <telemetry_task+0x2c4>
+10018a62:	e6f5      	b.n	10018850 <telemetry_task+0xb0>
+10018a64:	466b      	mov	r3, sp
+10018a66:	980b      	ldr	r0, [sp, #44]	@ 0x2c
+10018a68:	aa06      	add	r2, sp, #24
+10018a6a:	a906      	add	r1, sp, #24
+10018a6c:	8e1b      	ldrh	r3, [r3, #48]	@ 0x30
+10018a6e:	7ed2      	ldrb	r2, [r2, #27]
+10018a70:	7e89      	ldrb	r1, [r1, #26]
+10018a72:	9000      	str	r0, [sp, #0]
+10018a74:	a833      	add	r0, sp, #204	@ 0xcc
+10018a76:	f7fe fe01 	bl	1001767c <s1_set_barcode>
+10018a7a:	a80d      	add	r0, sp, #52	@ 0x34
+10018a7c:	f7ff fdb2 	bl	100185e4 <telemetry_get_faults>
+10018a80:	2800      	cmp	r0, #0
+10018a82:	d000      	beq.n	10018a86 <telemetry_task+0x2e6>
+10018a84:	e6ea      	b.n	1001885c <telemetry_task+0xbc>
+10018a86:	4669      	mov	r1, sp
+10018a88:	aa06      	add	r2, sp, #24
+10018a8a:	9b0d      	ldr	r3, [sp, #52]	@ 0x34
+10018a8c:	8c52      	ldrh	r2, [r2, #34]	@ 0x22
+10018a8e:	8f09      	ldrh	r1, [r1, #56]	@ 0x38
+10018a90:	a833      	add	r0, sp, #204	@ 0xcc
+10018a92:	f7fe fe71 	bl	10017778 <s1_set_faults>
+10018a96:	465b      	mov	r3, fp
+10018a98:	2200      	movs	r2, #0
+10018a9a:	2101      	movs	r1, #1
+10018a9c:	6818      	ldr	r0, [r3, #0]
+10018a9e:	f7e9 fe7b 	bl	10002798 <tk_wai_sem>
+10018aa2:	2800      	cmp	r0, #0
+10018aa4:	d000      	beq.n	10018aa8 <telemetry_task+0x308>
+10018aa6:	e6e2      	b.n	1001886e <telemetry_task+0xce>
+10018aa8:	a933      	add	r1, sp, #204	@ 0xcc
+10018aaa:	2249      	movs	r2, #73	@ 0x49
+10018aac:	9808      	ldr	r0, [sp, #32]
+10018aae:	f003 fae7 	bl	1001c080 <memcpy>
+10018ab2:	2208      	movs	r2, #8
+10018ab4:	2100      	movs	r1, #0
+10018ab6:	0028      	movs	r0, r5
+10018ab8:	f003 fa54 	bl	1001bf64 <memset>
+10018abc:	0028      	movs	r0, r5
+10018abe:	f7eb f9ff 	bl	10003ec0 <tk_get_tim>
+10018ac2:	6869      	ldr	r1, [r5, #4]
+10018ac4:	9809      	ldr	r0, [sp, #36]	@ 0x24
+10018ac6:	f7fe fa19 	bl	10016efc <s1_write_u32>
+10018aca:	465b      	mov	r3, fp
+10018acc:	2101      	movs	r1, #1
+10018ace:	6818      	ldr	r0, [r3, #0]
+10018ad0:	f7e9 fde8 	bl	100026a4 <tk_sig_sem>
+10018ad4:	e6cb      	b.n	1001886e <telemetry_task+0xce>
+10018ad6:	2208      	movs	r2, #8
+10018ad8:	2100      	movs	r1, #0
+10018ada:	4650      	mov	r0, sl
+10018adc:	f003 fa42 	bl	1001bf64 <memset>
+10018ae0:	4650      	mov	r0, sl
+10018ae2:	f7eb f9ed 	bl	10003ec0 <tk_get_tim>
+10018ae6:	4653      	mov	r3, sl
+10018ae8:	4642      	mov	r2, r8
+10018aea:	685b      	ldr	r3, [r3, #4]
+10018aec:	6812      	ldr	r2, [r2, #0]
+10018aee:	1a9b      	subs	r3, r3, r2
+10018af0:	22fa      	movs	r2, #250	@ 0xfa
+10018af2:	00d2      	lsls	r2, r2, #3
+10018af4:	4293      	cmp	r3, r2
+10018af6:	d900      	bls.n	10018afa <telemetry_task+0x35a>
+10018af8:	e6ee      	b.n	100188d8 <telemetry_task+0x138>
+10018afa:	4643      	mov	r3, r8
+10018afc:	685e      	ldr	r6, [r3, #4]
+10018afe:	689b      	ldr	r3, [r3, #8]
+10018b00:	606e      	str	r6, [r5, #4]
+10018b02:	60ab      	str	r3, [r5, #8]
+10018b04:	9b24      	ldr	r3, [sp, #144]	@ 0x90
+10018b06:	9a23      	ldr	r2, [sp, #140]	@ 0x8c
+10018b08:	934b      	str	r3, [sp, #300]	@ 0x12c
+10018b0a:	2384      	movs	r3, #132	@ 0x84
+10018b0c:	924a      	str	r2, [sp, #296]	@ 0x128
+10018b0e:	02db      	lsls	r3, r3, #11
+10018b10:	429e      	cmp	r6, r3
+10018b12:	d801      	bhi.n	10018b18 <telemetry_task+0x378>
+10018b14:	42b4      	cmp	r4, r6
+10018b16:	d801      	bhi.n	10018b1c <telemetry_task+0x37c>
+10018b18:	60ec      	str	r4, [r5, #12]
+10018b1a:	e6dd      	b.n	100188d8 <telemetry_task+0x138>
+10018b1c:	0034      	movs	r4, r6
+10018b1e:	0033      	movs	r3, r6
+10018b20:	2213      	movs	r2, #19
+10018b22:	2100      	movs	r1, #0
+10018b24:	9805      	ldr	r0, [sp, #20]
+10018b26:	f7fe fa0f 	bl	10016f48 <s1_set_bits>
+10018b2a:	60ec      	str	r4, [r5, #12]
+10018b2c:	e6d4      	b.n	100188d8 <telemetry_task+0x138>
+10018b2e:	46c0      	nop			@ (mov r8, r8)
+10018b30:	fffffc18 	.word	0xfffffc18
+10018b34:	200144fc 	.word	0x200144fc
+10018b38:	2000012c 	.word	0x2000012c
+10018b3c:	200000c0 	.word	0x200000c0
+10018b40:	2000012c 	.word	0x2000012c
+10018b44:	20000000 	.word	0x20000000
+10018b48:	200000c0 	.word	0x200000c0
+10018b4c:	2001445c 	.word	0x2001445c
+10018b50:	2001440c 	.word	0x2001440c
+10018b54:	20014408 	.word	0x20014408
+10018b58:	20000124 	.word	0x20000124
+10018b5c:	2001421f 	.word	0x2001421f
+10018b60:	0007ffff 	.word	0x0007ffff
+10018b64:	00005a23 	.word	0x00005a23
+10018b68:	00001a7c 	.word	0x00001a7c
+
+Disassembly of section .time_critical.tinyusb:

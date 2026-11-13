@@ -1,0 +1,93 @@
+{
+  "reference": "2026-11-13-normal-motor-fingerprint.json",
+  "files": [
+    {
+      "path": "app_program/subsystem2/encoder_capture.c",
+      "unchanged_since_working_v3": true
+    },
+    {
+      "path": "app_program/subsystem2/encoder_capture.h",
+      "unchanged_since_working_v3": true
+    },
+    {
+      "path": "app_program/subsystem2/motion_control.c",
+      "unchanged_since_working_v3": true
+    },
+    {
+      "path": "app_program/subsystem2/motion_control.h",
+      "unchanged_since_working_v3": true
+    },
+    {
+      "path": "app_program/subsystem2/subsystem2.c",
+      "unchanged_since_working_v3": true
+    },
+    {
+      "path": "app_program/subsystem2/subsystem2.h",
+      "unchanged_since_working_v3": true
+    },
+    {
+      "path": "app_program/subsystem2/subsystem2_test.c",
+      "unchanged_since_working_v3": true
+    },
+    {
+      "path": "app_program/subsystem3/barcode_capture.c",
+      "unchanged_since_working_v3": true
+    },
+    {
+      "path": "app_program/subsystem3/barcode_capture.h",
+      "unchanged_since_working_v3": true
+    },
+    {
+      "path": "app_program/subsystem3/barcode_decoder.c",
+      "unchanged_since_working_v3": true
+    },
+    {
+      "path": "app_program/subsystem3/barcode_decoder.h",
+      "unchanged_since_working_v3": true
+    },
+    {
+      "path": "app_program/subsystem3/ir_adc_test.c",
+      "unchanged_since_working_v3": true
+    },
+    {
+      "path": "app_program/subsystem3/line_detection.c",
+      "unchanged_since_working_v3": true
+    },
+    {
+      "path": "app_program/subsystem3/line_detection.h",
+      "unchanged_since_working_v3": true
+    },
+    {
+      "path": "app_program/subsystem3/subsystem3.c",
+      "unchanged_since_working_v3": true
+    },
+    {
+      "path": "app_program/subsystem3/subsystem3.h",
+      "unchanged_since_working_v3": true
+    },
+    {
+      "path": "app_program/subsystem3/subsystem3_test.c",
+      "unchanged_since_working_v3": true
+    },
+    {
+      "path": "app_program/subsystem4/drv_gy511.c",
+      "unchanged_since_working_v3": true
+    },
+    {
+      "path": "app_program/subsystem4/drv_gy511.h",
+      "unchanged_since_working_v3": true
+    },
+    {
+      "path": "app_program/subsystem4/subsystem4.c",
+      "unchanged_since_working_v3": true
+    },
+    {
+      "path": "app_program/subsystem4/subsystem4.h",
+      "unchanged_since_working_v3": true
+    },
+    {
+      "path": "app_program/subsystem4/subsystem4_test.c",
+      "unchanged_since_working_v3": true
+    }
+  ]
+}

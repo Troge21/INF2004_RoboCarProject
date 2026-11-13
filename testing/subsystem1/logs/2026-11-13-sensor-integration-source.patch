@@ -1,0 +1,1081 @@
+--- working-baseline/app_program/app_main.c
++++ sensor-integrated/app_program/app_main.c
+@@ -1,209 +1,245 @@
+-/* Application lifecycle: create all subsystem objects, then start tasks.
+- * S1: WiFi status and telemetry forwarding.
+- * S2: motor PWM command consumer; optional encoder calibration in TEST=1.
+- * S3: AO line sensing; GP28 reserved for future barcode decoding.
+- * S4: IMU/hump sensing.
+- * Analog steering is controller-owned; diagnostic benches are explicit modes.
+- * S5: fixed-position HC-SR04 measurements.
+- * Former producer/consumer/monitor sample tasks and interfaces are retired.
+- * Returning from usermain shuts down the kernel; leave it sleeping instead.
+- */
+-
+-#include "app.h"
+-#include "controller.h"
+-#include "subsystem1/subsystem1.h"
+-#include "subsystem2/subsystem2.h"
+-#include "subsystem3/subsystem3.h"
+-
+-/* Standalone analog IR/steering test; other normal subsystem tasks stay off. */
+-extern void ir_adc_test(void) __attribute__((noreturn));
+-
+-#if APP_LINE_FOLLOW_ENABLED && !APP_TEST
+-/* Preserve the teammate's AO policy. Both white is centered/forward;
+- * both black crosses a junction. Pattern: centre/left=2, right=1. */
+-static void app_line_targets(UINT pattern, INT *left, INT *right)
+-{
+-#if S2_LINE_USE_RPM_CONTROL
+-    const INT forward = S2_LINE_FORWARD_RPM_X10, inner = S2_LINE_INNER_RPM_X10;
+-#else
+-    const INT forward = APP_FORWARD_DUTY, inner = APP_INNER_DUTY;
+-#endif
+-    *left = *right = 0;
+-    if (pattern > 3U) return;
+-    *left = pattern == 2U ? inner : forward;
+-    *right = pattern == 1U ? inner : forward;
+-}
+-static ER app_motor_request(INT left, INT right)
+-{
+-#if S2_LINE_USE_RPM_CONTROL
+-    return subsystem2_set_rpm_x10(left, right);
+-#else
+-    return subsystem2_set_duty(left, right);
+-#endif
+-}
+-/* Sole integrated steering owner; S2 retains PWM/encoder/PID ownership. */
+-static void app_controller_step(UW started_ms)
+-{
+-        S3_LINE_DATA line = {0};
+-        S2_MOTION_DATA motion = {0};
+-        SYSTIM now = {0}, operating = {0};
+-        INT left = 0, right = 0;
+-        unsigned state = APP_CTRL_STARTING;
+-        unsigned inhibit = app_controller_poll();
+-        ER line_er = subsystem3_get_line(&line);
+-        ER motion_er = subsystem2_get_motion(&motion);
+-        BOOL fresh, motion_fresh;
+-        ER er;
+-        (void)tk_get_tim(&now); (void)tk_get_otm(&operating);
+-        fresh = line_er == E_OK && line.valid && line.pattern <= 3U &&
+-            (UW)(now.lo - line.timestamp_ms) <= APP_IR_MAX_AGE_MS;
+-        motion_fresh = motion_er == E_OK &&
+-            (UW)(now.lo - motion.timestamp_ms) <= S2_FEEDBACK_MAX_AGE_MS;
+-        if (inhibit & APP_CTRL_LATCH) state = APP_CTRL_STOP_LATCHED;
+-        else if (inhibit & APP_CTRL_POLL_BUSY) state = APP_CTRL_WAITING_LINE;
+-        else if ((UW)(operating.lo - started_ms) >= APP_START_DELAY_MS) {
+-            if (fresh && motion_fresh &&
+-                (!S2_LINE_USE_RPM_CONTROL || motion.speed_valid)) {
+-                app_line_targets(line.pattern, &left, &right);
+-                state = APP_CTRL_FOLLOWING;
+-            } else state = APP_CTRL_WAITING_LINE;
+-        }
+-        if (motion_fresh && motion.faults != 0U) {
+-            left = right = 0; state = APP_CTRL_FAULT;
+-        }
+-        er = app_motor_request(left, right);
+-        if (er != E_OK) (void)app_motor_request(0, 0);
+-        app_controller_publish(state, er);
+-}
+-static void vehicle_controller_task(INT stacd, void *exinf)
+-{
+-    SYSTIM started = {0};
+-    (void)stacd; (void)exinf;
+-    (void)tk_get_otm(&started);
+-    tm_printf((UB *)"[CTRL] Integrated AO controller; startup=%d ms, RPM mode=%u.\n",
+-              APP_START_DELAY_MS, (UINT)S2_LINE_USE_RPM_CONTROL);
+-    for (;;) {
+-        app_controller_step(started.lo);
+-        (void)tk_dly_tsk(APP_CONTROL_PERIOD_MS);
+-    }
+-}
+-#else
+-/* Stationary integrated mode never calls S2. */
+-static void vehicle_controller_task(INT stacd, void *exinf)
+-{
+-    (void)stacd; (void)exinf;
+-    for (;;) {
+-        (void)app_controller_poll();
+-        app_controller_publish(APP_CTRL_DISABLED, E_OK);
+-        (void)tk_dly_tsk(APP_CONTROL_PERIOD_MS);
+-    }
+-}
+-#endif
+-
+-/*
+- * Create and start one task (declared in app.h for every subsystem).
+- *   prc = TP_PRC1 (core 0), TP_PRC2 (core 1), or 0 for "any core".
+- */
+-EXPORT ID app_start_task(FP entry, PRI pri, UW prc, const char *name)
+-{
+-	T_CTSK	ctsk = {0};
+-	ID	tid;
+-	ER	er;
+-
+-	ctsk.task    = entry;		/* function the task runs */
+-	ctsk.itskpri = pri;		/* initial priority (1 = highest) */
+-	ctsk.stksz   = TASK_STACK_SIZE;	/* kernel allocates the stack */
+-	ctsk.tskatr  = TA_HLNG		/* written in a high-level language (C) */
+-		     | TA_RNG3;		/* runs at user protection level */
+-#if TK_SUPPORT_SMP
+-	if (prc != 0) {
+-		ctsk.tskatr |= TA_ASSPRC;	/* honour the affinity below */
+-		ctsk.assprc  = prc;		/* which core(s) it may run on */
+-	}
+-#else
+-	(void)prc;			/* single-core build: no affinity */
+-#endif
+-
+-	/* tk_cre_tsk: create the task.  It starts in the DORMANT state. */
+-	tid = tk_cre_tsk(&ctsk);
+-	if (tid < E_OK) {
+-		CHECK(tid, name);
+-		return tid;
+-	}
+-
+-	/* tk_sta_tsk: DORMANT -> READY.  The int is passed as stacd. */
+-	er = tk_sta_tsk(tid, 0);
+-	CHECK(er, name);
+-	if (er < E_OK) {
+-		(void)tk_del_tsk(tid);
+-		return er;
+-	}
+-#if APP_BENCH_MODE == APP_BENCH_INTEGRATED
+-    s1_resource_add_stack(TASK_STACK_SIZE);
+-#endif
+-	return tid;
+-}
+-
+-EXPORT INT usermain(void)
+-{
+-	T_RVER	ver;
+-
+-#if APP_BENCH_MODE == APP_BENCH_ENCODER
+-    /* Explicit exclusive encoder bench; powered mode starts only S2 motor PWM. */
+-    subsystem2_test();
+-    for (;;) {
+-        (void)tk_dly_tsk(2000);
+-        subsystem2_test_status();
+-    }
+-#elif APP_BENCH_MODE == APP_BENCH_IR
+-    ir_adc_test();
+-#endif
+-
+-	/* tk_ref_ver: ask the kernel who it is */
+-	tk_ref_ver(&ver);
+-	tm_printf((UB*)"\n=== micro T-Kernel on Raspberry Pi Pico W"
+-		  " (spec 0x%04x, product 0x%04x) ===\n", ver.spver, ver.prver);
+-#if TK_SUPPORT_SMP
+-	tm_printf((UB*)"dual-core (SMP) build, usermain on core %d\n",
+-		  tk_get_prc() - 1);	/* tk_get_prc() counts from 1 */
+-#else
+-	tm_printf((UB*)"single-core build\n");
+-#endif
+-
+-	/* Phase 1: every subsystem creates its kernel objects */
+-	CHECK(subsystem1_init(), "subsystem1_init");
+-	CHECK(subsystem2_init(), "subsystem2_init");
+-	CHECK(subsystem3_init(), "subsystem3_init");
+-	CHECK(subsystem4_init(), "subsystem4_init");
+-	CHECK(subsystem5_init(), "subsystem5_init");
+-    CHECK(app_controller_init(), "controller_init");
+-
+-	/* Phase 2: every subsystem starts its tasks */
+-	CHECK(subsystem1_start(), "subsystem1_start");
+-	CHECK(subsystem2_start(), "subsystem2_start");
+-	CHECK(subsystem3_start(), "subsystem3_start");
+-	CHECK(subsystem4_start(), "subsystem4_start");
+-	CHECK(subsystem5_start(), "subsystem5_start");
+-
+-    CHECK(app_start_task((FP)vehicle_controller_task, APP_PRI_CONTROLLER,
+-                         TP_PRC1, "vehicle_controller"), "start controller");
+-
+-	tm_printf((UB*)"all subsystems started\n\n");
+-
+-#if APP_TEST
+-	/* Test build (make TEST=1): run every subsystem's tests in turn,
+-	   here in the initial task, while the system is running.  Tests may
+-	   call tk_dly_tsk() to let the other tasks work for a while. */
+-	tm_printf((UB*)"[TEST] === test run start ===\n");
+-	subsystem1_test();
+-	subsystem2_test();
+-	subsystem3_test();
+-	subsystem4_test();
+-	subsystem5_test();
+-	tm_printf((UB*)"[TEST] === test run end ===\n");
+-#endif
+-
+-	/* Sleep forever.  Returning from usermain() would shut down. */
+-	tk_slp_tsk(TMO_FEVR);
+-	return 0;
+-}
++/* Application lifecycle: create all subsystem objects, then start tasks.
++ * S1: WiFi status and telemetry forwarding.
++ * S2: motor PWM command consumer; optional encoder calibration in TEST=1.
++ * S3: AO line sensing; GP28 reserved for future barcode decoding.
++ * S4: IMU/hump sensing.
++ * Analog steering is controller-owned; diagnostic benches are explicit modes.
++ * S5: HC-SR04/servo snapshots; controller arbitrates obstacle and line requests.
++ * Former producer/consumer/monitor sample tasks and interfaces are retired.
++ * Returning from usermain shuts down the kernel; leave it sleeping instead.
++ */
++
++#include "app.h"
++#include "controller.h"
++#include "subsystem1/subsystem1.h"
++#include "subsystem2/subsystem2.h"
++#include "subsystem3/subsystem3.h"
++#include "subsystem5/subsystem5.h"
++
++/* Standalone analog IR/steering test; other normal subsystem tasks stay off. */
++extern void ir_adc_test(void) __attribute__((noreturn));
++
++#if APP_LINE_FOLLOW_ENABLED && !APP_TEST
++/* Preserve the teammate's AO policy. Both white is centered/forward;
++ * both black crosses a junction. Pattern: centre/left=2, right=1. */
++static void app_line_targets(UINT pattern, INT *left, INT *right)
++{
++#if S2_LINE_USE_RPM_CONTROL
++    const INT forward = S2_LINE_FORWARD_RPM_X10, inner = S2_LINE_INNER_RPM_X10;
++#else
++    const INT forward = APP_FORWARD_DUTY, inner = APP_INNER_DUTY;
++#endif
++    *left = *right = 0;
++    if (pattern > 3U) return;
++    *left = pattern == 2U ? inner : forward;
++    *right = pattern == 1U ? inner : forward;
++}
++static ER app_motor_request(INT left, INT right)
++{
++#if S2_LINE_USE_RPM_CONTROL
++    return subsystem2_set_rpm_x10(left, right);
++#else
++    return subsystem2_set_duty(left, right);
++#endif
++}
++/* Sole integrated steering owner; S2 retains PWM/encoder/PID ownership. */
++static void app_controller_step(UW started_ms)
++{
++        S3_LINE_DATA line = {0};
++        S2_MOTION_DATA motion = {0};
++        S5_NAV_DATA navigation = {0};
++        SYSTIM now = {0}, operating = {0};
++        INT left = 0, right = 0;
++        unsigned state = APP_CTRL_STARTING;
++        unsigned inhibit = app_controller_poll();
++        ER line_er = subsystem3_get_line(&line);
++        ER motion_er = subsystem2_get_motion(&motion);
++        ER navigation_er = subsystem5_get_navigation(&navigation);
++        BOOL fresh, motion_fresh, navigation_fresh;
++        ER er;
++        (void)tk_get_tim(&now); (void)tk_get_otm(&operating);
++        fresh = line_er == E_OK && line.valid && line.pattern <= 3U &&
++            (UW)(now.lo - line.timestamp_ms) <= APP_IR_MAX_AGE_MS;
++        motion_fresh = motion_er == E_OK &&
++            (UW)(now.lo - motion.timestamp_ms) <= S2_FEEDBACK_MAX_AGE_MS;
++        navigation_fresh = navigation_er == E_OK &&
++            (UW)(now.lo - navigation.timestamp_ms) <= S5_NAV_MAX_AGE_MS;
++        if (inhibit & APP_CTRL_LATCH) state = APP_CTRL_STOP_LATCHED;
++        else if (inhibit & APP_CTRL_POLL_BUSY) state = APP_CTRL_WAITING_LINE;
++        else if ((UW)(operating.lo - started_ms) >= APP_START_DELAY_MS) {
++            if (fresh && motion_fresh &&
++                (!S2_LINE_USE_RPM_CONTROL || motion.speed_valid)) {
++                /* S5 publishes intent only. This is the sole wheel requester,
++                 * after latch/startup/feedback/line gates on every 20 ms step. */
++                state = APP_CTRL_STOPPED;
++                if (navigation_fresh) {
++                    switch (navigation.phase) {
++                    case S5_NAV_CLEAR:
++                        app_line_targets(line.pattern, &left, &right);
++                        state = APP_CTRL_FOLLOWING;
++                        break;
++                    case S5_NAV_SCANNING:
++                        state = APP_CTRL_SCANNING;
++                        break;
++                    case S5_NAV_LEFT:
++#if S2_LINE_USE_RPM_CONTROL
++                        left = S5_TURN_INNER_RPM_X10;
++                        right = S5_TURN_OUTER_RPM_X10;
++#else
++                        right = APP_FORWARD_DUTY;
++#endif
++                        state = APP_CTRL_TURNING_LEFT;
++                        break;
++                    case S5_NAV_RIGHT:
++#if S2_LINE_USE_RPM_CONTROL
++                        left = S5_TURN_OUTER_RPM_X10;
++                        right = S5_TURN_INNER_RPM_X10;
++#else
++                        left = APP_FORWARD_DUTY;
++#endif
++                        state = APP_CTRL_TURNING_RIGHT;
++                        break;
++                    default: break; /* blocked/unknown: zero */
++                    }
++                }
++            } else state = APP_CTRL_WAITING_LINE;
++        }
++        if (motion_fresh && motion.faults != 0U) {
++            left = right = 0; state = APP_CTRL_FAULT;
++        }
++        er = app_motor_request(left, right);
++        if (er != E_OK) (void)app_motor_request(0, 0);
++        app_controller_publish(state, er);
++}
++static void vehicle_controller_task(INT stacd, void *exinf)
++{
++    SYSTIM started = {0};
++    (void)stacd; (void)exinf;
++    (void)tk_get_otm(&started);
++    tm_printf((UB *)"[CTRL] Integrated AO controller; startup=%d ms, RPM mode=%u.\n",
++              APP_START_DELAY_MS, (UINT)S2_LINE_USE_RPM_CONTROL);
++    for (;;) {
++        app_controller_step(started.lo);
++        (void)tk_dly_tsk(APP_CONTROL_PERIOD_MS);
++    }
++}
++#else
++/* Stationary integrated mode never calls S2. */
++static void vehicle_controller_task(INT stacd, void *exinf)
++{
++    (void)stacd; (void)exinf;
++    for (;;) {
++        (void)app_controller_poll();
++        app_controller_publish(APP_CTRL_DISABLED, E_OK);
++        (void)tk_dly_tsk(APP_CONTROL_PERIOD_MS);
++    }
++}
++#endif
++
++/*
++ * Create and start one task (declared in app.h for every subsystem).
++ *   prc = TP_PRC1 (core 0), TP_PRC2 (core 1), or 0 for "any core".
++ */
++EXPORT ID app_start_task(FP entry, PRI pri, UW prc, const char *name)
++{
++	T_CTSK	ctsk = {0};
++	ID	tid;
++	ER	er;
++
++	ctsk.task    = entry;		/* function the task runs */
++	ctsk.itskpri = pri;		/* initial priority (1 = highest) */
++	ctsk.stksz   = TASK_STACK_SIZE;	/* kernel allocates the stack */
++	ctsk.tskatr  = TA_HLNG		/* written in a high-level language (C) */
++		     | TA_RNG3;		/* runs at user protection level */
++#if TK_SUPPORT_SMP
++	if (prc != 0) {
++		ctsk.tskatr |= TA_ASSPRC;	/* honour the affinity below */
++		ctsk.assprc  = prc;		/* which core(s) it may run on */
++	}
++#else
++	(void)prc;			/* single-core build: no affinity */
++#endif
++
++	/* tk_cre_tsk: create the task.  It starts in the DORMANT state. */
++	tid = tk_cre_tsk(&ctsk);
++	if (tid < E_OK) {
++		CHECK(tid, name);
++		return tid;
++	}
++
++	/* tk_sta_tsk: DORMANT -> READY.  The int is passed as stacd. */
++	er = tk_sta_tsk(tid, 0);
++	CHECK(er, name);
++	if (er < E_OK) {
++		(void)tk_del_tsk(tid);
++		return er;
++	}
++#if APP_BENCH_MODE == APP_BENCH_INTEGRATED
++    s1_resource_add_stack(TASK_STACK_SIZE);
++#endif
++	return tid;
++}
++
++EXPORT INT usermain(void)
++{
++	T_RVER	ver;
++
++#if APP_BENCH_MODE == APP_BENCH_ENCODER
++    /* Explicit exclusive encoder bench; powered mode starts only S2 motor PWM. */
++    subsystem2_test();
++    for (;;) {
++        (void)tk_dly_tsk(2000);
++        subsystem2_test_status();
++    }
++#elif APP_BENCH_MODE == APP_BENCH_IR
++    ir_adc_test();
++#endif
++
++	/* tk_ref_ver: ask the kernel who it is */
++	tk_ref_ver(&ver);
++	tm_printf((UB*)"\n=== micro T-Kernel on Raspberry Pi Pico W"
++		  " (spec 0x%04x, product 0x%04x) ===\n", ver.spver, ver.prver);
++#if TK_SUPPORT_SMP
++	tm_printf((UB*)"dual-core (SMP) build, usermain on core %d\n",
++		  tk_get_prc() - 1);	/* tk_get_prc() counts from 1 */
++#else
++	tm_printf((UB*)"single-core build\n");
++#endif
++
++	/* Phase 1: every subsystem creates its kernel objects */
++	CHECK(subsystem1_init(), "subsystem1_init");
++	CHECK(subsystem2_init(), "subsystem2_init");
++	CHECK(subsystem3_init(), "subsystem3_init");
++	CHECK(subsystem4_init(), "subsystem4_init");
++	CHECK(subsystem5_init(), "subsystem5_init");
++    CHECK(app_controller_init(), "controller_init");
++
++	/* Phase 2: every subsystem starts its tasks */
++	CHECK(subsystem1_start(), "subsystem1_start");
++	CHECK(subsystem2_start(), "subsystem2_start");
++	CHECK(subsystem3_start(), "subsystem3_start");
++	CHECK(subsystem4_start(), "subsystem4_start");
++	CHECK(subsystem5_start(), "subsystem5_start");
++
++    CHECK(app_start_task((FP)vehicle_controller_task, APP_PRI_CONTROLLER,
++                         TP_PRC1, "vehicle_controller"), "start controller");
++
++	tm_printf((UB*)"all subsystems started\n\n");
++
++#if APP_TEST
++	/* Test build (make TEST=1): run every subsystem's tests in turn,
++	   here in the initial task, while the system is running.  Tests may
++	   call tk_dly_tsk() to let the other tasks work for a while. */
++	tm_printf((UB*)"[TEST] === test run start ===\n");
++	subsystem1_test();
++	subsystem2_test();
++	subsystem3_test();
++	subsystem4_test();
++	subsystem5_test();
++	tm_printf((UB*)"[TEST] === test run end ===\n");
++#endif
++
++	/* Sleep forever.  Returning from usermain() would shut down. */
++	tk_slp_tsk(TMO_FEVR);
++	return 0;
++}
+--- working-baseline/app_program/subsystem5/subsystem5.c
++++ sensor-integrated/app_program/subsystem5/subsystem5.c
+@@ -1,180 +1,310 @@
+-/* HC-SR04: GP4 TRIG, GP5 ECHO through a 5 V -> 3.3 V divider.
+- * GPIO IRQ13 timestamps echo edges; the task sleeps while waiting.
+- * Only this core-0 task owns the sensor. No servo or controller commands yet.
+- */
+-#include "subsystem5.h"
+-#include "../gpio_irq.h"
+-#include "../subsystem2/subsystem2.h"
+-#include <sys/sysdef.h>
+-#include <tk/syslib.h>
+-
+-
+-#define ECHO_FALL (4U << (4 * S5_ECHO_PIN))
+-#define ECHO_RISE (8U << (4 * S5_ECHO_PIN))
+-#define ECHO_EDGES (ECHO_FALL | ECHO_RISE)
+-#define ECHO_TIMEOUT_MS 40
+-#define SAMPLE_PAUSE_MS 500 /* comfortably longer than 60 ms trigger spacing */
+-
+-enum { WAIT_RISE, WAIT_FALL, COMPLETE, BAD_EDGES };
+-static ID echo_done;
+-static ID range_sem;
+-/* seq32 + publication32 + distance12/present1/reserved3; no native padding. */
+-static UB range_publication[10];
+-static void range_write(UW seq,UW mm,BOOL valid)
+-{
+-    SYSTIM now={0};UINT i;UW word=0x8000U|(valid?mm:0U);
+-    (void)tk_get_tim(&now);
+-    if(tk_wai_sem(range_sem,1,TMO_POL)!=E_OK)return;
+-    for(i=0;i<4;++i) {
+-        range_publication[i]=(UB)(seq>>(8*i));
+-        range_publication[4+i]=(UB)(now.lo>>(8*i));
+-    }
+-    range_publication[8]=(UB)word;range_publication[9]=(UB)(word>>8);
+-    (void)tk_sig_sem(range_sem,1);
+-}
+-EXPORT ER subsystem5_get_range(S5_RANGE_DATA *out)
+-{
+-    UINT i;UW seq=0,t=0,word;ER er;
+-    if(!out)return E_PAR;
+-    if(range_sem<=0)return E_OBJ;
+-    er=tk_wai_sem(range_sem,1,TMO_POL);if(er!=E_OK)return er;
+-    for(i=0;i<4;++i){seq|=(UW)range_publication[i]<<(8*i);t|=(UW)range_publication[4+i]<<(8*i);}
+-    word=range_publication[8]|((UW)range_publication[9]<<8);
+-    (void)tk_sig_sem(range_sem,1);
+-    if(!(word&0x8000U))return E_TMOUT;
+-    out->sequence=seq;out->timestamp_ms=t;out->distance_mm=word&4095U;
+-    out->valid=out->distance_mm!=0;return E_OK;
+-}
+-static volatile UINT echo_state;
+-static volatile UW rise_us, width_us;
+-
+-EXPORT ER s5_echo_to_mm(UW pulse_us, UW *mm)
+-{
+-    if (mm == NULL) return E_PAR;
+-    *mm = 0;
+-    /* Datasheet formula: centimetres = microseconds / 58 (x10 for mm). */
+-    if (pulse_us < 116 || pulse_us > 23200) return E_PAR;
+-    *mm = (pulse_us * 10U + 29U) / 58U;
+-    return E_OK;
+-}
+-
+-static void echo_isr(UINT pin, UINT events, UW levels, UW now)
+-{
+-    UW pending = events << (4U * S5_ECHO_PIN);
+-    (void)pin;
+-    (void)levels;
+-    if (pending == 0) return;
+-    if (echo_state == WAIT_RISE && pending == ECHO_RISE) {
+-        rise_us = now;
+-        echo_state = WAIT_FALL;
+-        return;
+-    }
+-    if (echo_state == WAIT_FALL && pending == ECHO_FALL) {
+-        width_us = now - rise_us; /* unsigned subtraction handles timer wrap */
+-        echo_state = COMPLETE;
+-    } else {
+-        /* Coalesced edges or unexpected order cannot give a valid width. */
+-        echo_state = BAD_EDGES;
+-    }
+-    (void)app_gpio_irq_enable(S5_ECHO_PIN, FALSE);
+-    tk_sig_sem(echo_done, 1); /* no printing or waiting in interrupt context */
+-}
+-
+-static const char *measure(UW *mm, UW *pulse)
+-{
+-    ER er;
+-    *mm = 0;
+-    *pulse = 0;
+-    if (gpio_get_val(S5_ECHO_PIN)) return "ECHO_HIGH_BEFORE_TRIGGER";
+-    while (tk_wai_sem(echo_done, 1, TMO_POL) == E_OK) { /* drain stale signal */ }
+-
+-    (void)app_gpio_irq_enable(S5_ECHO_PIN, FALSE);
+-    echo_state = WAIT_RISE;
+-    width_us = 0;
+-    (void)app_gpio_irq_enable(S5_ECHO_PIN, TRUE);
+-    gpio_set_val(S5_TRIG_PIN, 1);
+-    WaitUsec(12); /* HC-SR04 requires at least 10 us */
+-    gpio_set_val(S5_TRIG_PIN, 0);
+-    er = tk_wai_sem(echo_done, 1, ECHO_TIMEOUT_MS);
+-    (void)app_gpio_irq_enable(S5_ECHO_PIN, FALSE);
+-    if (er == E_TMOUT) {
+-        return echo_state == WAIT_RISE ? "NO_ECHO_TIMEOUT" : "ECHO_END_TIMEOUT";
+-    }
+-    if (er < E_OK) return "KERNEL_WAIT_ERROR";
+-    if (echo_state != COMPLETE) return "INVALID_EDGE_SEQUENCE";
+-    *pulse = width_us;
+-    return s5_echo_to_mm(*pulse, mm) == E_OK ? NULL : "OUT_OF_RANGE";
+-}
+-
+-static void ultrasonic_task(INT stacd, void *exinf)
+-{
+-    ER er;
+-    (void)stacd;
+-    (void)exinf;
+-    /* GPIO interrupt routing and NVIC setup are both on physical core 0. */
+-    er = app_gpio_irq_register(S5_ECHO_PIN, APP_GPIO_RISE | APP_GPIO_FALL, echo_isr);
+-    if (er < E_OK) {
+-        CHECK(er, "ultrasonic IRQ setup");
+-        tk_exd_tsk();
+-        return;
+-    }
+-    if (S5_ULTRA_LOG_ENABLED)
+-        tm_printf((UB *)"[ULTRA] HC-SR04 GP4=TRIG GP5=ECHO (divider required); servo OFF\n");
+-    tk_dly_tsk(100); /* let sensor power settle */
+-    UW sequence = 0;
+-    for (;;) {
+-        UW mm, pulse;
+-        const char *error = measure(&mm, &pulse);
+-        /* Publication only. Sensor timing never depends on network/queue state. */
+-        range_write(sequence++,mm,error==NULL);
+-        if (S5_ULTRA_LOG_ENABLED) {
+-            if (error == NULL) {
+-                tm_printf((UB *)"[ULTRA] distance=%u mm echo=%u us\n", mm, pulse);
+-            } else {
+-                tm_printf((UB *)"[ULTRA] INVALID %s echo=%u us (not clear space)\n",
+-                          error, pulse);
+-            }
+-        }
+-        tk_dly_tsk(SAMPLE_PAUSE_MS);
+-    }
+-}
+-
+-EXPORT ER subsystem5_init(void)
+-{
+-#if APP_TEST && S2_ENCODER_CALIBRATION
+-    return E_OK;
+-#else
+-    T_CSEM csem = {0};
+-    ER er;
+-    gpio_set_val(S5_TRIG_PIN, 0);
+-    er = gpio_set_pin(S5_TRIG_PIN, GPIO_MODE_OUT);
+-    if (er < E_OK) return er;
+-    er = gpio_set_pin(S5_ECHO_PIN, GPIO_MODE_IN);
+-    if (er < E_OK) return er;
+-    clr_w(GPIO(S5_ECHO_PIN), GPIO_PUE);
+-    set_w(GPIO(S5_ECHO_PIN), GPIO_PDE); /* idle low when unplugged */
+-    csem.sematr = TA_TFIFO;
+-    csem.maxsem = 1;
+-    echo_done = tk_cre_sem(&csem);
+-    if(echo_done<E_OK)return echo_done;
+-    csem.isemcnt=1;
+-    range_sem=tk_cre_sem(&csem);
+-    if(range_sem<E_OK){(void)tk_del_sem(echo_done);echo_done=0;}
+-    return range_sem<E_OK?range_sem:E_OK;
+-#endif
+-}
+-
+-EXPORT ER subsystem5_start(void)
+-{
+-#if APP_TEST && S2_ENCODER_CALIBRATION
+-    if (S5_ULTRA_LOG_ENABLED)
+-        tm_printf((UB *)"[ULTRA] SKIP: subsystem2 encoder calibration owns GPIO IRQ13.\n");
+-    return E_OK;
+-#else
+-    ID tid;
+-    if (echo_done <= 0 || range_sem <= 0) return E_OBJ;
+-    tid = app_start_task((FP)ultrasonic_task, S5_PRI_MAIN, TP_PRC1,
+-                         "ultrasonic_task");
+-    return tid < E_OK ? tid : E_OK;
+-#endif
+-}
++/* HC-SR04: GP4 TRIG, GP5 ECHO through a 5 V -> 3.3 V divider.
++ * GPIO IRQ13 timestamps echo edges; the task sleeps while waiting.
++ * Only this core-0 task owns sensor/servo I/O. It publishes navigation
++ * intent; the shared controller alone requests wheels after its STOP latch.
++ */
++#include "subsystem5.h"
++#include "../gpio_irq.h"
++#include "../telemetry_sources.h"
++#include <sys/sysdef.h>
++#include <tk/syslib.h>
++
++
++#define ECHO_FALL (4U << (4 * S5_ECHO_PIN))
++#define ECHO_RISE (8U << (4 * S5_ECHO_PIN))
++#define ECHO_EDGES (ECHO_FALL | ECHO_RISE)
++#define ECHO_TIMEOUT_MS 40
++#define SAMPLE_PAUSE_MS 80 /* trigger spacing remains greater than 60 ms */
++#define S5_PWM_SLICE 6U
++#define S5_PWM_TOP 39062U
++#define S5_PWM_REG(offset) (PWM_BASE + S5_PWM_SLICE * 0x14U + (offset))
++
++enum { WAIT_RISE, WAIT_FALL, COMPLETE, BAD_EDGES };
++static ID echo_done;
++static ID range_sem;
++/* seq32 + publication32 + distance12/present1/reserved3; no native padding. */
++static UB range_publication[10];
++static void range_write(UW seq,UW mm,BOOL valid)
++{
++    SYSTIM now={0};UINT i;UW word=0x8000U|(valid?mm:0U);
++    (void)tk_get_tim(&now);
++    if(tk_wai_sem(range_sem,1,TMO_POL)!=E_OK)return;
++    for(i=0;i<4;++i) {
++        range_publication[i]=(UB)(seq>>(8*i));
++        range_publication[4+i]=(UB)(now.lo>>(8*i));
++    }
++    range_publication[8]=(UB)word;range_publication[9]=(UB)(word>>8);
++    (void)tk_sig_sem(range_sem,1);
++}
++EXPORT ER subsystem5_get_range(S5_RANGE_DATA *out)
++{
++    UINT i;UW seq=0,t=0,word;ER er;
++    if(!out)return E_PAR;
++    if(range_sem<=0)return E_OBJ;
++    er=tk_wai_sem(range_sem,1,TMO_POL);if(er!=E_OK)return er;
++    for(i=0;i<4;++i){seq|=(UW)range_publication[i]<<(8*i);t|=(UW)range_publication[4+i]<<(8*i);}
++    word=range_publication[8]|((UW)range_publication[9]<<8);
++    (void)tk_sig_sem(range_sem,1);
++    if(!(word&0x8000U))return E_TMOUT;
++    out->sequence=seq;out->timestamp_ms=t;out->distance_mm=word&4095U;
++    out->valid=out->distance_mm!=0;return E_OK;
++}
++/* Shared under range_sem. time32 + phase3; completed scan is time32 +
++ * ID32 + three distance12 values + present1/reserved3. Fixed angles implicit. */
++static UB navigation_publication[5],scan_publication[13];
++static void write32(UB *out,UW value)
++{
++    UINT i;for(i=0;i<4;++i)out[i]=(UB)(value>>(8*i));
++}
++static UW read32(const UB *in)
++{
++    UW value=0;UINT i;for(i=0;i<4;++i)value|=(UW)in[i]<<(8*i);return value;
++}
++static void navigation_write(S5_NAV_PHASE phase)
++{
++    SYSTIM now={0};(void)tk_get_tim(&now);
++    if(tk_wai_sem(range_sem,1,TMO_POL)!=E_OK)return;
++    write32(navigation_publication,now.lo);navigation_publication[4]=(UB)phase;
++    (void)tk_sig_sem(range_sem,1);
++}
++EXPORT ER subsystem5_get_navigation(S5_NAV_DATA *out)
++{
++    UB copy[5];UINT i;ER er;
++    if(!out)return E_PAR;
++    if(range_sem<=0)return E_OBJ;
++    er=tk_wai_sem(range_sem,1,TMO_POL);if(er!=E_OK)return er;
++    for(i=0;i<5;++i)copy[i]=navigation_publication[i];
++    (void)tk_sig_sem(range_sem,1);
++    if(copy[4]==S5_NAV_UNAVAILABLE)return E_TMOUT;
++    out->timestamp_ms=read32(copy);out->phase=copy[4];return E_OK;
++}
++static void scan_write(UW sequence,UW right,UW centre,UW left)
++{
++    SYSTIM now={0};UB copy[13]={0};UINT i;
++    (void)tk_get_tim(&now);write32(copy,now.lo);write32(copy+4,sequence);
++    copy[8]=(UB)right;copy[9]=(UB)((right>>8)|((centre&15U)<<4));
++    copy[10]=(UB)(centre>>4);copy[11]=(UB)left;copy[12]=(UB)((left>>8)|16U);
++    if(tk_wai_sem(range_sem,1,TMO_POL)!=E_OK)return;
++    for(i=0;i<13;++i)scan_publication[i]=copy[i];
++    (void)tk_sig_sem(range_sem,1);
++}
++int telemetry_get_scan(TELEMETRY_SCAN *out)
++{
++    UB copy[13];UINT i;ER er;
++    if(!out)return E_PAR;
++    if(range_sem<=0)return E_OBJ;
++    er=tk_wai_sem(range_sem,1,TMO_POL);if(er!=E_OK)return er;
++    for(i=0;i<13;++i)copy[i]=scan_publication[i];
++    (void)tk_sig_sem(range_sem,1);
++    if(!(copy[12]&16U))return E_TMOUT;
++    out->timestamp_ms=read32(copy);out->sequence=read32(copy+4);out->count=3;
++    out->points[0].angle=S5_SERVO_RIGHT_DEG;
++    out->points[0].distance_mm=(uint16_t)(copy[8]|((copy[9]&15U)<<8));
++    out->points[1].angle=S5_SERVO_CENTRE_DEG;
++    out->points[1].distance_mm=(uint16_t)((copy[9]>>4)|((UINT)copy[10]<<4));
++    out->points[2].angle=S5_SERVO_LEFT_DEG;
++    out->points[2].distance_mm=(uint16_t)(copy[11]|((copy[12]&15U)<<8));
++    return E_OK;
++}
++EXPORT S5_MOTION s5_choose_motion(BOOL centre_valid,UW centre_mm,
++                                 BOOL left_valid,UW left_mm,
++                                 BOOL right_valid,UW right_mm)
++{
++    BOOL left_clear=left_valid&&left_mm>S5_OBSTACLE_MM;
++    BOOL right_clear=right_valid&&right_mm>S5_OBSTACLE_MM;
++    if(!centre_valid)return S5_MOTION_STOP;
++    if(centre_mm>S5_OBSTACLE_MM)return S5_MOTION_FORWARD;
++    if(!left_clear&&!right_clear)return S5_MOTION_STOP;
++    if(!right_clear)return S5_MOTION_LEFT;
++    if(!left_clear)return S5_MOTION_RIGHT;
++    return left_mm+S5_CLEARANCE_MARGIN_MM>=right_mm?S5_MOTION_LEFT:S5_MOTION_RIGHT;
++}
++static void servo_set_angle(UINT degrees)
++{
++    UW pulse_us=1000U+(1000U*degrees)/180U;
++    UW compare=(pulse_us*(S5_PWM_TOP+1U)+10000U)/20000U;
++    (void)pwm_set_cc(S5_SERVO_PIN,compare);
++}
++static void phase_delay(UW delay_ms,S5_NAV_PHASE phase)
++{
++    while(delay_ms) {
++        UW step=delay_ms>50U?50U:delay_ms;
++        navigation_write(phase);
++        (void)tk_dly_tsk(step);delay_ms-=step;
++    }
++    navigation_write(phase);
++}
++static volatile UINT echo_state;
++static volatile UW rise_us, width_us;
++
++EXPORT ER s5_echo_to_mm(UW pulse_us, UW *mm)
++{
++    if (mm == NULL) return E_PAR;
++    *mm = 0;
++    /* Datasheet formula: centimetres = microseconds / 58 (x10 for mm). */
++    if (pulse_us < 116 || pulse_us > 23200) return E_PAR;
++    *mm = (pulse_us * 10U + 29U) / 58U;
++    return E_OK;
++}
++
++static void echo_isr(UINT pin, UINT events, UW levels, UW now)
++{
++    UW pending = events << (4U * S5_ECHO_PIN);
++    (void)pin;
++    (void)levels;
++    if (pending == 0) return;
++    if (echo_state == WAIT_RISE && pending == ECHO_RISE) {
++        rise_us = now;
++        echo_state = WAIT_FALL;
++        return;
++    }
++    if (echo_state == WAIT_FALL && pending == ECHO_FALL) {
++        width_us = now - rise_us; /* unsigned subtraction handles timer wrap */
++        echo_state = COMPLETE;
++    } else {
++        /* Coalesced edges or unexpected order cannot give a valid width. */
++        echo_state = BAD_EDGES;
++    }
++    (void)app_gpio_irq_enable(S5_ECHO_PIN, FALSE);
++    tk_sig_sem(echo_done, 1); /* no printing or waiting in interrupt context */
++}
++
++static const char *measure(UW *mm, UW *pulse)
++{
++    ER er;
++    *mm = 0;
++    *pulse = 0;
++    if (gpio_get_val(S5_ECHO_PIN)) return "ECHO_HIGH_BEFORE_TRIGGER";
++    while (tk_wai_sem(echo_done, 1, TMO_POL) == E_OK) { /* drain stale signal */ }
++
++    (void)app_gpio_irq_enable(S5_ECHO_PIN, FALSE);
++    echo_state = WAIT_RISE;
++    width_us = 0;
++    (void)app_gpio_irq_enable(S5_ECHO_PIN, TRUE);
++    gpio_set_val(S5_TRIG_PIN, 1);
++    WaitUsec(12); /* HC-SR04 requires at least 10 us */
++    gpio_set_val(S5_TRIG_PIN, 0);
++    er = tk_wai_sem(echo_done, 1, ECHO_TIMEOUT_MS);
++    (void)app_gpio_irq_enable(S5_ECHO_PIN, FALSE);
++    if (er == E_TMOUT) {
++        return echo_state == WAIT_RISE ? "NO_ECHO_TIMEOUT" : "ECHO_END_TIMEOUT";
++    }
++    if (er < E_OK) return "KERNEL_WAIT_ERROR";
++    if (echo_state != COMPLETE) return "INVALID_EDGE_SEQUENCE";
++    *pulse = width_us;
++    return s5_echo_to_mm(*pulse, mm) == E_OK ? NULL : "OUT_OF_RANGE";
++}
++
++static void ultrasonic_task(INT stacd, void *exinf)
++{
++    ER er;
++    (void)stacd;
++    (void)exinf;
++    /* GPIO interrupt routing and NVIC setup are both on physical core 0. */
++    er = app_gpio_irq_register(S5_ECHO_PIN, APP_GPIO_RISE | APP_GPIO_FALL, echo_isr);
++    if (er < E_OK) {
++        CHECK(er, "ultrasonic IRQ setup");
++        tk_exd_tsk();
++        return;
++    }
++    (void)tk_dly_tsk(100);
++    servo_set_angle(S5_SERVO_CENTRE_DEG);
++    phase_delay(S5_SERVO_SETTLE_MS,S5_NAV_SCANNING);
++    {
++        UW sequence=0,profile=0;
++        S5_NAV_PHASE current=S5_NAV_SCANNING;
++        for(;;) {
++            UW centre=0,left=0,right=0,pulse;
++            const char *centre_error,*left_error,*right_error;
++            S5_MOTION choice;
++            servo_set_angle(S5_SERVO_CENTRE_DEG);
++            phase_delay(S5_SERVO_SETTLE_MS,current);
++            centre_error=measure(&centre,&pulse);
++            /* Only actual centre samples reach the front-distance tile. */
++            range_write(sequence++,centre,centre_error==NULL);
++            if(centre_error!=NULL) {
++                current=S5_NAV_BLOCKED;phase_delay(SAMPLE_PAUSE_MS,current);continue;
++            }
++            if(centre>S5_OBSTACLE_MM) {
++                current=S5_NAV_CLEAR;phase_delay(SAMPLE_PAUSE_MS,current);continue;
++            }
++            /* Stop through the controller before moving to a side view. */
++            phase_delay(SAMPLE_PAUSE_MS,S5_NAV_SCANNING);
++            servo_set_angle(S5_SERVO_LEFT_DEG);
++            phase_delay(S5_SERVO_SETTLE_MS,S5_NAV_SCANNING);
++            left_error=measure(&left,&pulse);
++            phase_delay(SAMPLE_PAUSE_MS,S5_NAV_SCANNING);
++            servo_set_angle(S5_SERVO_RIGHT_DEG);
++            phase_delay(S5_SERVO_SETTLE_MS,S5_NAV_SCANNING);
++            right_error=measure(&right,&pulse);
++            servo_set_angle(S5_SERVO_CENTRE_DEG);
++            scan_write(++profile,right,centre,left);
++            choice=s5_choose_motion(TRUE,centre,left_error==NULL,left,
++                                    right_error==NULL,right);
++            if(choice==S5_MOTION_LEFT||choice==S5_MOTION_RIGHT) {
++                phase_delay(S5_TURN_MS,choice==S5_MOTION_LEFT?S5_NAV_LEFT:S5_NAV_RIGHT);
++                current=S5_NAV_SCANNING; /* stop until a fresh centre check */
++            } else {
++                current=S5_NAV_BLOCKED;phase_delay(SAMPLE_PAUSE_MS,current);
++            }
++        }
++    }
++}
++
++EXPORT ER subsystem5_init(void)
++{
++#if APP_TEST && S2_ENCODER_CALIBRATION
++    return E_OK;
++#else
++    T_CSEM csem = {0};
++    ER er;
++    gpio_set_val(S5_TRIG_PIN, 0);
++    er = gpio_set_pin(S5_TRIG_PIN, GPIO_MODE_OUT);
++    if (er < E_OK) return er;
++    er = gpio_set_pin(S5_ECHO_PIN, GPIO_MODE_IN);
++    if (er < E_OK) return er;
++    clr_w(GPIO(S5_ECHO_PIN), GPIO_PUE);
++    set_w(GPIO(S5_ECHO_PIN), GPIO_PDE); /* idle low when unplugged */
++    /* Release only PWM reset; do not reconfigure S2 slices 4/5.
++     * Stationary S2 does not initialize PWM, so S5 owns this startup too. */
++    {
++        UINT timeout=10000U;
++        clr_w(RESETS_RESET,RESETS_RESET_PWM);
++        while(!(in_w(RESETS_RESET_DONE)&RESETS_RESET_PWM)) {
++            if(--timeout==0U)return E_IO;
++            WaitUsec(1);
++        }
++        out_w(S5_PWM_REG(PWM_CHx_CSR),0U);
++        out_w(S5_PWM_REG(PWM_CHx_DIV),0x400U);
++        out_w(S5_PWM_REG(PWM_CHx_CTR),0U);
++        out_w(S5_PWM_REG(PWM_CHx_CC),0U);
++        out_w(S5_PWM_REG(PWM_CHx_TOP),S5_PWM_TOP);
++        er=pwm_set_pin(S5_SERVO_PIN);if(er<E_OK)return er;
++        servo_set_angle(S5_SERVO_CENTRE_DEG);
++        er=pwm_set_enabled(S5_SERVO_PIN,TRUE);if(er<E_OK)return er;
++    }
++    csem.sematr = TA_TFIFO;
++    csem.maxsem = 1;
++    echo_done = tk_cre_sem(&csem);
++    if(echo_done<E_OK)return echo_done;
++    csem.isemcnt=1;
++    range_sem=tk_cre_sem(&csem);
++    if(range_sem<E_OK){(void)tk_del_sem(echo_done);echo_done=0;}
++    return range_sem<E_OK?range_sem:E_OK;
++#endif
++}
++
++EXPORT ER subsystem5_start(void)
++{
++#if APP_TEST && S2_ENCODER_CALIBRATION
++    if (S5_ULTRA_LOG_ENABLED)
++        tm_printf((UB *)"[ULTRA] SKIP: subsystem2 encoder calibration owns GPIO IRQ13.\n");
++    return E_OK;
++#else
++    ID tid;
++    if (echo_done <= 0 || range_sem <= 0) return E_OBJ;
++    tid = app_start_task((FP)ultrasonic_task, S5_PRI_MAIN, TP_PRC1,
++                         "ultrasonic_task");
++    return tid < E_OK ? tid : E_OK;
++#endif
++}
+--- working-baseline/app_program/subsystem5/subsystem5.h
++++ sensor-integrated/app_program/subsystem5/subsystem5.h
+@@ -1,20 +1,46 @@
+-/* Subsystem 5: fixed-position HC-SR04 bench measurement (servo not started). */
+-#ifndef SUBSYSTEM5_H
+-#define SUBSYSTEM5_H
+-
+-#include "../app.h"
+-
+-#define S5_PRI_MAIN 20
+-#define S5_TRIG_PIN 4
+-#define S5_ECHO_PIN 5
+-#define S5_ULTRA_LOG_ENABLED 0 /* set to 1 to restore ultrasonic output */
+-typedef struct { UW timestamp_ms,sequence,distance_mm; BOOL valid; } S5_RANGE_DATA;
+-/* Protected passive snapshot. E_TMOUT before first result or when busy.
+- * A valid snapshot may report valid=FALSE (no usable echo), never clear space. */
+-EXPORT ER subsystem5_get_range(S5_RANGE_DATA *out);
+-
+-/* Internal conversion shared with subsystem5_test.c. Valid range 20–4000 mm.
+- * Returns E_PAR for invalid widths and clears *mm on failure. */
+-IMPORT ER s5_echo_to_mm(UW pulse_us, UW *mm);
+-
+-#endif /* SUBSYSTEM5_H */
++/* S5 owns HC-SR04/servo sensing. Only the shared controller requests wheels. */
++#ifndef SUBSYSTEM5_H
++#define SUBSYSTEM5_H
++
++#include "../app.h"
++
++#define S5_PRI_MAIN 20
++#define S5_TRIG_PIN 4
++#define S5_ECHO_PIN 5
++#define S5_SERVO_PIN 12
++#define S5_ULTRA_LOG_ENABLED 0 /* set to 1 to restore ultrasonic output */
++
++/* Imported from origin/sensor c8a789b. Angles are commanded, not servo feedback. */
++#define S5_SERVO_RIGHT_DEG       30U
++#define S5_SERVO_CENTRE_DEG      90U
++#define S5_SERVO_LEFT_DEG       150U
++#define S5_SERVO_SETTLE_MS      300U
++#define S5_OBSTACLE_MM          250U
++#define S5_CLEARANCE_MARGIN_MM   30U
++#define S5_TURN_OUTER_RPM_X10    260
++#define S5_TURN_INNER_RPM_X10      0
++#define S5_TURN_MS              500U
++#define S5_NAV_MAX_AGE_MS        200U
++typedef enum {
++    S5_MOTION_STOP, S5_MOTION_FORWARD, S5_MOTION_LEFT, S5_MOTION_RIGHT
++} S5_MOTION;
++typedef enum {
++    S5_NAV_UNAVAILABLE, S5_NAV_CLEAR, S5_NAV_SCANNING,
++    S5_NAV_LEFT, S5_NAV_RIGHT, S5_NAV_BLOCKED
++} S5_NAV_PHASE;
++typedef struct { UW timestamp_ms; UINT phase; } S5_NAV_DATA;
++/* Nonconsuming publication; the controller checks age and its own STOP latch. */
++EXPORT ER subsystem5_get_navigation(S5_NAV_DATA *out);
++EXPORT S5_MOTION s5_choose_motion(BOOL centre_valid, UW centre_mm,
++                                BOOL left_valid, UW left_mm,
++                                BOOL right_valid, UW right_mm);
++typedef struct { UW timestamp_ms,sequence,distance_mm; BOOL valid; } S5_RANGE_DATA;
++/* Protected passive snapshot. E_TMOUT before first result or when busy.
++ * A valid snapshot may report valid=FALSE (no usable echo), never clear space. */
++EXPORT ER subsystem5_get_range(S5_RANGE_DATA *out);
++
++/* Internal conversion shared with subsystem5_test.c. Valid range 20–4000 mm.
++ * Returns E_PAR for invalid widths and clears *mm on failure. */
++IMPORT ER s5_echo_to_mm(UW pulse_us, UW *mm);
++
++#endif /* SUBSYSTEM5_H */
+--- working-baseline/app_program/subsystem5/subsystem5_test.c
++++ sensor-integrated/app_program/subsystem5/subsystem5_test.c
+@@ -1,23 +1,36 @@
+-/* Software conversion checks only; hardware checks are in TEST_LOG.md. */
+-#include "subsystem5.h"
+-#include "../test_report.h"
+-
+-#if APP_TEST
+-EXPORT void subsystem5_test(void)
+-{
+-    UW mm;
+-    TEST_INIT();
+-    /* S5-U01 remains the retired template test; do not reuse its ID. */
+-    TEST_CHECK("S5-U03", s5_echo_to_mm(580, &mm) == E_OK && mm == 100 &&
+-               s5_echo_to_mm(5800, &mm) == E_OK && mm == 1000,
+-               "echo widths convert to 100 and 1000 mm");
+-    TEST_CHECK("S5-U04", s5_echo_to_mm(116, &mm) == E_OK && mm == 20 &&
+-               s5_echo_to_mm(23200, &mm) == E_OK && mm == 4000,
+-               "specified 20 to 4000 mm range accepted");
+-    TEST_CHECK("S5-U05", s5_echo_to_mm(0, &mm) == E_PAR && mm == 0 &&
+-               s5_echo_to_mm(115, &mm) == E_PAR && mm == 0 &&
+-               s5_echo_to_mm(23201, &mm) == E_PAR && mm == 0,
+-               "invalid echo widths rejected and distance cleared");
+-    TEST_SUMMARY("subsystem5 conversion (hardware not checked)");
+-}
+-#endif
++/* Software conversion checks only; hardware checks are in TEST_LOG.md. */
++#include "subsystem5.h"
++#include "../test_report.h"
++
++#if APP_TEST
++EXPORT void subsystem5_test(void)
++{
++    UW mm;
++    TEST_INIT();
++    /* S5-U01 remains the retired template test; do not reuse its ID. */
++    TEST_CHECK("S5-U03", s5_echo_to_mm(580, &mm) == E_OK && mm == 100 &&
++               s5_echo_to_mm(5800, &mm) == E_OK && mm == 1000,
++               "echo widths convert to 100 and 1000 mm");
++    TEST_CHECK("S5-U04", s5_echo_to_mm(116, &mm) == E_OK && mm == 20 &&
++               s5_echo_to_mm(23200, &mm) == E_OK && mm == 4000,
++               "specified 20 to 4000 mm range accepted");
++    TEST_CHECK("S5-U05", s5_echo_to_mm(0, &mm) == E_PAR && mm == 0 &&
++               s5_echo_to_mm(115, &mm) == E_PAR && mm == 0 &&
++               s5_echo_to_mm(23201, &mm) == E_PAR && mm == 0,
++               "invalid echo widths rejected and distance cleared");
++    TEST_CHECK("S5-U06",
++               s5_choose_motion(TRUE,251,FALSE,0,FALSE,0)==S5_MOTION_FORWARD &&
++               s5_choose_motion(TRUE,100,TRUE,500,TRUE,300)==S5_MOTION_LEFT &&
++               s5_choose_motion(TRUE,100,TRUE,300,TRUE,500)==S5_MOTION_RIGHT,
++               "clear centre permits line following; blocked centre chooses a clear side");
++    TEST_CHECK("S5-U07",
++               s5_choose_motion(FALSE,0,TRUE,500,TRUE,500)==S5_MOTION_STOP &&
++               s5_choose_motion(TRUE,100,FALSE,0,FALSE,0)==S5_MOTION_STOP,
++               "unknown centre or missing escape echoes cannot permit movement");
++    TEST_CHECK("S5-U08",
++               s5_choose_motion(TRUE,100,TRUE,240,TRUE,260)==S5_MOTION_RIGHT &&
++               s5_choose_motion(TRUE,100,TRUE,250,TRUE,251)==S5_MOTION_RIGHT,
++               "tie margin never prefers a blocked side over a clear side");
++    TEST_SUMMARY("subsystem5 conversion (hardware not checked)");
++}
++#endif

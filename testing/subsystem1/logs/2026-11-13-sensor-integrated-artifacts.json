@@ -1,0 +1,44 @@
+[
+  {
+    "profile": "normal",
+    "flags": "NET=lwip MQTT=1 TEST=0 APP_MODE=integrated",
+    "path": "build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt.uf2",
+    "bytes": 714240,
+    "sha256": "e69158b2f214bb9521f4526073f1f5ace0449d36a689a3716d3d3955d8e6a248",
+    "warnings": [],
+    "log": "testing/subsystem1/logs/2026-11-13-sensor-integrated-normal-build.txt",
+    "ELF": {
+      "path": "build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt.elf",
+      "bytes": 3353144,
+      "sha256": "ec41414b57e3e42766d6e532884a32e66db3c3aee27a5f5d157f01d1a999ec7b"
+    },
+    "sections": {
+      "text": 356864,
+      "data": 108,
+      "bss": 84008,
+      "static_ram": 84116
+    },
+    "retained": false
+  },
+  {
+    "profile": "stationary",
+    "flags": "NET=lwip MQTT=1 TEST=1 APP_MODE=integrated",
+    "path": "build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2",
+    "bytes": 723456,
+    "sha256": "3a8b79c37a01cfa92615db69e62d2817795ab53ec9decae5e33c4faa19f3aaf6",
+    "warnings": [],
+    "log": "testing/subsystem1/logs/2026-11-13-sensor-integrated-stationary-build.txt",
+    "ELF": {
+      "path": "build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.elf",
+      "bytes": 3359716,
+      "sha256": "1d38fb0f96a00e17d65706f994a085ebdf0680f19469fe5617a31bc784d47ae9"
+    },
+    "sections": {
+      "text": 361420,
+      "data": 108,
+      "bss": 84584,
+      "static_ram": 84692
+    },
+    "retained": true
+  }
+]

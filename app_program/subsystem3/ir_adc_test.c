@@ -8,6 +8,7 @@
  */
 #include "../app.h"
 #include "../subsystem2/subsystem2.h"
+#include "subsystem3.h"
 #include <sys/sysdef.h>
 #include <tk/syslib.h>
 
@@ -15,11 +16,11 @@
 #ifndef IR_TEST_STEERING_ENABLED
 #define IR_TEST_STEERING_ENABLED 1
 #endif
-#define IR_TEST_SAMPLES 2U
+#define IR_TEST_SAMPLES S3_IR_SAMPLES
 #define IR_TEST_LOG_MS  500U
-#define IR_TEST_LEFT_THRESHOLD   1390U
-#define IR_TEST_CENTRE_THRESHOLD 950U
-#define IR_TEST_RIGHT_THRESHOLD  1420U
+#define IR_TEST_LEFT_THRESHOLD   S3_BARCODE_THRESHOLD
+#define IR_TEST_CENTRE_THRESHOLD S3_IR_CENTRE_THRESHOLD
+#define IR_TEST_RIGHT_THRESHOLD  S3_IR_RIGHT_THRESHOLD
 #if S2_LINE_USE_RPM_CONTROL
 #define IR_TARGET_LABEL "target_rpm_x10"
 #else

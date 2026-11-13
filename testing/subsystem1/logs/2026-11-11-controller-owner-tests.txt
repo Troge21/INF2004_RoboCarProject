@@ -1,0 +1,34 @@
+[controller] PASS zero IDs/session are rejected
+[controller] PASS one occupied request slot rejects another request
+[controller] PASS latch is held by controller, not acknowledged before motor submission
+[controller] PASS busy motor handoff does not produce a success reply
+[controller] PASS matching applied result follows accepted zero-duty submission
+[controller] PASS subsequent steering state cannot override stop latch
+[controller] PASS reinitialization cannot clear an active latch
+[controller] PASS deadline expiry is checked again by the controller
+[controller] PASS unbounded future deadlines are rejected
+[controller] PASS motor errors retain inhibit and report fault, not successful stop
+[controller] PASS permanent busy handoff expires without clearing inhibit
+[controller] PASS contended shared access never waits or invents a state
+[controller] PASS lease survives wrap and disabled build reports only logical inhibit
+[controller] PASS build mode is real compile-time mode
+[controller] PASS stale owner publication cannot admit commands
+[controller] PASS unavailable/calibration controller does not admit stop
+[controller] SUMMARY 16 checks, 0 failures (TEST=0)
+[controller] PASS zero IDs/session are rejected
+[controller] PASS one occupied request slot rejects another request
+[controller] PASS latch is held by controller, not acknowledged before motor submission
+[controller] PASS busy motor handoff does not produce a success reply
+[controller] PASS matching applied result follows accepted zero-duty submission
+[controller] PASS subsequent steering state cannot override stop latch
+[controller] PASS reinitialization cannot clear an active latch
+[controller] PASS deadline expiry is checked again by the controller
+[controller] PASS unbounded future deadlines are rejected
+[controller] PASS motor errors retain inhibit and report fault, not successful stop
+[controller] PASS permanent busy handoff expires without clearing inhibit
+[controller] PASS contended shared access never waits or invents a state
+[controller] PASS lease survives wrap and disabled build reports only logical inhibit
+[controller] PASS build mode is real compile-time mode
+[controller] PASS stale owner publication cannot admit commands
+[controller] PASS unavailable/calibration controller does not admit stop
+[controller] SUMMARY 16 checks, 0 failures (TEST=1)

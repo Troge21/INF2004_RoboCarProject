@@ -1,0 +1,14 @@
+PASS: actual analog policy: white/white and black/black forward; individual corrections
+PASS: normal controller requests RPM and actual PID/motor loop produces nonzero output after startup
+PASS: expired STOP cannot inhibit the running controller
+PASS: controller contention submits zero through actual RPM motor channel
+PASS: busy motor channel cannot acknowledge a STOP before accepting zero
+PASS: normal STOP result follows accepted request and zero output in the actual PID/motor loop
+PASS: latched STOP persists through all analog patterns, stale and invalid snapshots
+PASS: STOP is serviced during startup
+PASS: startup STOP prevents later white/white forward motion
+PASS: S2 encoder fault propagates to controller and never becomes a fabricated successful STOP
+PASS: stale ADC snapshot stops actual motor output
+PASS: invalid ADC snapshot stops actual motor output
+PASS: unsupported line pattern cannot drive motors
+SUMMARY: 13 actual controller/PID/motor checks passed; no hardware or sockets.

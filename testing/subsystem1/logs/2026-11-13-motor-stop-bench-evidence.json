@@ -1,0 +1,117 @@
+{
+  "recorded_at_utc": "2026-11-13T06:41:04.841079+00:00",
+  "client_date": "2026-11-13",
+  "base_commit": "f37055f567d46d4f2465725e1af46082b880ba29",
+  "result": "PASS: current normal-build raised-wheel STOP and continuous-power persistence, physical behavior reported by user and protocol/controller evidence independently captured.",
+  "artifact": {
+    "path": "build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt.uf2",
+    "bytes": 701952,
+    "sha256": "1a2687d1c3b642626fb8c81b355587f8327e6d32a82e08e6829ae0d02dd1fc08"
+  },
+  "source_files_unchanged_since_normal_build": 90,
+  "normal_build_fingerprint": {
+    "path": "testing/subsystem1/logs/2026-11-13-normal-motor-fingerprint.json",
+    "bytes": 31511,
+    "sha256": "aa59f15b0ce0d67d0920b20178832ac8bb553e91a415a18f75e34f7856aa3a71"
+  },
+  "summary": "testing/subsystem1/logs/2026-11-13-normal-motor-observation-summary.json",
+  "power": "Single whole-car USB/power-bank supply; earlier restarts were deliberate unplug/reconnect. No separate battery switch.",
+  "limits": "One functional bench check, no flash readback or measured stopping time. Final-image outage recovery, strict delivery intervals, runtime peak RAM and final integrated demonstration remain open.",
+  "files": [
+    {
+      "path": "dashboard/README.md",
+      "bytes": 11740,
+      "sha256": "c74e9344bde06344ab739810b8dd2ff7215f57406489b1d909dcc41b742c0b79"
+    },
+    {
+      "path": "README.md",
+      "bytes": 12609,
+      "sha256": "dd60480c9d33f910d1d2806e749be7f08afadec40ccfc8b1a38a9ed462ed1863"
+    },
+    {
+      "path": "TEMP_S1_PROGRESS_AND_PLANS.md",
+      "bytes": 10675,
+      "sha256": "2633942d215adef2d7e485662ff686ac3fd31f260fba74aa8754d590a243e1c3"
+    },
+    {
+      "path": "testing/subsystem1/CONTROLLER_COMMANDS.md",
+      "bytes": 15151,
+      "sha256": "8b694f6f53a62188789401139e4932dbf67ffe1f666505f3d97e09f523878781"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-13-normal-motor-baseline.json",
+      "bytes": 79339,
+      "sha256": "8ade367ceb277ede44281f31ebf49bc05c0a91a45e98fc78d1e7b257be802378"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-13-normal-motor-build.txt",
+      "bytes": 586680,
+      "sha256": "eca593b9f0b6c270ee721f81e6770aa4e14ea903774b4b5124d967c01df23ee5"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-13-normal-motor-fingerprint.json",
+      "bytes": 31511,
+      "sha256": "aa59f15b0ce0d67d0920b20178832ac8bb553e91a415a18f75e34f7856aa3a71"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-13-normal-motor-observation-summary.json",
+      "bytes": 4816,
+      "sha256": "88cb35206e42d3a68ae95c87634a68f336be1cca60c85e692ec6d89669374cae"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-13-normal-motor-stop-trial.json",
+      "bytes": 291342,
+      "sha256": "0b384ceaa36acc03e2e6fa21a1876010d07798caf7ec48c4d281668419636043"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-13-normal-stop-continuous-power.json",
+      "bytes": 559666,
+      "sha256": "48094d72499d5a3db81097848ff427c1cdfc2eb58b1cf729bf5dccbd427f1c54"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-13-normal-stop-persistence.json",
+      "bytes": 222288,
+      "sha256": "f845b6d5b90dfd7f584143059ce6bbad02fbde09141db030d36a633667b2e76b"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-13-wiring-latch-check.json",
+      "bytes": 328481,
+      "sha256": "594a4ff1f9596d0ca711525c15d82ea093d7d80538ea8fe4b3be966c692216a0"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-13-wiring-pattern-check-usb.json",
+      "bytes": 214039,
+      "sha256": "a94684844b953297d37c4e91daa100948a56fd96663616f43247f0986b796a81"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-13-wiring-pattern-check.json",
+      "bytes": 186405,
+      "sha256": "5e3453c6c476d453a7eafb99ec5518fb32cdbe7735ca69635e77038d236b3b9b"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-13-wiring-stationary-baseline.json",
+      "bytes": 75910,
+      "sha256": "29f1dde1c474177170835204ba28839bd2accfc3d3280b4a1277208f5944ea28"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-13-wiring-stationary-summary.json",
+      "bytes": 3175,
+      "sha256": "e04c19678a8a5ac828c6684919ea1b39825137be59287b7bbf8905475ee1c090"
+    },
+    {
+      "path": "testing/subsystem1/MOTOR_STOP_TEST.md",
+      "bytes": 7652,
+      "sha256": "df1eadeaa631bb06f352c3202b53858d90f03af53161c4b6d1545b6c4276e4e3"
+    },
+    {
+      "path": "testing/subsystem1/RECOVERY_TESTS.md",
+      "bytes": 13136,
+      "sha256": "5e498b6aead3a1daaef49b42d4d225a8df38dd6649803b0e65fbd931332f0ced"
+    },
+    {
+      "path": "testing/subsystem1/TEST_LOG.md",
+      "bytes": 91644,
+      "sha256": "a3b9758e56419e203dd75642ba0866549724a83f277c2708511bae7404317596"
+    }
+  ]
+}

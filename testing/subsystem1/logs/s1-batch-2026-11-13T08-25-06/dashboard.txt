@@ -1,0 +1,85 @@
+✔ only current STATUS framing and consistent snapshot identity are accepted (2.5463ms)
+✔ full IDs and modulo deadlines survive command encoding (0.3373ms)
+✔ all prepared controller states are bounded and latch invariants retained (0.233ms)
+✔ STOP requires a fresh handshake before constructing its one command (1.1894ms)
+✔ expired preflight lease sends no STOP (1.2878ms)
+✔ only matching nonretained timely controller reply confirms STOP (0.6095ms)
+✔ fault is not success and the ninth result bit is preserved (0.1744ms)
+✖ timeout means unknown outcome, and reconnect never automatically retries STOP (1.5284ms)
+✔ a new robot session cancels an in-flight command (0.5838ms)
+✔ current controller expires; historical STATUS is never substituted for live stream (0.3642ms)
+✔ disabled build can acknowledge a logical latch without claiming physical standstill (0.4129ms)
+✔ packet reader reassembles fragmented and coalesced MQTT messages (1.2236ms)
+✔ packet reader bounds untrusted lengths and rejects malformed varints (0.5506ms)
+✔ publish parser preserves binary bytes, retain flag and packet ID (1.2876ms)
+✔ live connection waits for all three subscriptions before declaring readiness (1.896ms)
+✔ subscription failure never enables commands and disconnect cancels retries (0.7701ms)
+✔ unsafe or ambiguous broker/topic settings are rejected before opening a socket (0.3549ms)
+✔ a subscribed dashboard stays empty until fresh telemetry arrives (3.9029ms)
+✔ current 46-byte telemetry survives MQTT framing and reach the telemetry store (1ms)
+✔ two-topic SUBACK cannot enable the three-topic STATUS connection (0.7436ms)
+✔ a fragmented STATUS reply matches its request without replacing live telemetry (0.8634ms)
+✔ v4 real motion preserves signed counts/net distance and separates path length (3.0745ms)
+✔ zero measurements differ from unavailable sentinels (0.6188ms)
+✔ independent canonical missing-data byte vector (0.3103ms)
+✔ only current v4 telemetry is accepted (0.5353ms)
+✔ all IR codes retain physical left/right roles (1.244ms)
+✔ malformed ranges, source flags and fault coverage are rejected (1.1048ms)
+✔ Code39 character, reversal, event and owner navigation are distinct (0.2395ms)
+✔ IMU faults and missing pitch never erase independent distance (0.21ms)
+✔ partial fault knowledge is preserved, not global all-clear (0.2857ms)
+✔ clock sync is required before live measurements (1.6465ms)
+✔ delayed frames expire against fresh Pico uptime and live values expire (0.6078ms)
+✔ sequence duplicate/backward rejection, gaps and wrap (1.2328ms)
+✔ heartbeat replay is rejected and wrap does not reset telemetry replay baseline (0.5648ms)
+✔ fresh new session resets live state, not history (0.3773ms)
+✔ retained packets and lost connections never make measurements current (0.3637ms)
+✔ history, inspector and activity are bounded (27.7082ms)
+✔ barcode events are not duplicated after a brief missing snapshot (0.3523ms)
+✔ 181 point profile reassembles without treating chunks as telemetry samples (1.0463ms)
+✔ scan truncation, point ranges, order and reserved bits are rejected (0.251ms)
+✔ resource unknown is distinct from valid zero; capacities are not peaks (0.3146ms)
+✔ diagnostic history is bounded and disconnected/stale values unavailable (1.9182ms)
+ℹ tests 42
+ℹ suites 0
+ℹ pass 41
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 171.0488
+
+✖ failing tests:
+
+test at dashboard\tests\controller.test.mjs:57:1
+✖ timeout means unknown outcome, and reconnect never automatically retries STOP (1.5284ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + {
+  +   at: 1100,
+  +   boot_deadline: 3100,
+  +   command_id: 100,
+  +   deadline: 4160,
+  +   phase: 'waiting',
+  +   sent_at: 1160,
+  +   session: 305419896,
+  +   status_id: 12,
+  +   valid_until: 3100
+  + }
+  - null
+  
+      at TestContext.<anonymous> (file:///C:/Users/wilso/OneDrive/Desktop/INF2004%20Embedded%20Systems%20Programming/INF2004_RoboCarProject/dashboard/tests/controller.test.mjs:59:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { phase: 'waiting', status_id: 12, at: 1100, deadline: 4160, session: 305419896, boot_deadline: 3100, valid_until: 3100, command_id: 100, sent_at: 1160 },
+    expected: null,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

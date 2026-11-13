@@ -1,0 +1,134 @@
+✔ only current STATUS framing and consistent snapshot identity are accepted (4.953ms)
+✔ full IDs and modulo deadlines survive command encoding (0.4692ms)
+✔ all prepared controller states are bounded and latch invariants retained (0.3444ms)
+✖ STOP requires a fresh handshake before constructing its one command (1.3015ms)
+✖ expired preflight lease sends no STOP (0.5169ms)
+✖ only matching nonretained timely controller reply confirms STOP (1.3065ms)
+✔ fault is not success and the ninth result bit is preserved (0.4588ms)
+✖ timeout means unknown outcome, and reconnect never automatically retries STOP (0.3059ms)
+✖ a new robot session cancels an in-flight command (0.3705ms)
+✔ current controller expires; historical STATUS is never substituted for live stream (0.517ms)
+✖ disabled build can acknowledge a logical latch without claiming physical standstill (0.3363ms)
+✔ packet reader reassembles fragmented and coalesced MQTT messages (1.5028ms)
+✔ packet reader bounds untrusted lengths and rejects malformed varints (0.8469ms)
+✔ publish parser preserves binary bytes, retain flag and packet ID (1.6441ms)
+✔ live connection waits for all three subscriptions before declaring readiness (1.8173ms)
+✔ subscription failure never enables commands and disconnect cancels retries (0.4625ms)
+✔ unsafe or ambiguous broker/topic settings are rejected before opening a socket (0.2297ms)
+✔ a subscribed dashboard stays empty until fresh telemetry arrives (2.94ms)
+✔ current 46-byte telemetry survives MQTT framing and reach the telemetry store (0.7146ms)
+✔ two-topic SUBACK cannot enable the three-topic STATUS connection (0.5834ms)
+✔ a fragmented STATUS reply matches its request without replacing live telemetry (1.2949ms)
+✔ v4 real motion preserves signed counts/net distance and separates path length (2.1988ms)
+✔ zero measurements differ from unavailable sentinels (0.8734ms)
+✔ independent canonical missing-data byte vector (0.3339ms)
+✔ only current v4 telemetry is accepted (1.5383ms)
+✔ all IR codes retain physical left/right roles (1.4893ms)
+✔ malformed ranges, source flags and fault coverage are rejected (0.8593ms)
+✔ Code39 character, reversal, event and owner navigation are distinct (0.1971ms)
+✔ IMU faults and missing pitch never erase independent distance (0.2949ms)
+✔ partial fault knowledge is preserved, not global all-clear (0.2918ms)
+✔ clock sync is required before live measurements (1.562ms)
+✔ delayed frames expire against fresh Pico uptime and live values expire (0.4161ms)
+✔ sequence duplicate/backward rejection, gaps and wrap (0.9116ms)
+✔ heartbeat replay is rejected and wrap does not reset telemetry replay baseline (0.5843ms)
+✔ fresh new session resets live state, not history (0.6923ms)
+✔ retained packets and lost connections never make measurements current (0.5267ms)
+✔ history, inspector and activity are bounded (33.8719ms)
+✔ barcode events are not duplicated after a brief missing snapshot (0.5093ms)
+✔ 181 point profile reassembles without treating chunks as telemetry samples (1.8041ms)
+✔ scan truncation, point ranges, order and reserved bits are rejected (0.3073ms)
+✔ resource unknown is distinct from valid zero; capacities are not peaks (0.353ms)
+✔ diagnostic history is bounded and disconnected/stale values unavailable (2.208ms)
+ℹ tests 42
+ℹ suites 0
+ℹ pass 36
+ℹ fail 6
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 219.7032
+
+✖ failing tests:
+
+test at dashboard\tests\controller.test.mjs:29:1
+✖ STOP requires a fresh handshake before constructing its one command (1.3015ms)
+  Error: Wait briefly before requesting STATUS again
+      at TelemetryStore.beginStatus (file:///C:/Users/wilso/OneDrive/Desktop/INF2004%20Embedded%20Systems%20Programming/INF2004_RoboCarProject/dashboard/dist/protocol.js:167:73)
+      at TelemetryStore.beginStop (file:///C:/Users/wilso/OneDrive/Desktop/INF2004%20Embedded%20Systems%20Programming/INF2004_RoboCarProject/dashboard/dist/protocol.js:198:22)
+      at TestContext.<anonymous> (file:///C:/Users/wilso/OneDrive/Desktop/INF2004%20Embedded%20Systems%20Programming/INF2004_RoboCarProject/dashboard/tests/controller.test.mjs:30:21)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at dashboard\tests\controller.test.mjs:37:1
+✖ expired preflight lease sends no STOP (0.5169ms)
+  Error: Wait briefly before requesting STATUS again
+      at TelemetryStore.beginStatus (file:///C:/Users/wilso/OneDrive/Desktop/INF2004%20Embedded%20Systems%20Programming/INF2004_RoboCarProject/dashboard/dist/protocol.js:167:73)
+      at TelemetryStore.beginStop (file:///C:/Users/wilso/OneDrive/Desktop/INF2004%20Embedded%20Systems%20Programming/INF2004_RoboCarProject/dashboard/dist/protocol.js:198:22)
+      at TestContext.<anonymous> (file:///C:/Users/wilso/OneDrive/Desktop/INF2004%20Embedded%20Systems%20Programming/INF2004_RoboCarProject/dashboard/tests/controller.test.mjs:38:21)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at dashboard\tests\controller.test.mjs:42:1
+✖ only matching nonretained timely controller reply confirms STOP (1.3065ms)
+  Error: Wait briefly before requesting STATUS again
+      at TelemetryStore.beginStatus (file:///C:/Users/wilso/OneDrive/Desktop/INF2004%20Embedded%20Systems%20Programming/INF2004_RoboCarProject/dashboard/dist/protocol.js:167:73)
+      at TelemetryStore.beginStop (file:///C:/Users/wilso/OneDrive/Desktop/INF2004%20Embedded%20Systems%20Programming/INF2004_RoboCarProject/dashboard/dist/protocol.js:198:22)
+      at waiting (file:///C:/Users/wilso/OneDrive/Desktop/INF2004%20Embedded%20Systems%20Programming/INF2004_RoboCarProject/dashboard/tests/controller.test.mjs:7:5)
+      at TestContext.<anonymous> (file:///C:/Users/wilso/OneDrive/Desktop/INF2004%20Embedded%20Systems%20Programming/INF2004_RoboCarProject/dashboard/tests/controller.test.mjs:43:19)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at dashboard\tests\controller.test.mjs:57:1
+✖ timeout means unknown outcome, and reconnect never automatically retries STOP (0.3059ms)
+  Error: Wait briefly before requesting STATUS again
+      at TelemetryStore.beginStatus (file:///C:/Users/wilso/OneDrive/Desktop/INF2004%20Embedded%20Systems%20Programming/INF2004_RoboCarProject/dashboard/dist/protocol.js:167:73)
+      at TelemetryStore.beginStop (file:///C:/Users/wilso/OneDrive/Desktop/INF2004%20Embedded%20Systems%20Programming/INF2004_RoboCarProject/dashboard/dist/protocol.js:198:22)
+      at waiting (file:///C:/Users/wilso/OneDrive/Desktop/INF2004%20Embedded%20Systems%20Programming/INF2004_RoboCarProject/dashboard/tests/controller.test.mjs:7:5)
+      at TestContext.<anonymous> (file:///C:/Users/wilso/OneDrive/Desktop/INF2004%20Embedded%20Systems%20Programming/INF2004_RoboCarProject/dashboard/tests/controller.test.mjs:58:19)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at dashboard\tests\controller.test.mjs:63:1
+✖ a new robot session cancels an in-flight command (0.3705ms)
+  Error: Wait briefly before requesting STATUS again
+      at TelemetryStore.beginStatus (file:///C:/Users/wilso/OneDrive/Desktop/INF2004%20Embedded%20Systems%20Programming/INF2004_RoboCarProject/dashboard/dist/protocol.js:167:73)
+      at TelemetryStore.beginStop (file:///C:/Users/wilso/OneDrive/Desktop/INF2004%20Embedded%20Systems%20Programming/INF2004_RoboCarProject/dashboard/dist/protocol.js:198:22)
+      at waiting (file:///C:/Users/wilso/OneDrive/Desktop/INF2004%20Embedded%20Systems%20Programming/INF2004_RoboCarProject/dashboard/tests/controller.test.mjs:7:5)
+      at TestContext.<anonymous> (file:///C:/Users/wilso/OneDrive/Desktop/INF2004%20Embedded%20Systems%20Programming/INF2004_RoboCarProject/dashboard/tests/controller.test.mjs:64:19)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at dashboard\tests\controller.test.mjs:72:1
+✖ disabled build can acknowledge a logical latch without claiming physical standstill (0.3363ms)
+  Error: Wait briefly before requesting STATUS again
+      at TelemetryStore.beginStatus (file:///C:/Users/wilso/OneDrive/Desktop/INF2004%20Embedded%20Systems%20Programming/INF2004_RoboCarProject/dashboard/dist/protocol.js:167:73)
+      at TelemetryStore.beginStop (file:///C:/Users/wilso/OneDrive/Desktop/INF2004%20Embedded%20Systems%20Programming/INF2004_RoboCarProject/dashboard/dist/protocol.js:198:22)
+      at waiting (file:///C:/Users/wilso/OneDrive/Desktop/INF2004%20Embedded%20Systems%20Programming/INF2004_RoboCarProject/dashboard/tests/controller.test.mjs:7:5)
+      at TestContext.<anonymous> (file:///C:/Users/wilso/OneDrive/Desktop/INF2004%20Embedded%20Systems%20Programming/INF2004_RoboCarProject/dashboard/tests/controller.test.mjs:73:43)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)

@@ -1,0 +1,13 @@
+C:\Users\wilso\AppData\Local\Temp\robocar-ao-stop-bgjtxvqo\stop_path.c:58:11: error: static declaration of 'subsystem5_get_navigation' follows non-static declaration
+   58 | static ER subsystem5_get_navigation(S5_NAV_DATA *out){
+      |           ^~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from C:\Users\wilso\AppData\Local\Temp\robocar-ao-stop-bgjtxvqo\stop_path.c:37:
+C:\Users\wilso\OneDrive\Desktop\INF2004 Embedded Systems Programming\INF2004_RoboCarProject\app_program/subsystem5/subsystem5.h:33:11: note: previous declaration of 'subsystem5_get_navigation' with type 'ER(S5_NAV_DATA *)' {aka 'int(S5_NAV_DATA *)'}
+   33 | EXPORT ER subsystem5_get_navigation(S5_NAV_DATA *out);
+      |           ^~~~~~~~~~~~~~~~~~~~~~~~~
+Traceback (most recent call last):
+  File "C:\Users\wilso\OneDrive\Desktop\INF2004 Embedded Systems Programming\INF2004_RoboCarProject\testing\subsystem1\test_motor_stop_path.py", line 214, in <module>
+    subprocess.run(['gcc','-std=c11','-Wall','-Wextra','-Werror',
+  File "C:\msys64\ucrt64\lib\python3.12\subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['gcc', '-std=c11', '-Wall', '-Wextra', '-Werror', '-I', 'C:\\Users\\wilso\\OneDrive\\Desktop\\INF2004 Embedded Systems Programming\\INF2004_RoboCarProject\\app_program', '-I', 'C:\\Users\\wilso\\OneDrive\\Desktop\\INF2004 Embedded Systems Programming\\INF2004_RoboCarProject\\app_program\\subsystem2', 'C:\\Users\\wilso\\AppData\\Local\\Temp\\robocar-ao-stop-bgjtxvqo\\stop_path.c', '-o', 'C:\\Users\\wilso\\AppData\\Local\\Temp\\robocar-ao-stop-bgjtxvqo\\stop_path.exe']' returned non-zero exit status 1.

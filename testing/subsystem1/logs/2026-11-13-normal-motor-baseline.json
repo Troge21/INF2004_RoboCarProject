@@ -1,0 +1,3304 @@
+{
+  "started_utc": "2026-11-13T06:21:46.814Z",
+  "duration_seconds": 45,
+  "transport": "Local MQTT over WebSocket; not a Pico recovery timing measurement",
+  "physical_motion": "Not measured by this recorder; requires separate user observation",
+  "commands_sent": "Read-only STATUS only; at most three attempts until first matching reply",
+  "expected_local_uf2": {
+    "path": "C:\\Users\\wilso\\OneDrive\\Desktop\\INF2004 Embedded Systems Programming\\INF2004_RoboCarProject\\build_make\\mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt.uf2",
+    "bytes": 701952,
+    "sha256": "1a2687d1c3b642626fb8c81b355587f8327e6d32a82e08e6829ae0d02dd1fc08",
+    "note": "Intended local file only, no flash readback"
+  },
+  "events": [
+    {
+      "at_ms": 19,
+      "message": "connecting: Opening MQTT WebSocket"
+    },
+    {
+      "at_ms": 35,
+      "message": "connected: Subscribed to telemetry, heartbeat and STATUS replies"
+    },
+    {
+      "at_ms": 493,
+      "message": "Controller: Following line; latch=false; TEST=false"
+    },
+    {
+      "at_ms": 494,
+      "message": "Read-only STATUS sent: 3365344910"
+    },
+    {
+      "at_ms": 696,
+      "message": "Matching STATUS: TEST=false, Following line, 203 ms"
+    },
+    {
+      "at_ms": 45022,
+      "message": "disconnected: Disconnected"
+    }
+  ],
+  "packets": [
+    {
+      "at_ms": 38,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "6f 00 00 00 63 f1 aa 83 58 14 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 111,
+        "obstacle_valid": true,
+        "obstacle_mm": 355,
+        "line_bits": 7,
+        "ir": [
+          null,
+          1,
+          1
+        ],
+        "pitch_deg": 3.7,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 17,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 493,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 595,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "70 00 00 00 56 d1 9b 83 58 14 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 112,
+        "obstacle_valid": true,
+        "obstacle_mm": 342,
+        "line_bits": 5,
+        "ir": [
+          null,
+          0,
+          1
+        ],
+        "pitch_deg": 2.2,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 17,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 695,
+      "topic": "mtk3smp-pico/status",
+      "length": 26,
+      "hex": "a1 8e 16 97 c8 f2 df 00 00 32 30 5b 53 52 17 70 00 00 00 56 d1 9b 83 58 14 00",
+      "retained": false,
+      "decoded": {
+        "request_id": 3365344910,
+        "uptime_ms": 57330,
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false,
+        "sample_age_ms": 50,
+        "snapshot": {
+          "sequence": 112,
+          "obstacle_valid": true,
+          "obstacle_mm": 342,
+          "line_bits": 5,
+          "ir": [
+            null,
+            0,
+            1
+          ],
+          "pitch_deg": 2.2,
+          "hump_mm": 16,
+          "max_hump_mm": 22,
+          "imu_state": "Monitoring",
+          "imu_flags": 17,
+          "imu_speed_source": "nominal",
+          "state": null,
+          "left_mps": null,
+          "right_mps": null,
+          "distance_m": null,
+          "barcode": null,
+          "faults": null,
+          "scan": null
+        }
+      },
+      "matching_observer_STATUS": true,
+      "round_trip_ms": 203
+    },
+    {
+      "at_ms": 1057,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "71 00 00 00 4e d1 b7 83 58 14 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 113,
+        "obstacle_valid": true,
+        "obstacle_mm": 334,
+        "line_bits": 5,
+        "ir": [
+          null,
+          0,
+          1
+        ],
+        "pitch_deg": 5,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 17,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 1400,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 1570,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "72 00 00 00 ae d1 a1 83 58 14 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 114,
+        "obstacle_valid": true,
+        "obstacle_mm": 430,
+        "line_bits": 5,
+        "ir": [
+          null,
+          0,
+          1
+        ],
+        "pitch_deg": 2.8,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 17,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 2124,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "73 00 00 00 68 d1 c1 83 58 14 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 115,
+        "obstacle_valid": true,
+        "obstacle_mm": 360,
+        "line_bits": 5,
+        "ir": [
+          null,
+          0,
+          1
+        ],
+        "pitch_deg": 6,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 17,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 2400,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 3920,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "74 00 00 00 58 e1 bc 83 58 14 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 116,
+        "obstacle_valid": true,
+        "obstacle_mm": 344,
+        "line_bits": 6,
+        "ir": [
+          null,
+          1,
+          0
+        ],
+        "pitch_deg": 5.5,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 17,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 3978,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "75 00 00 00 5d d1 ac 83 58 14 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 117,
+        "obstacle_valid": true,
+        "obstacle_mm": 349,
+        "line_bits": 5,
+        "ir": [
+          null,
+          0,
+          1
+        ],
+        "pitch_deg": 3.9,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 17,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 3979,
+      "topic": "mtk3smp-pico/heartbeat",
+      "length": 5,
+      "hex": "80 0a 00 00 00",
+      "retained": false,
+      "decoded": {
+        "counter": 10
+      }
+    },
+    {
+      "at_ms": 3980,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 4119,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "77 00 00 00 48 d1 d2 83 58 36 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 119,
+        "obstacle_valid": true,
+        "obstacle_mm": 328,
+        "line_bits": 5,
+        "ir": [
+          null,
+          0,
+          1
+        ],
+        "pitch_deg": 7.7,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Ascending hump",
+        "imu_flags": 19,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 4415,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 4632,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "78 00 00 00 96 d1 9d 83 58 38 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 120,
+        "obstacle_valid": true,
+        "obstacle_mm": 406,
+        "line_bits": 5,
+        "ir": [
+          null,
+          0,
+          1
+        ],
+        "pitch_deg": 2.4,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Descending hump",
+        "imu_flags": 19,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 5138,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "79 00 00 00 6a d1 a7 83 58 38 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 121,
+        "obstacle_valid": true,
+        "obstacle_mm": 362,
+        "line_bits": 5,
+        "ir": [
+          null,
+          0,
+          1
+        ],
+        "pitch_deg": 3.4,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Descending hump",
+        "imu_flags": 19,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 5396,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 5637,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "7a 00 00 00 6d d1 9c 83 58 38 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 122,
+        "obstacle_valid": true,
+        "obstacle_mm": 365,
+        "line_bits": 5,
+        "ir": [
+          null,
+          0,
+          1
+        ],
+        "pitch_deg": 2.3,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Descending hump",
+        "imu_flags": 19,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 6169,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "7b 00 00 00 a2 d1 ab 83 58 38 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 123,
+        "obstacle_valid": true,
+        "obstacle_mm": 418,
+        "line_bits": 5,
+        "ir": [
+          null,
+          0,
+          1
+        ],
+        "pitch_deg": 3.8,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Descending hump",
+        "imu_flags": 19,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 6415,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 7605,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "7c 00 00 00 e4 d1 71 83 58 38 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 124,
+        "obstacle_valid": true,
+        "obstacle_mm": 484,
+        "line_bits": 5,
+        "ir": [
+          null,
+          0,
+          1
+        ],
+        "pitch_deg": -2,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Descending hump",
+        "imu_flags": 19,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 7606,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "7d 00 00 00 6f d1 84 83 58 14 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 125,
+        "obstacle_valid": true,
+        "obstacle_mm": 367,
+        "line_bits": 5,
+        "ir": [
+          null,
+          0,
+          1
+        ],
+        "pitch_deg": -0.1,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 17,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 7607,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 7678,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "7e 00 00 00 58 d1 82 83 58 14 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 126,
+        "obstacle_valid": true,
+        "obstacle_mm": 344,
+        "line_bits": 5,
+        "ir": [
+          null,
+          0,
+          1
+        ],
+        "pitch_deg": -0.3,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 17,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 9161,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "7f 00 00 00 46 d1 83 83 58 14 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 127,
+        "obstacle_valid": true,
+        "obstacle_mm": 326,
+        "line_bits": 5,
+        "ir": [
+          null,
+          0,
+          1
+        ],
+        "pitch_deg": -0.2,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 17,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 9162,
+      "topic": "mtk3smp-pico/heartbeat",
+      "length": 5,
+      "hex": "80 0b 00 00 00",
+      "retained": false,
+      "decoded": {
+        "counter": 11
+      }
+    },
+    {
+      "at_ms": 9163,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 10681,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "81 00 00 00 5b d1 85 83 58 14 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 129,
+        "obstacle_valid": true,
+        "obstacle_mm": 347,
+        "line_bits": 5,
+        "ir": [
+          null,
+          0,
+          1
+        ],
+        "pitch_deg": 0,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 17,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 12237,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 12238,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "82 00 00 00 55 d1 7d 83 58 14 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 130,
+        "obstacle_valid": true,
+        "obstacle_mm": 341,
+        "line_bits": 5,
+        "ir": [
+          null,
+          0,
+          1
+        ],
+        "pitch_deg": -0.8,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 17,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 12239,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "83 00 00 00 65 d1 95 83 58 14 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 131,
+        "obstacle_valid": true,
+        "obstacle_mm": 357,
+        "line_bits": 5,
+        "ir": [
+          null,
+          0,
+          1
+        ],
+        "pitch_deg": 1.6,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 17,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 12318,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "85 00 00 00 6d c1 b3 83 58 14 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 133,
+        "obstacle_valid": true,
+        "obstacle_mm": 365,
+        "line_bits": 4,
+        "ir": [
+          null,
+          0,
+          0
+        ],
+        "pitch_deg": 4.6,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 17,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 12318,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 12319,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "86 00 00 00 6a c1 ae 83 58 14 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 134,
+        "obstacle_valid": true,
+        "obstacle_mm": 362,
+        "line_bits": 4,
+        "ir": [
+          null,
+          0,
+          0
+        ],
+        "pitch_deg": 4.1,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 17,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 12319,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "87 00 00 00 6d c1 96 83 58 14 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 135,
+        "obstacle_valid": true,
+        "obstacle_mm": 365,
+        "line_bits": 4,
+        "ir": [
+          null,
+          0,
+          0
+        ],
+        "pitch_deg": 1.7,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 17,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 12443,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 12788,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "88 00 00 00 68 c1 a9 83 58 14 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 136,
+        "obstacle_valid": true,
+        "obstacle_mm": 360,
+        "line_bits": 4,
+        "ir": [
+          null,
+          0,
+          0
+        ],
+        "pitch_deg": 3.6,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 17,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 13297,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "89 00 00 00 82 f1 d0 83 58 14 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 137,
+        "obstacle_valid": true,
+        "obstacle_mm": 386,
+        "line_bits": 7,
+        "ir": [
+          null,
+          1,
+          1
+        ],
+        "pitch_deg": 7.5,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 17,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 13396,
+      "topic": "mtk3smp-pico/heartbeat",
+      "length": 5,
+      "hex": "80 0c 00 00 00",
+      "retained": false,
+      "decoded": {
+        "counter": 12
+      }
+    },
+    {
+      "at_ms": 13458,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 13798,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "8a 00 00 00 7b f1 cf 83 58 14 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 138,
+        "obstacle_valid": true,
+        "obstacle_mm": 379,
+        "line_bits": 7,
+        "ir": [
+          null,
+          1,
+          1
+        ],
+        "pitch_deg": 7.4,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 17,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 14324,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "8b 00 00 00 7f f1 d8 83 58 14 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 139,
+        "obstacle_valid": true,
+        "obstacle_mm": 383,
+        "line_bits": 7,
+        "ir": [
+          null,
+          1,
+          1
+        ],
+        "pitch_deg": 8.3,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 17,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 14505,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 14817,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "8c 00 00 00 6f f1 ce 83 58 14 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 140,
+        "obstacle_valid": true,
+        "obstacle_mm": 367,
+        "line_bits": 7,
+        "ir": [
+          null,
+          1,
+          1
+        ],
+        "pitch_deg": 7.3,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 17,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 15338,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "8d 00 00 00 7b f1 bf 83 58 14 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 141,
+        "obstacle_valid": true,
+        "obstacle_mm": 379,
+        "line_bits": 7,
+        "ir": [
+          null,
+          1,
+          1
+        ],
+        "pitch_deg": 5.8,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 17,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 16356,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 16356,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "8e 00 00 00 7f f1 c1 83 58 14 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 142,
+        "obstacle_valid": true,
+        "obstacle_mm": 383,
+        "line_bits": 7,
+        "ir": [
+          null,
+          1,
+          1
+        ],
+        "pitch_deg": 6,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 17,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 16462,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "8f 00 00 00 84 f1 c2 83 58 14 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 143,
+        "obstacle_valid": true,
+        "obstacle_mm": 388,
+        "line_bits": 7,
+        "ir": [
+          null,
+          1,
+          1
+        ],
+        "pitch_deg": 6.1,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 17,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 16463,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 16869,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "90 00 00 00 7b f1 b5 83 58 14 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 144,
+        "obstacle_valid": true,
+        "obstacle_mm": 379,
+        "line_bits": 7,
+        "ir": [
+          null,
+          1,
+          1
+        ],
+        "pitch_deg": 4.8,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 17,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 17379,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "91 00 00 00 71 f1 d2 83 58 14 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 145,
+        "obstacle_valid": true,
+        "obstacle_mm": 369,
+        "line_bits": 7,
+        "ir": [
+          null,
+          1,
+          1
+        ],
+        "pitch_deg": 7.7,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 17,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 17476,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 17888,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "92 00 00 00 6a f1 a9 83 58 14 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 146,
+        "obstacle_valid": true,
+        "obstacle_mm": 362,
+        "line_bits": 7,
+        "ir": [
+          null,
+          1,
+          1
+        ],
+        "pitch_deg": 3.6,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 17,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 18434,
+      "topic": "mtk3smp-pico/heartbeat",
+      "length": 5,
+      "hex": "80 0d 00 00 00",
+      "retained": false,
+      "decoded": {
+        "counter": 13
+      }
+    },
+    {
+      "at_ms": 18482,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "93 00 00 00 71 f1 21 84 58 36 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 147,
+        "obstacle_valid": true,
+        "obstacle_mm": 369,
+        "line_bits": 7,
+        "ir": [
+          null,
+          1,
+          1
+        ],
+        "pitch_deg": 15.6,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Ascending hump",
+        "imu_flags": 19,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 18482,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 18899,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "94 00 00 00 6b f1 d4 83 58 36 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 148,
+        "obstacle_valid": true,
+        "obstacle_mm": 363,
+        "line_bits": 7,
+        "ir": [
+          null,
+          1,
+          1
+        ],
+        "pitch_deg": 7.9,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Ascending hump",
+        "imu_flags": 19,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 19399,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 19460,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "95 00 00 00 10 f2 e8 83 58 36 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 149,
+        "obstacle_valid": true,
+        "obstacle_mm": 528,
+        "line_bits": 7,
+        "ir": [
+          null,
+          1,
+          1
+        ],
+        "pitch_deg": 9.9,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Ascending hump",
+        "imu_flags": 19,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 19917,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "96 00 00 00 51 d2 df 83 58 36 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 150,
+        "obstacle_valid": true,
+        "obstacle_mm": 593,
+        "line_bits": 5,
+        "ir": [
+          null,
+          0,
+          1
+        ],
+        "pitch_deg": 9,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Ascending hump",
+        "imu_flags": 19,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 20410,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 20956,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "97 00 00 00 43 c2 ad 83 58 54 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 151,
+        "obstacle_valid": true,
+        "obstacle_mm": 579,
+        "line_bits": 4,
+        "ir": [
+          null,
+          0,
+          0
+        ],
+        "pitch_deg": 4,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 21,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 22840,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "98 00 00 00 c7 f4 2e 84 58 36 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 152,
+        "obstacle_valid": true,
+        "obstacle_mm": 1223,
+        "line_bits": 7,
+        "ir": [
+          null,
+          1,
+          1
+        ],
+        "pitch_deg": 16.9,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Ascending hump",
+        "imu_flags": 19,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 22913,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 22914,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "99 00 00 00 12 f2 ba 84 58 36 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 153,
+        "obstacle_valid": true,
+        "obstacle_mm": 530,
+        "line_bits": 7,
+        "ir": [
+          null,
+          1,
+          1
+        ],
+        "pitch_deg": 30.9,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Ascending hump",
+        "imu_flags": 19,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 22915,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "9a 00 00 00 36 f1 af 83 58 38 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 154,
+        "obstacle_valid": true,
+        "obstacle_mm": 310,
+        "line_bits": 7,
+        "ir": [
+          null,
+          1,
+          1
+        ],
+        "pitch_deg": 4.2,
+        "hump_mm": 16,
+        "max_hump_mm": 22,
+        "imu_state": "Descending hump",
+        "imu_flags": 19,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 22915,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 23012,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "9c 00 00 00 03 f1 37 8c 58 36 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 156,
+        "obstacle_valid": true,
+        "obstacle_mm": 259,
+        "line_bits": 7,
+        "ir": [
+          null,
+          1,
+          1
+        ],
+        "pitch_deg": 17.8,
+        "hump_mm": 17,
+        "max_hump_mm": 22,
+        "imu_state": "Ascending hump",
+        "imu_flags": 19,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 23397,
+      "topic": "mtk3smp-pico/heartbeat",
+      "length": 5,
+      "hex": "80 0e 00 00 00",
+      "retained": false,
+      "decoded": {
+        "counter": 14
+      }
+    },
+    {
+      "at_ms": 23417,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 23566,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "9d 00 00 00 11 f2 4c 8c 58 36 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 157,
+        "obstacle_valid": true,
+        "obstacle_mm": 529,
+        "line_bits": 7,
+        "ir": [
+          null,
+          1,
+          1
+        ],
+        "pitch_deg": 19.9,
+        "hump_mm": 17,
+        "max_hump_mm": 22,
+        "imu_state": "Ascending hump",
+        "imu_flags": 19,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 23998,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "9e 00 00 00 38 f2 f4 8c 58 36 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 158,
+        "obstacle_valid": true,
+        "obstacle_mm": 568,
+        "line_bits": 7,
+        "ir": [
+          null,
+          1,
+          1
+        ],
+        "pitch_deg": 36.7,
+        "hump_mm": 17,
+        "max_hump_mm": 22,
+        "imu_state": "Ascending hump",
+        "imu_flags": 19,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 24400,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 24552,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "9f 00 00 00 3c f4 27 8d 58 36 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 159,
+        "obstacle_valid": true,
+        "obstacle_mm": 1084,
+        "line_bits": 7,
+        "ir": [
+          null,
+          1,
+          1
+        ],
+        "pitch_deg": 41.8,
+        "hump_mm": 17,
+        "max_hump_mm": 22,
+        "imu_state": "Ascending hump",
+        "imu_flags": 19,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 25023,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "a0 00 00 00 74 f1 fd 8c 58 36 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 160,
+        "obstacle_valid": true,
+        "obstacle_mm": 372,
+        "line_bits": 7,
+        "ir": [
+          null,
+          1,
+          1
+        ],
+        "pitch_deg": 37.6,
+        "hump_mm": 17,
+        "max_hump_mm": 22,
+        "imu_state": "Ascending hump",
+        "imu_flags": 19,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 25422,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 25543,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "a1 00 00 00 71 f1 d8 8b 58 14 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 161,
+        "obstacle_valid": true,
+        "obstacle_mm": 369,
+        "line_bits": 7,
+        "ir": [
+          null,
+          1,
+          1
+        ],
+        "pitch_deg": 8.3,
+        "hump_mm": 17,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 17,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 26037,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "a2 00 00 00 7f d1 56 8b 58 38 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 162,
+        "obstacle_valid": true,
+        "obstacle_mm": 383,
+        "line_bits": 5,
+        "ir": [
+          null,
+          0,
+          1
+        ],
+        "pitch_deg": -4.7,
+        "hump_mm": 17,
+        "max_hump_mm": 22,
+        "imu_state": "Descending hump",
+        "imu_flags": 19,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 26397,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 26556,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "a3 00 00 00 43 e1 6f 33 58 54 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 163,
+        "obstacle_valid": true,
+        "obstacle_mm": 323,
+        "line_bits": 6,
+        "ir": [
+          null,
+          1,
+          0
+        ],
+        "pitch_deg": -2.2,
+        "hump_mm": 6,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 21,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 27124,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "a4 00 00 00 58 e1 9a 33 58 54 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 164,
+        "obstacle_valid": true,
+        "obstacle_mm": 344,
+        "line_bits": 6,
+        "ir": [
+          null,
+          1,
+          0
+        ],
+        "pitch_deg": 2.1,
+        "hump_mm": 6,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 21,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 27414,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 27584,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "a5 00 00 00 6a d1 b0 33 58 54 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 165,
+        "obstacle_valid": true,
+        "obstacle_mm": 362,
+        "line_bits": 5,
+        "ir": [
+          null,
+          0,
+          1
+        ],
+        "pitch_deg": 4.3,
+        "hump_mm": 6,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 21,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 28079,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "a6 00 00 00 56 f1 97 33 58 54 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 166,
+        "obstacle_valid": true,
+        "obstacle_mm": 342,
+        "line_bits": 7,
+        "ir": [
+          null,
+          1,
+          1
+        ],
+        "pitch_deg": 1.8,
+        "hump_mm": 6,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 21,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 28397,
+      "topic": "mtk3smp-pico/heartbeat",
+      "length": 5,
+      "hex": "80 0f 00 00 00",
+      "retained": false,
+      "decoded": {
+        "counter": 15
+      }
+    },
+    {
+      "at_ms": 28419,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 28599,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "a7 00 00 00 6b e1 b8 33 58 54 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 167,
+        "obstacle_valid": true,
+        "obstacle_mm": 363,
+        "line_bits": 6,
+        "ir": [
+          null,
+          1,
+          0
+        ],
+        "pitch_deg": 5.1,
+        "hump_mm": 6,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 21,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 29097,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "a8 00 00 00 68 c1 d7 33 58 54 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 168,
+        "obstacle_valid": true,
+        "obstacle_mm": 360,
+        "line_bits": 4,
+        "ir": [
+          null,
+          0,
+          0
+        ],
+        "pitch_deg": 8.2,
+        "hump_mm": 6,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 21,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 29398,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 29620,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "a9 00 00 00 0f d2 ba 33 58 54 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 169,
+        "obstacle_valid": true,
+        "obstacle_mm": 527,
+        "line_bits": 5,
+        "ir": [
+          null,
+          0,
+          1
+        ],
+        "pitch_deg": 5.3,
+        "hump_mm": 6,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 21,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 30117,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "aa 00 00 00 7d d1 c3 33 58 54 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 170,
+        "obstacle_valid": true,
+        "obstacle_mm": 381,
+        "line_bits": 5,
+        "ir": [
+          null,
+          0,
+          1
+        ],
+        "pitch_deg": 6.2,
+        "hump_mm": 6,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 21,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 30403,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 30639,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "ab 00 00 00 3c c1 d1 33 58 54 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 171,
+        "obstacle_valid": true,
+        "obstacle_mm": 316,
+        "line_bits": 4,
+        "ir": [
+          null,
+          0,
+          0
+        ],
+        "pitch_deg": 7.6,
+        "hump_mm": 6,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 21,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 31138,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "ac 00 00 00 2e c1 c3 33 58 54 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 172,
+        "obstacle_valid": true,
+        "obstacle_mm": 302,
+        "line_bits": 4,
+        "ir": [
+          null,
+          0,
+          0
+        ],
+        "pitch_deg": 6.2,
+        "hump_mm": 6,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 21,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 31402,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 31678,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "ad 00 00 00 79 f1 7b 33 58 54 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 173,
+        "obstacle_valid": true,
+        "obstacle_mm": 377,
+        "line_bits": 7,
+        "ir": [
+          null,
+          1,
+          1
+        ],
+        "pitch_deg": -1,
+        "hump_mm": 6,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 21,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 32175,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "ae 00 00 00 4b e1 69 33 58 38 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 174,
+        "obstacle_valid": true,
+        "obstacle_mm": 331,
+        "line_bits": 6,
+        "ir": [
+          null,
+          1,
+          0
+        ],
+        "pitch_deg": -2.8,
+        "hump_mm": 6,
+        "max_hump_mm": 22,
+        "imu_state": "Descending hump",
+        "imu_flags": 19,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 32396,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 32689,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "af 00 00 00 46 d1 43 33 58 38 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 175,
+        "obstacle_valid": true,
+        "obstacle_mm": 326,
+        "line_bits": 5,
+        "ir": [
+          null,
+          0,
+          1
+        ],
+        "pitch_deg": -6.6,
+        "hump_mm": 6,
+        "max_hump_mm": 22,
+        "imu_state": "Descending hump",
+        "imu_flags": 19,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 33199,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "b0 00 00 00 76 c1 d6 33 58 14 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 176,
+        "obstacle_valid": true,
+        "obstacle_mm": 374,
+        "line_bits": 4,
+        "ir": [
+          null,
+          0,
+          0
+        ],
+        "pitch_deg": 8.1,
+        "hump_mm": 6,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 17,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 33397,
+      "topic": "mtk3smp-pico/heartbeat",
+      "length": 5,
+      "hex": "80 10 00 00 00",
+      "retained": false,
+      "decoded": {
+        "counter": 16
+      }
+    },
+    {
+      "at_ms": 33416,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 33719,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "b1 00 00 00 55 c0 b3 33 58 14 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 177,
+        "obstacle_valid": true,
+        "obstacle_mm": 85,
+        "line_bits": 4,
+        "ir": [
+          null,
+          0,
+          0
+        ],
+        "pitch_deg": 4.6,
+        "hump_mm": 6,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 17,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 34197,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "b2 00 00 00 62 d1 70 33 58 14 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 178,
+        "obstacle_valid": true,
+        "obstacle_mm": 354,
+        "line_bits": 5,
+        "ir": [
+          null,
+          0,
+          1
+        ],
+        "pitch_deg": -2.1,
+        "hump_mm": 6,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 17,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 34396,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 34738,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "b3 00 00 00 73 c1 45 33 58 14 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 179,
+        "obstacle_valid": true,
+        "obstacle_mm": 371,
+        "line_bits": 4,
+        "ir": [
+          null,
+          0,
+          0
+        ],
+        "pitch_deg": -6.4,
+        "hump_mm": 6,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 17,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 35222,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "b4 00 00 00 81 c1 a7 33 58 14 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 180,
+        "obstacle_valid": true,
+        "obstacle_mm": 385,
+        "line_bits": 4,
+        "ir": [
+          null,
+          0,
+          0
+        ],
+        "pitch_deg": 3.4,
+        "hump_mm": 6,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 17,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 35467,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 35751,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "b5 00 00 00 60 e1 d3 33 58 14 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 181,
+        "obstacle_valid": true,
+        "obstacle_mm": 352,
+        "line_bits": 6,
+        "ir": [
+          null,
+          1,
+          0
+        ],
+        "pitch_deg": 7.8,
+        "hump_mm": 6,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 17,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 36252,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "b6 00 00 00 c0 c1 c6 33 58 14 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 182,
+        "obstacle_valid": true,
+        "obstacle_mm": 448,
+        "line_bits": 4,
+        "ir": [
+          null,
+          0,
+          0
+        ],
+        "pitch_deg": 6.5,
+        "hump_mm": 6,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 17,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 36397,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 36757,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "b7 00 00 00 00 c3 2a 33 58 14 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 183,
+        "obstacle_valid": true,
+        "obstacle_mm": 768,
+        "line_bits": 4,
+        "ir": [
+          null,
+          0,
+          0
+        ],
+        "pitch_deg": -9.1,
+        "hump_mm": 6,
+        "max_hump_mm": 22,
+        "imu_state": "Monitoring",
+        "imu_flags": 17,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 38296,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "b8 00 00 00 bc f1 93 34 58 36 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 184,
+        "obstacle_valid": true,
+        "obstacle_mm": 444,
+        "line_bits": 7,
+        "ir": [
+          null,
+          1,
+          1
+        ],
+        "pitch_deg": 27,
+        "hump_mm": 6,
+        "max_hump_mm": 22,
+        "imu_state": "Ascending hump",
+        "imu_flags": 19,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 38297,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 38298,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "b9 00 00 00 80 f2 57 34 58 36 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 185,
+        "obstacle_valid": true,
+        "obstacle_mm": 640,
+        "line_bits": 7,
+        "ir": [
+          null,
+          1,
+          1
+        ],
+        "pitch_deg": 21,
+        "hump_mm": 6,
+        "max_hump_mm": 22,
+        "imu_state": "Ascending hump",
+        "imu_flags": 19,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 38365,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "ba 00 00 00 00 f0 19 35 58 36 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 186,
+        "obstacle_valid": false,
+        "obstacle_mm": null,
+        "line_bits": 7,
+        "ir": [
+          null,
+          1,
+          1
+        ],
+        "pitch_deg": 40.4,
+        "hump_mm": 6,
+        "max_hump_mm": 22,
+        "imu_state": "Ascending hump",
+        "imu_flags": 19,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 38398,
+      "topic": "mtk3smp-pico/heartbeat",
+      "length": 5,
+      "hex": "80 11 00 00 00",
+      "retained": false,
+      "decoded": {
+        "counter": 17
+      }
+    },
+    {
+      "at_ms": 38465,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 38877,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "bb 00 00 00 00 f0 48 35 58 36 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 187,
+        "obstacle_valid": false,
+        "obstacle_mm": null,
+        "line_bits": 7,
+        "ir": [
+          null,
+          1,
+          1
+        ],
+        "pitch_deg": 45.1,
+        "hump_mm": 6,
+        "max_hump_mm": 22,
+        "imu_state": "Ascending hump",
+        "imu_flags": 19,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 39398,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 39677,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "bc 00 00 00 00 f0 35 35 58 36 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 188,
+        "obstacle_valid": false,
+        "obstacle_mm": null,
+        "line_bits": 7,
+        "ir": [
+          null,
+          1,
+          1
+        ],
+        "pitch_deg": 43.2,
+        "hump_mm": 6,
+        "max_hump_mm": 22,
+        "imu_state": "Ascending hump",
+        "imu_flags": 19,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 41356,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "bd 00 00 00 00 f0 ed 34 58 36 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 189,
+        "obstacle_valid": false,
+        "obstacle_mm": null,
+        "line_bits": 7,
+        "ir": [
+          null,
+          1,
+          1
+        ],
+        "pitch_deg": 36,
+        "hump_mm": 6,
+        "max_hump_mm": 22,
+        "imu_state": "Ascending hump",
+        "imu_flags": 19,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 41445,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 41446,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "be 00 00 00 00 f0 24 35 58 36 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 190,
+        "obstacle_valid": false,
+        "obstacle_mm": null,
+        "line_bits": 7,
+        "ir": [
+          null,
+          1,
+          1
+        ],
+        "pitch_deg": 41.5,
+        "hump_mm": 6,
+        "max_hump_mm": 22,
+        "imu_state": "Ascending hump",
+        "imu_flags": 19,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 41447,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "bf 00 00 00 38 f2 0e 35 58 36 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 191,
+        "obstacle_valid": true,
+        "obstacle_mm": 568,
+        "line_bits": 7,
+        "ir": [
+          null,
+          1,
+          1
+        ],
+        "pitch_deg": 39.3,
+        "hump_mm": 6,
+        "max_hump_mm": 22,
+        "imu_state": "Ascending hump",
+        "imu_flags": 19,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 41565,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "c0 00 00 00 45 f2 bb 34 58 36 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 192,
+        "obstacle_valid": true,
+        "obstacle_mm": 581,
+        "line_bits": 7,
+        "ir": [
+          null,
+          1,
+          1
+        ],
+        "pitch_deg": 31,
+        "hump_mm": 6,
+        "max_hump_mm": 22,
+        "imu_state": "Ascending hump",
+        "imu_flags": 19,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 42079,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "c1 00 00 00 3a f2 d5 34 58 36 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 193,
+        "obstacle_valid": true,
+        "obstacle_mm": 570,
+        "line_bits": 7,
+        "ir": [
+          null,
+          1,
+          1
+        ],
+        "pitch_deg": 33.6,
+        "hump_mm": 6,
+        "max_hump_mm": 22,
+        "imu_state": "Ascending hump",
+        "imu_flags": 19,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    },
+    {
+      "at_ms": 42748,
+      "topic": "mtk3smp-pico/status",
+      "length": 6,
+      "hex": "a3 5b 53 52 17 03",
+      "retained": false,
+      "decoded": {
+        "session_token": 391271259,
+        "controller_word": 3,
+        "controller_state_code": 3,
+        "controller_state": "Following line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false
+      }
+    },
+    {
+      "at_ms": 42749,
+      "topic": "mtk3smp-pico/telemetry",
+      "length": 11,
+      "hex": "c2 00 00 00 46 f4 df 34 58 36 00",
+      "retained": false,
+      "decoded": {
+        "sequence": 194,
+        "obstacle_valid": true,
+        "obstacle_mm": 1094,
+        "line_bits": 7,
+        "ir": [
+          null,
+          1,
+          1
+        ],
+        "pitch_deg": 34.6,
+        "hump_mm": 6,
+        "max_hump_mm": 22,
+        "imu_state": "Ascending hump",
+        "imu_flags": 19,
+        "imu_speed_source": "nominal",
+        "state": null,
+        "left_mps": null,
+        "right_mps": null,
+        "distance_m": null,
+        "barcode": null,
+        "faults": null,
+        "scan": null
+      }
+    }
+  ],
+  "omitted_packets": 0,
+  "finished_utc": "2026-11-13T06:22:31.837Z"
+}

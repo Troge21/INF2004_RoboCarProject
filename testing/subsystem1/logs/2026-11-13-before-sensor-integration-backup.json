@@ -1,0 +1,9 @@
+{
+  "date": "2026-11-13",
+  "base_commit": "f37055f567d46d4f2465725e1af46082b880ba29",
+  "backup": "C:\\Users\\wilso\\AppData\\Local\\Temp\\robocar-before-sensor-integration-0yuvid7h\\working-baseline.zip",
+  "sha256": "235e0ab2fe99dba911e9770cf81e3deebb0597e52df6a8ef7df37bf21f3f2fe3",
+  "file_count": 719,
+  "old_uf2_sha256": "390c589344927280ab77175a1cee2d04a07beacad2d522d63760146ad30f6f55",
+  "note": "Source/docs and current artifacts; no private secrets or .git; existing working changes preserved."
+}

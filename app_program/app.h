@@ -27,6 +27,15 @@
  * --------------------------------------------------------------------- */
 #define TASK_STACK_SIZE		2048	/* bytes; tm_printf needs ~1 KB */
 
+/* Integrated startup is the default. Standalone hardware benches are explicit
+ * APP_MODE=ir / APP_MODE=encoder builds; they never run alongside S1/S3/S5. */
+#define APP_BENCH_INTEGRATED 0
+#define APP_BENCH_IR         1
+#define APP_BENCH_ENCODER    2
+#ifndef APP_BENCH_MODE
+#define APP_BENCH_MODE APP_BENCH_INTEGRATED
+#endif
+
 /* IR-to-motor controller settings; normal builds only. */
 #define APP_LINE_FOLLOW_ENABLED  1 /* centre/right line tracking; left is barcode only */
 #define APP_CONTROL_PERIOD_MS    20
@@ -34,10 +43,8 @@
 #define APP_START_DELAY_MS       3000
 #define APP_FORWARD_DUTY         20
 #define APP_INNER_DUTY           15
-/* On all-white, pivot forward toward the last known side, then stop.
- * No side history means stop immediately. Both-black preserves history. */
-#define APP_RECOVERY_DUTY        20
-#define APP_RECOVERY_TIMEOUT_MS  200U
+/* Analog tracking: both white is centered/forward; both black crosses a
+ * junction. Missing/invalid/stale ADC data stops; white is not line loss. */
 
 
 #define APP_PRI_CONTROLLER       15

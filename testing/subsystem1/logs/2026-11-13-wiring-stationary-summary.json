@@ -1,0 +1,90 @@
+{
+  "client_date": "2026-11-13",
+  "recorded_at_utc": "2026-11-13T06:05:17.742445+00:00",
+  "user_report": "User reports connecting car and flashing latest UF2; no flash readback performed.",
+  "capture": {
+    "path": "testing/subsystem1/logs/2026-11-13-wiring-stationary-baseline.json",
+    "sha256": "29f1dde1c474177170835204ba28839bd2accfc3d3280b4a1277208f5944ea28"
+  },
+  "expected_local_uf2": {
+    "path": "C:\\Users\\wilso\\OneDrive\\Desktop\\INF2004 Embedded Systems Programming\\INF2004_RoboCarProject\\build_make\\mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2",
+    "bytes": 716288,
+    "sha256": "2cb408f2b453226ad9a55c005b59bad1e7171b0ccc4204b69a246fd129f2eccb",
+    "note": "Intended local file only, no flash readback"
+  },
+  "read_only": true,
+  "packets": {
+    "telemetry": 77,
+    "heartbeat": 8,
+    "status": 39
+  },
+  "decode_errors": 0,
+  "telemetry_valid_ultrasonic": 77,
+  "telemetry_samples": 77,
+  "ultrasonic_mm_range": [
+    226,
+    554
+  ],
+  "fresh_pitch_samples": 77,
+  "line_bits_observed": {
+    "6": 72,
+    "4": 5
+  },
+  "matching_status": [
+    {
+      "round_trip_ms": 31,
+      "decoded": {
+        "request_id": 3108238742,
+        "uptime_ms": 389650,
+        "session_token": 2723016381,
+        "controller_word": 25,
+        "controller_state_code": 1,
+        "controller_state": "Control disabled",
+        "controller_valid": true,
+        "stop_latched": true,
+        "test_build": true,
+        "sample_age_ms": 410,
+        "snapshot": {
+          "sequence": 763,
+          "obstacle_valid": true,
+          "obstacle_mm": 548,
+          "line_bits": 0,
+          "ir": [
+            null,
+            null,
+            null
+          ],
+          "pitch_deg": null,
+          "hump_mm": 19,
+          "max_hump_mm": 56,
+          "imu_state": "Monitoring",
+          "imu_flags": 1,
+          "imu_speed_source": "nominal",
+          "state": null,
+          "left_mps": null,
+          "right_mps": null,
+          "distance_m": null,
+          "barcode": null,
+          "faults": null,
+          "scan": null
+        }
+      }
+    }
+  ],
+  "limits": "No flash readback, board-summary capture, physical encoder/motor-stop test, calibrated accuracy or final-image recovery acceptance.",
+  "user_confirmed_power": "Laptop USB or power bank is the sole whole-car supply; no separate battery/motor switch.",
+  "user_IR_observation": "All four physical GP27/GP26 combinations match 4, 6, 5, 7 with laptop USB connected.",
+  "pattern_capture": {
+    "path": "testing/subsystem1/logs/2026-11-13-wiring-pattern-check-usb.json",
+    "sha256": "a94684844b953297d37c4e91daa100948a56fd96663616f43247f0986b796a81",
+    "line_bits_counts": {
+      "5": 61,
+      "6": 17,
+      "4": 18,
+      "7": 125
+    },
+    "limit": "All four codes captured; physical correspondence separately reported by user."
+  },
+  "user_latch_observation": "Latch persists through dashboard reconnect; clears after USB unplug/reconnect without BOOTSEL. Both expected results confirmed by user.",
+  "stationary_functional_result": "PASS: live transport/sensor baseline captured; all four physical IR patterns and latch reconnect/restart user-confirmed."
+}

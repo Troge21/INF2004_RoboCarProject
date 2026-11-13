@@ -177,7 +177,7 @@ This is best-effort live telemetry, not guaranteed delivery or command handling.
 The existing heartbeat RX is independent: telemetry TX appears in serial, and
 the external subscriber above verifies delivery (telemetry is not self-subscribed).
 
-Development verification: all 14 local checks passed on the host with the
+Development verification: all 15 local checks passed on the host with the
 actual S1 source and kernel/console stubs under address/undefined-behavior
 sanitizers (leak checking disabled because the execution environment uses ptrace).
 A deterministic host queue simulation also checked input overflow, newest-sample
@@ -865,3 +865,908 @@ Next: one clean five-trial hotspot series after the explicit flash, without
 restarting the laptop/Pico/broker within that series. No further reflash or
 code change is needed just to start the measurement. Keep the unresolved
 timeout, exact-image caveat and strict interval/peak-RAM/controller work open.
+
+## Confirmed-flash hotspot recovery - 11 November 2026
+
+The user completed the requested clean five-trial series after the explicit
+flash confirmation. The capture is normally closed, contains all five trials
+with no timeout/abort reason, and each stored assessment recomputes exactly
+using the unchanged recorder. Local UF2 hash matches the current file:
+9c5ac8f0876055939f2cc4049a22e3ca9285b38ccccd889096bd801dafc2a7a0.
+The captured recorder hash also matches current source. Image identity rests
+on the explicit user flash confirmation plus local fingerprints, not flash
+readback. Earlier failed/unconfirmed-image captures remain preserved.
+
+| Trial | Restore-marker to first new telemetry receipt | Matching fresh STATUS / compatible uptime | Maximum telemetry arrival interval | Observed heartbeat interval |
+| --- | ---: | --- | ---: | ---: |
+| 1 | 8.511 s | Yes | 2.080 s | 4.997 s |
+| 2 | 7.922 s | Yes | 0.539 s | 4.987 s |
+| 3 | 8.913 s | Yes | 0.546 s | 5.020 s |
+| 4 | 9.242 s | Yes | 0.599 s | 5.086 s |
+| 5 | 8.688 s | Yes | 0.592 s | 4.992 s |
+
+**Recovery result: 5/5 within 15 seconds**, meeting the earlier design/test
+criterion of at least four of five. Each trial received at least five
+telemetry messages, two heartbeats and a matching fresh TEST=1 STATUS reply.
+All five individual uptime checks passed. Across the complete series, Pico
+uptime advanced **245660 ms**, versus **245691 ms** between first/last received
+STATUS observations, compatible with uninterrupted operation and reply latency.
+No reboot was indicated during this series.
+
+One attempted baseline between trials 3 and 4 was rejected by the fresh-data
+gate before a recorded trial started; a later valid baseline began trial 4.
+It is retained in events and is not an omitted completed/failed trial.
+The previous timeout records and their image-identity caveats are unchanged;
+they are not pooled into this newly confirmed series.
+
+The recovery bounds begin at an operator marker before AP restoration and
+include human delay, laptop association, observation and Pico recovery.
+They do not measure isolated AP-beacon-to-Pico restoration time. The first
+new telemetry receipt is not independently source-timestamped; correlated
+fresh STATUS establishes recent communication. This is a stationary bench
+result, not full-project acceptance or proof of long-run reliability.
+
+Separate earlier interval targets remain **OPEN**. Four/five short telemetry
+windows met 2 s (maximum 2.080 s); three/five heartbeat windows met 5 s
+(maximum 5.086 s). Do not round these misses into passes or count recovery
+success as delivery-cadence validation. Peak runtime RAM, controller-owned
+commands/status, sensor accuracy and final integrated demonstration remain
+separate work. STOP remains disabled.
+
+Source commit at review: **b11c682808c3e82caae907fba0d1ef5c3c69311c**.
+Tracked source was clean at review start; no firmware or recorder source
+change, rebuild, reflash or additional outage was performed during review.
+
+- [Original clean series](logs/2026-11-11T06-09-18-051Z-wifi-recovery.json).
+- [Verified five-trial summary](logs/2026-11-11-hotspot-confirmed-recovery-summary.json).
+- [Capture/source fingerprint](logs/2026-11-11-hotspot-recovery-fingerprint.json).
+
+This completes the requested clean hotspot-recovery milestone. Next S1
+priority is the agreed controller-owned command/status handoff, alongside
+the remaining interval, RAM and final demonstration evidence. No additional
+hotspot series or reflash is requested just to repeat this completed result.
+
+
+## Controller command/status integration — 11 November 2026
+
+User explicitly requested proceeding with controller-owned command/status
+integration. The shared controller and S1/network/browser were updated; S2,
+S3, S4 and S5 source folders and the IMU algorithm were not changed. This is
+a local development implementation, not team/instructor approval or a physical
+motor-stop pass. No live STOP, flash, outage or motor movement was performed
+in this stage. Browser access host was unavailable, so no visual QA/screenshot
+was captured.
+
+The controller now owns a persistent stop inhibit, a protected state
+publication and bounded request/result slots. It runs every 20 ms, processes
+STOP before normal steering and throughout startup, and repeatedly submits
+zero duty to the existing S2 API while latched. S2 alone writes PWM. Contention
+never blocks; a normal controller poll conflict requests zero for that loop.
+A successful normal reply requires S2 acceptance, not merely queue submission.
+Motor handoff errors preserve the inhibit and report fault; even an already
+latched fault cannot be reported as a successful stop. Only Pico restart clears
+the latch. There is no remote RESUME.
+
+In the stationary TEST=1 image the supervisor now runs, but the motor task
+remains disabled and the supervisor never calls S2. State is Control disabled,
+plus a real software latch if requested. A bench success cannot establish
+physical motor stopping. The encoder calibration configuration is excluded
+from command admission. Normal driving task code was compile-checked to
+temporary objects only; the single UF2 remains TEST=1.
+
+Sensor v3 stays 11 bytes and heartbeat five bytes. STATUS request remains
+five bytes; its current reply is 15/26 bytes (old 11/22 removed). Existing
+status topic also carries six-byte controller beacons and ten-byte STOP
+results. STOP request is 13 bytes: correlation ID/session/boot deadline.
+The explicit-click browser handshake uses current STATUS, a two-second
+lease, one pending command, three-second reply timeout and no automatic retry.
+Session changes cancel browser requests; controller-applied latch persists.
+The stock receive callback has no retain flag; session/deadline checks reject
+old commands, but are not authentication on the anonymous trusted bench broker.
+
+All new controller deadlines/publications use operating time (`tk_get_otm`),
+not existing sensor calendar-domain timestamps or lwIP's retry clock. Controller
+snapshot expiry is 500 ms in firmware, two seconds at browser receipt. CSV
+controller columns explicitly describe state at sensor receipt, not a
+synchronized sensor sample. The recovery recorder ignores non-STATUS markers
+on the shared status topic and remains read-only. Earlier captures/source
+fingerprints and recovery results are unchanged.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Actual controller source, TEST=0 and TEST=1 | 16 checks each, zero failures | [Owner tests](logs/2026-11-11-controller-owner-tests.txt) |
+| Actual MQTT port: fragmentation, admission, replay/session/expiry, failures/recovery | 50 checks, zero failures | [Port tests](logs/2026-11-11-controller-mqtt-tests.txt) |
+| Actual S1 codec and queue/cache bridge | 36 + 23 checks, zero failures | [S1 tests](logs/2026-11-11-controller-s1-tests.txt) |
+| Dashboard current schema, command lifecycle and existing MQTT/telemetry | 45 tests, zero failures | [Dashboard tests](logs/2026-11-11-controller-dashboard-tests.txt) |
+| Actual C → JavaScript contract/framing | 19914 distance/IR + 4083 IMU frames, 3 heartbeats, 3 STATUS requests, 24 STATUS replies, 147 controller/STOP vectors | [Wire tests](logs/2026-11-11-controller-wire-tests.txt) |
+| Existing recovery recorder | 8 tests, zero failures | [Recorder tests](logs/2026-11-11-controller-recovery-probe-tests.txt) |
+| Existing S2 line policy (unchanged) | Passed | [Line tests](logs/2026-11-11-controller-line-policy-tests.txt) |
+| Actual normal app_main/controller branch | ARM compilation passed; temporary objects only | [Normal compile](logs/2026-11-11-controller-normal-compile.txt) |
+| ARM stationary image | Build passed | [Build log](logs/2026-11-11-controller-build.txt) |
+| Real Pico/controller/motors | NOT TESTED in this stage | Stationary checklist in the guide; motor trial remains separate |
+
+Expected on-device S1 summary is now **37 passed, 0 failed**: 36 software
+checks plus the Pico clock check. This expectation is not a captured board
+pass. Existing earlier 33-check startup evidence belongs to the prior image.
+The wire matrix omits two fault-state success combinations deliberately:
+a fault may carry a latch but must not encode a successful STOP.
+
+Current UF2: `build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2`,
+**714752 bytes**, SHA-256
+`eb29f4ab661a6810fbf43095cbf9052e4fac4100870de6cb158787e8bf9f412b`.
+Base commit **b11c682808c3e82caae907fba0d1ef5c3c69311c**, with local changes;
+no commit was created. [Fingerprint](logs/2026-11-11-controller-fingerprint.json)
+records source hashes without WiFi credentials. Only one UF2 is kept. **This
+image has not yet been flashed.**
+
+Matched TEST=1 linked sizes: text **357108**, data **104**, bss **82576**;
+static RAM **82680 bytes**, +68 versus previous recovery image (82612).
+Text grew 3464 bytes. S1 queue-buffer requests remain **192 bytes**. Added
+controller record bytes and the RX slot are compact application state;
+no new S1 message queue or lwIP timer was created. The stationary profile
+now also allocates a controller task with a **2048-byte stack plus kernel
+bookkeeping**, and one semaphore. Normal driving already had the task.
+Static size is not a peak RAM measurement or an accounting of dynamic cost.
+This is a feature addition, not a like-for-like savings comparison.
+
+[Controller guide](CONTROLLER_COMMANDS.md) gives the exact bit/range tables,
+resource costs and physical steps. First flash/verify the stationary image
+and test software latch/persistence/restart behavior; then prepare normal
+controller/S2 motor-inhibit validation with the owners. Earlier 5/5 recovery
+results, strict interval misses, runtime peak RAM and final demonstration
+remain separately scoped. The IMU one-wheel/curb algorithm is still deferred.
+
+
+## User-reported stationary controller checks — 11 November 2026
+
+The user reports all five tests from the immediately preceding instructions
+produced the expected result: normal restart shows Control disabled with no
+latch; Request status confirms a matching reply; Latch stop confirms the
+software inhibit with motor control disabled; dashboard reconnect preserves
+the latch; a second normal Pico restart clears it. Record these as **five
+user-observed functional passes**.
+
+See [the bench observation](logs/2026-11-11-controller-user-bench-observation.md).
+The intended local UF2 remains 714752 bytes with SHA-256
+`eb29f4ab661a6810fbf43095cbf9052e4fac4100870de6cb158787e8bf9f412b`.
+No flash readback, independent packet/serial capture or timing was obtained
+in this confirmation. Do not infer actual motor stopping, new-image outage
+recovery/cadence or the 37-check board summary from these five passes.
+
+This supersedes the earlier controller development section's then-unflashed
+status, while preserving the original source/build fingerprint. The agent
+made documentation changes only when recording the report; no firmware
+change, rebuild, flash, live command or outage occurred. Next is normal
+controller/S2 motor-inhibit validation, followed by final integration and
+cadence/resource/submission evidence. Buddy 4's IMU algorithm remains deferred.
+
+
+## Normal motor-stop trial preparation — 11 November 2026
+
+After the stationary five-check pass, the user requested the next milestone
+and confirmed **car available, both wheels raised securely, battery off**.
+The actual normal controller loop, controller latch, S2 API and S2 motor loop
+were exercised together with deterministic RTOS/PWM stubs. Eight integration
+checks passed: startup delay, expired request, contention fallback, no early
+success on a busy S2 handoff, accepted zero output, persistent inhibit despite
+changing/stale IR, STOP during startup, and inhibition beyond startup.
+[Actual-loop log](logs/2026-11-11-motor-stop-path-tests.txt). Existing S2 policy
+and motor API tests also pass unchanged; [log](logs/2026-11-11-motor-stop-s2-tests.txt).
+These are offline checks, not physical wheel stopping evidence.
+
+A forced ARM rebuild with `NET=lwip MQTT=1 TEST=0` passed without warnings:
+[build](logs/2026-11-11-motor-stop-build.txt). The source, motor duties (20%
+forward/15% inner), packet format, dashboard decoder and S2–S5 files are
+unchanged. Normal steering can start 3000 ms after boot, before WiFi is ready.
+No on-device self-test summary runs in normal mode. The current image is
+`build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt.uf2` (no `_test`), 694784 bytes,
+SHA-256 `fa871dff33210a77bf3166baed8f29e4dcd65342868e3a1c2a3103ae5752bf55`.
+It is **not yet flashed or physically tested**. The superseded stationary
+UF2 was removed after both hashes were checked, leaving only one current UF2;
+old logs/fingerprints are preserved. No physical command or motor power was
+performed by the agent during preparation.
+
+Normal linked sizes: text 347276, data 104, bss 82592, static RAM **82696**.
+S1 queue requests remain 192 bytes. Normal versus stationary linked sections
+are different build profiles, not a like-for-like saving. Normal additionally
+runs S2 motor and barcode reporter tasks with a 2048-byte stack each plus
+kernel overhead; runtime peaks are not measured.
+
+`observe_controller.mjs` is a bounded local WebSocket recorder using the
+existing dashboard MQTT adapter and binary decoder. It sends only read-only
+STATUS, records controller results from other clients and does not claim
+physical wheel or recovery timing measurements. Syntax check passed; its live
+use follows the flash. The existing recovery trial recorder intentionally
+requires stationary TEST=1 and is not used to command normal motors.
+
+[Motor-stop procedure](MOTOR_STOP_TEST.md) and
+[normal build fingerprint](logs/2026-11-11-motor-stop-fingerprint.json)
+identify the intended image and exact physical steps. First verify Normal
+build with battery off. Then observe both wheels rotating on both-black;
+keep the same target while requesting STOP; verify actual stopping and
+persistence through changing line input/dashboard reconnect. Physical results
+will be recorded separately, without overwriting this preparation record.
+
+
+## Normal flash / USB reconnect follow-up — 11 November 2026
+
+The user reported flashing the normal UF2 and reconnecting with wheels raised
+and battery still off. Initial preflight and normal-flash WebSocket observers
+connected/subscribed to the broker but received no car packets. Windows found
+neither Pico USB nor BOOTSEL/serial at that moment. The laptop WiFi address
+and car-facing broker listener were still 172.20.10.2. No powered motor trial
+was started or counted from those silent windows.
+
+After the user confirmed a normal USB reconnect (without BOOTSEL), COM5 / Pico
+USB and the car TCP session returned. The 20-second live observer received a
+matching fresh STATUS in **24 ms**, TEST=false, Waiting for line, stop latch
+false. Real telemetry/heartbeat/controller packets continued. This verifies
+normal-mode communication and a read-only reply, not physical wheel stopping
+or independent flash identity. No firmware change, agent flash or motor
+command was needed for this communication restoration.
+
+[Live baseline summary](logs/2026-11-11-motor-stop-normal-baseline-summary.json)
+links/hashes the completed raw capture and intended local UF2. The earlier
+silent captures remain preserved. The user is now asked to power the raised
+wheels, observe both rotating on both-black, keep that target unchanged and
+request Latch stop through the website. A bounded read-only capture is running;
+physical stopping/persistence must be reported separately. No powered motor
+pass has been recorded yet.
+
+
+## Motor trial deferred for teammate wiring/code — 11 November 2026
+
+The user reports changed wiring by the teammate responsible for the motor
+and other subsystem integration, and explicitly requests waiting for that
+teammate's code before continuing. Record the physical motor-stop trial as
+**DEFERRED / NOT COMPLETED**. Do not turn the hardware mismatch report into a
+physical STOP pass or a conclusive S1 protocol failure. No new pin map or
+motor interface was supplied; no speculative driver/pin changes were made.
+
+The prior five stationary checks remain user-reported passes. Normal-mode
+communication and the 24 ms matched read-only STATUS after USB reconnect
+remain recorded. The bounded 180-second capture is finished and preserved;
+it cannot establish wheel motion/physical stopping. The agent made only
+local documentation updates for this deferral, with no flash, motor command,
+GPIO change, additional live probe or Git pull/merge.
+
+[Deferral record](logs/2026-11-11-motor-stop-deferred-wiring.md) hashes the
+finished raw capture and identifies the existing normal UF2, which still
+reflects the preceding software/pin assignments. The original build/source
+fingerprint is preserved as historical preparation evidence. Resume by
+preserving local S1 changes, integrating the teammate's actual wiring/code,
+checking GPIO ownership/controller/motor contracts and rebuilding one current
+UF2. Verify communication with motor power off before repeating the raised-
+wheel motor-stop trial. Do not modify teammate-owned S2 files based on guesses.
+
+
+## Safe teammate pull — 12 November 2026
+
+The user's earlier VS Code pull fetched f37055f but aborted because local
+TEAM.md and app_main.c changes would be overwritten. Main was still b11c682.
+A verified file backup preserved 59 modified/untracked files plus binary
+working-tree/staging patches. A named Git stash also preserved the local work.
+After fetching, a fast-forward pull moved main to f37055f; local S1 changes
+were reapplied. The one content conflict in TEAM.md was resolved by keeping
+the local S1 row and upstream's actual S2 motor/bench row. app_main.c merged
+automatically, preserving both sides. All 57 non-overlapping saved files were
+verified byte-for-byte; 17 Git-normalized files were restored to original
+bytes so historical capture hashes remain valid. The original unstaged state
+was restored, with no unmerged index entries. No feature commit or push occurred.
+The recovery stash/file backup are retained.
+
+Dashboard: **45 tests passed**; actual S1 codec **36 passed**, queue/cache
+**23 passed**. [Dashboard log](logs/2026-11-12-post-pull-dashboard-tests.txt),
+[S1 log](logs/2026-11-12-post-pull-s1-tests.txt),
+[pull/recovery record](logs/2026-11-12-pull-record.json).
+Main matches origin/main (0 ahead / 0 behind). Upstream-owned S2/S3/S5 and
+new GPIO/encoder/motion files match HEAD; no speculative changes were made.
+
+The new normal usermain invokes noreturn ir_adc_test() before the full
+subsystem lifecycle. Analog IR uses GP28/27/26 and centre/right analog
+tracking; encoders use GP16/17 and GP0/1. These source assignments must be
+reviewed against actual hardware, and the active standalone startup needs
+S1/controller integration before dashboard/motor acceptance resumes. Existing
+S1 sensor formats/algorithms were not expanded as part of this Git operation.
+The old motor harness/evidence belongs to its prior S2 API/source. No ARM
+build, UF2 replacement, flash, live command or motor-power operation occurred.
+The existing local UF2 predates this pull and must not be mistaken for the
+new teammate firmware. Earlier passes and raw records remain historical.
+
+## Analog-wiring / full S1 integration — 12 November 2026
+
+User request: check the pulled wiring changes, continue S1 integration and
+fix affected earlier work. Base HEAD remains f37055f, with local restored S1
+changes. No commit/push, live MQTT command, flash or motor-power action was
+performed in this development stage.
+
+Three concrete conflicts were fixed: the old GP16 line path overlapped the
+left encoder, digital barcode capture on GP26 would conflict with the new
+right AO input, and noreturn standalone IR startup bypassed the full S1/
+controller lifecycle. S3 now owns GP28/27/26 ADC2/1/0 via the existing kernel
+ADC device. Thresholds (1390 reserved barcode, 950 centre/left, 1420 right),
+discard-one/two-sample averaging and raw 0..4095 bounds are retained from
+the teammate. Failed/short/out-of-range or >100 ms sampling is invalid;
+timestamp marks the oldest conversion. Snapshot readers never call drivers.
+
+Default APP_MODE=integrated restores all subsystem lifecycles. Explicit
+APP_MODE=ir preserves the standalone IR diagnostic. TEST=1 APP_MODE=encoder
+preserves the teammate's timed powered encoder bench. S2 calibration is now
+selected only by that explicit mode; ordinary integrated TEST=1 contains no
+motor task. The build profile includes APP_MODE to avoid stale object reuse.
+
+The normal controller preserves both-white/both-black forward and individual
+corrections at 35/35 or 26/35, 35/26 RPM. It uses existing S2 APIs and leaves
+PID gains, encoder calibration, polarity, PWM and fault algorithms intact.
+Fresh ADC/motion validity gates steering; a known S2 fault requests zero and
+is reported as a controller/motor fault. STOP always takes priority. A known
+motor fault cannot become a successful STOP merely because a zero request
+was accepted. The new regression covers that case.
+
+S5 retains GP4/5 and the upstream per-pin IRQ13 dispatcher; no change to
+distance conversion, startup tick fix or radio retry policy was made. S4
+wiring and estimator are unchanged. It still uses nominal 150 mm/s until
+measured speed is explicitly integrated; one-wheel/curb accuracy is deferred.
+The GP28 AO input is barcode-reserved but not decoded; no digital capture/
+timer or barcode-result queue is started. Future barcode acquisition needs
+its owner rather than interpreting the new right sensor as barcode.
+
+Sensor telemetry stays 11 bytes and heartbeat five; controller/status/STOP
+contracts are unchanged. The website now labels actual GP27/26/28 roles and
+describes white/white forward. S2 motion feedback is used for controller
+validity/faults, not yet transmitted as wheel speed/distance in v3. Missing
+panels remain unavailable. Browser access host was unavailable, so visual
+inspection/screenshot was not obtained; software tests and syntax checks
+are separate evidence.
+
+| Validation | Result | Evidence |
+| --- | --- | --- |
+| Actual S3 ADC/snapshot/task and existing decoder models | 16 suite groups passed; AO harness in both controller configurations | [Analog tests](logs/2026-11-12-wiring-analog-tests.txt) |
+| Actual controller + S2 API/PID/motor loop, no hardware | 13 checks passed | [Motor tests](logs/2026-11-12-wiring-motor-tests.txt) |
+| AO policy in RPM and duty modes | Passed | [Policy tests](logs/2026-11-12-wiring-policy-tests.txt) |
+| Actual shared IRQ dispatcher / echo masking / encoder continuity | Passed | [GPIO tests](logs/2026-11-12-wiring-gpio-tests.txt) |
+| Controller owner | 17 checks in each TEST mode, zero failures | [Owner tests](logs/2026-11-12-wiring-owner-tests.txt) |
+| Actual S1 codec and queue/cache bridge | 36 + 23 passed | [S1 tests](logs/2026-11-12-wiring-s1-tests.txt) |
+| Actual MQTT port | 50 passed | [Port tests](logs/2026-11-12-wiring-mqtt-tests.txt) |
+| Dashboard | 45 passed | [Dashboard tests](logs/2026-11-12-wiring-dashboard-tests.txt) |
+| C → JavaScript packed contract | 23997 sensor frames, 147 controller vectors, 3 heartbeats, 3 requests / 24 STATUS replies | [Wire tests](logs/2026-11-12-wiring-wire-tests.txt) |
+| Actual ARM compile/startup symbols, four modes | Passed; benches exclusive, default stationary has no motor task | [Mode checks](logs/2026-11-12-wiring-profile-tests.txt) |
+| Final normal ARM link, WSL temporary output only | Passed: text 350712, data 104, bss 82652 | [Normal build](logs/2026-11-12-wiring-final-normal-build.txt) |
+| Final stationary ARM link, current UF2 | Passed: text 357820, data 104, bss 82492 | [Stationary build](logs/2026-11-12-wiring-stationary-build.txt) |
+| Actual current stationary ELF task symbols | S1/S3/controller present; motor, encoder bench, standalone IR, digital capture absent | [Image check](logs/2026-11-12-wiring-image-check.txt) |
+| Rewired car / physical STOP | NOT TESTED | Stationary validation first; then separate raised-wheel normal test |
+
+The current sole UF2 is
+build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2,
+716288 bytes, SHA-256 2cb408f2b453226ad9a55c005b59bad1e7171b0ccc4204b69a246fd129f2eccb.
+Build NET=lwip MQTT=1 TEST=1 APP_MODE=integrated.
+It has not been flashed or physically tested. Expected S1 board summary
+remains 37 checks; this is not an observed board pass.
+
+Current stationary static RAM is **82596 bytes**; checked normal mode uses
+82756. Different modes/features are not like-for-like savings comparisons.
+S1 input/output queue storage remains 64+128 =192 bytes. S3 sharing is nine
+bytes: timestamp:32, raw ADCs 3×12, validity:1, reserved:3; pattern derives
+from thresholds. No extra pattern/validity booleans or sample queue are
+needed; old barcode-result queue allocation is removed. Driver-required UW
+conversion buffers are transient local API working values. Runtime heap/
+stack peaks remain unmeasured; other subsystem/native state conversion is
+still group-wide work.
+
+[Fingerprint](logs/2026-11-12-wiring-fingerprint.json) identifies source,
+logs, current UF2 and validation limits without private WiFi credentials.
+Current-mode checks may be reproduced in WSL with
+python3 testing/subsystem1/test_build_modes.py, using the retained build-log
+flags; pass a newer log as its first argument when rebuilding later.
+
+The provided image is stationary first because new PID motion requests
+with motor power off may latch a stall fault. After actual IR/telemetry/
+latch validation, rebuild a matching normal integrated image and use the
+documented raised-wheel power/restart procedure. Prior digital-IR, motor
+and recovery observations remain preserved for their original images, not
+silently transferred into a physical pass for this new wiring.
+
+### Hardware availability follow-up - 12 November 2026
+
+The user answered "Car unavailable - test later" to the stationary-image
+flash/setup request. No flash, live capture, powered test or hardware pass
+is recorded for this new image. Keep the current stationary UF2 and resume
+Phase 1 of [the wiring/motor procedure](MOTOR_STOP_TEST.md) when the car is
+available. Normal driving firmware and the raised-wheel STOP trial follow
+only after the new sensor mapping is physically checked.
+
+## Rewired stationary live baseline - 13 November 2026
+
+The user reports connecting the car and flashing the latest UF2. Firmware,
+build and dashboard source hashes still match the prepared 12 November
+image (716288 bytes, SHA-256 2cb408f2b453226ad9a55c005b59bad1e7171b0ccc4204b69a246fd129f2eccb).
+This identifies the intended local artifact, not a flash readback.
+
+A read-only 40-second WebSocket/MQTT capture received 77 eleven-byte telemetry
+frames, eight five-byte heartbeats, 38 six-byte controller beacons and one
+26-byte matching STATUS reply (31 ms). All 77 telemetry frames supplied valid
+ultrasonic distance (226..554 mm) and pitch; there were no decode errors.
+Controller state was Control disabled, TEST true, STOP latch already true.
+Observed line_bits were 4 and 6; receipt alone does not validate the physical
+sensor mapping. STATUS rechecked its older sensor snapshot and correctly
+expired IR/pitch independently. No motor command was sent by the recorder.
+
+The four actual black/background combinations and latch reconnect/restart
+checks remain pending. Physical motion, encoder feedback, height/distance
+accuracy, board check summary and final-image recovery are not established.
+
+[Raw capture](logs/2026-11-13-wiring-stationary-baseline.json),
+[summary and capture fingerprint](logs/2026-11-13-wiring-stationary-summary.json).
+
+### Power clarification and IR observation - 13 November 2026
+
+The user clarified that the whole car is powered by either laptop USB or a
+power bank; there is no separate battery/motor switch. The earlier request
+to switch a motor battery off assumed the wrong setup. Current dashboard,
+motor, recovery and progress instructions now keep USB connected for
+stationary tests and require raised wheels before normal firmware is powered
+or flashed. Unplugging the active USB supply turns the whole car off.
+No rewiring, voltage change or sensor/actuator code change was made.
+
+With laptop USB connected, the user explicitly reports all four physical
+GP27/GP26 black/background combinations match line_bits 4, 6, 5, 7. This is
+user-observed mapping/threshold behavior, not a calibrated accuracy trial.
+The prior power-clarification capture includes a controller session change
+from latched to unlatched; without a correlated operator action it is not
+counted as the requested reconnect/restart test. Latch confirmation and
+normal powered motor STOP remain pending.
+
+### Stationary latch follow-up - 13 November 2026
+
+The user reports the latch persists when reconnecting only the dashboard,
+and disappears after unplugging USB and reconnecting normally without
+BOOTSEL. Both are the expected behavior: restarting the Pico clears its
+controller inhibit; browser reconnection does not. Together with the four
+IR combinations and captured live sensor/STATUS baseline, the stationary
+functional checks pass. These user observations do not establish physical
+motor stopping, calibrated sensor accuracy or repeated timing acceptance.
+Preparing the matching normal integrated image is the next step; both drive
+wheels must be raised before that firmware is flashed or powered.
+
+### Matched normal motor image prepared - 13 November 2026
+
+After the stationary checks passed, a forced normal build with NET=lwip
+MQTT=1 TEST=0 APP_MODE=integrated passed without compiler/linker warnings.
+Firmware sources still match the 12 November software-tested AO integration;
+this step changes the compile-time mode, not pins, thresholds, PID gains,
+IMU algorithms or the wire schema. ELF symbols confirm motor/PID, analog S3,
+S1 and controller presence, with standalone benches/digital capture absent.
+
+Current sole UF2: build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt.uf2,
+701952 bytes, SHA-256 1a2687d1c3b642626fb8c81b355587f8327e6d32a82e08e6829ae0d02dd1fc08.
+The superseded stationary UF2 was removed only after both hashes were
+verified; its raw observations and original fingerprint remain preserved.
+Normal sections: text 350712, data 104, bss 82652; linked static RAM 82756
+bytes. S1 queues remain 192 bytes; runtime heap/stack peaks are unmeasured.
+Normal mode runs no on-board TEST suite.
+
+The normal image is not yet flashed or physically validated. The car has a
+single USB/power-bank supply: both drive wheels must be securely raised
+before flashing/connecting it. Normal motion may start after three seconds,
+before WiFi or the dashboard connects. The motor STOP trial must observe
+rotation before the explicit website click, then both wheels stopping;
+nonmoving or already-faulted wheels are not a pass.
+
+[Build output](logs/2026-11-13-normal-motor-build.txt),
+[normal source/artifact fingerprint](logs/2026-11-13-normal-motor-fingerprint.json),
+[physical procedure](MOTOR_STOP_TEST.md).
+
+### Normal flash and live pre-STOP baseline - 13 November 2026
+
+The user explicitly confirms both drive wheels raised and the current normal
+UF2 flashed/reconnected. A read-only 45-second live capture received 80
+eleven-byte telemetry frames, eight five-byte heartbeats, 41 six-byte controller
+beacons and one 26-byte matching STATUS reply (203 ms), without decode errors.
+The Pico reported TEST=false, Following line, stop_latched=false. All four
+line codes appeared. This confirms normal communication/controller state;
+physical wheel movement and actual STOP still require the user observation.
+
+[Raw baseline](logs/2026-11-13-normal-motor-baseline.json),
+[normal observation summary](logs/2026-11-13-normal-motor-observation-summary.json).
+The recorder sent only read-only STATUS; the explicit motor STOP will be
+clicked by the user on the website after observing both wheels rotating.
+
+A subsequent 180-second recording received normal-mode telemetry/controller
+messages but captured no STOP result. It is preserved as a pre-command
+observation window, not counted as a physical STOP pass or failure. The
+user's before/after wheel observation and post-latch persistence remain
+pending. [Recording](logs/2026-11-13-normal-motor-stop-trial.json).
+
+### User motor STOP observation and restart clarification - 13 November
+
+The user reports both wheels rotating before the website STOP click, both
+stopping afterward, and Stop latched confirmed on the dashboard. The
+recording window above had ended before this result; no physical stopping
+time or independently captured STOP result is claimed.
+
+A subsequent fresh matching STATUS (68 ms) reported Following line,
+unlatched, with uptime 5750 ms. Earlier matching normal uptimes were 57330 ms
+and later 6970 ms, with different sessions. Restarts occurred between these
+windows. The user was asked whether USB was deliberately unplugged/reconnected
+after STOP. Reboot conditions and continuous-power latch persistence must
+be clarified; do not treat the currently clear latch as either a persistence
+pass or a proven latch-loss defect without that information.
+
+The user subsequently confirmed unplugging/reconnecting USB after STOP;
+the latch disappeared and the wheels resumed turning. This resolves the
+restart condition as a deliberate power-cycle and matches the specified
+restart-clears-latch behavior. It is not evidence of latch loss while
+continuously powered. A final explicit check now keeps USB connected through
+STOP, all four IR changes and dashboard reconnect, then turns the car off
+by unplugging USB at the end. No firmware change is needed for this behavior.
+
+### Normal STOP and continuous-power persistence PASS - 13 November 2026
+
+The final explicit procedure kept USB connected throughout STOP, all four
+IR patterns and dashboard disconnect/reconnect. The user confirms both wheels
+were rotating, both stopped after the website STOP, and both stayed stopped
+through the entire sequence with Stop latched displayed.
+
+The independent read-only recorder captured a successful normal STOP result
+(request ID 2378069613, session 3056588280, TEST=false, Stop latched). After
+that result it received 535 telemetry frames covering every valid IR code
+(4:128, 5:179, 6:79, 7:149), 272 controller beacons all Stop latched/true in
+the same normal session, and 55 heartbeats. Telemetry sequences and heartbeat
+counters advanced; there were no decode errors or indicated reboot in this
+window. The website sent STOP; the recorder sent only read-only STATUS.
+
+This completes a functional normal-build motor STOP/persistence bench check
+for the pulled analog wiring and current 701952-byte UF2. Physical wheel
+motion is user-observed; packet/controller evidence is independently captured.
+No stopping-time, encoder-standstill, accuracy, repeated fault-injection,
+runtime heap/stack or final-image recovery acceptance claim is made.
+
+[Successful continuous-power capture](logs/2026-11-13-normal-stop-continuous-power.json),
+[combined normal summary and capture fingerprints](logs/2026-11-13-normal-motor-observation-summary.json),
+[exact normal build/source fingerprint](logs/2026-11-13-normal-motor-fingerprint.json).
+No firmware/schema change was needed during these physical checks.
+
+
+## S1 completion batch ? 13 November 2026
+
+The user disconnected the car and requested all remaining S1 implementation
+together, with one consolidated testing stage afterward. Following a usage
+interruption, the implementation was completed and checked offline. No Pico,
+broker, hotspot, USB device or service was operated in this batch. No flash,
+commit or push occurred. Earlier hardware passes remain historical.
+
+Requirements were re-read from the supplied Project Write-up.pdf pages 1?5
+and 10?11 using a temporary verified parser, subsequently removed. Buddy 1
+covers connectivity, MQTT/topics, telemetry, commands, recovery and
+heartbeat/status; the telemetry list is examples. The mission is autonomous.
+No remote steering/START/RESUME or S4 curb algorithm was added.
+
+### Resulting implementation
+
+- One current Packed v4: main 46 bytes; scan chunks 19..56; resources 40;
+  heartbeat five; STATUS request/reply 5 / 16 or 62; STOP request/result 13 / 11.
+  Earlier live formats and separate controller beacons are removed.
+- S1 collects independent passive snapshots every 40 ms, publishes main data
+  every 400 ms and is no longer triggered by ultrasonic queue submissions.
+  S5 supplies a protected ten-byte range snapshot. GPIO/IRQ/echo behavior stays
+  with S5; S2 retains PWM/encoder/PID ownership.
+- Actual S2 feedback supplies wheel speed/counts/signed net travel/mode/reason
+  and faults. True travelled path is a distinct optional producer.
+- Stable weak/strong passive getters prepare barcode/navigation, actual path,
+  complete scans and external fault reports. Missing owners remain unavailable;
+  S1 does not steal controller events or fabricate algorithms/data.
+- Per-source expiry, main generation boot time/session, automatic read-only
+  STATUS clock anchoring and stale transport rejection. At most 181 cached
+  scan points and 16 points/chunk, with bounded local backpressure retry.
+- Controller state is four bits plus latch/TEST, with 14 defined states.
+  Existing owner-controlled inhibit, leases/replay validation and correlation
+  remain. Future states are published only when real owner behavior exists.
+- Read-only allocator free/largest block introspection includes duplicate-size
+  free-list buckets. Minimum free heap is sampled, not an exact peak.
+  Requested application stacks exclude kernel/radio stacks and are not stack
+  high-water. Unsupported high-water remains unavailable.
+- Dashboard current decoder, motion/resources/scan views, CSVs and bounded
+  evidence JSON; current observers and recovery recorder use the new frames.
+  Nominal heartbeat changed 5 s to 4 s for jitter margin; this is not a measured
+  cadence pass.
+
+### Consolidated offline validation
+
+All 15 groups pass across the initial and focused correction runs. The initial
+failed outputs are retained, not overwritten. Failures corrected: strict C
+indentation warnings, test clock/expiry-call assumptions and Windows COFF weak
+symbol behavior (actual default/strong linkage checked with ELF GCC in WSL).
+
+| Check | Result |
+| --- | --- |
+| Dashboard | 42 tests passed |
+| Actual MQTT port | 51 checks passed |
+| Portable codec + actual collector/cache bridge | 23 + 25 checks passed |
+| Controller owner, normal and stationary | 17 checks in each mode |
+| Actual normal controller/S2 STOP path | 13 checks passed |
+| Recovery recorder | Eight tests passed |
+| Cross-language C/JavaScript/MQTT vectors | 20,089 passed |
+| Weak defaults / strong owner override | Actual linking passed |
+| Read-only heap snapshot model | Queue/bucket traversal passed |
+| Shared GPIO and analog policy | Passed |
+| Analog/barcode | 16 groups passed |
+| Browser/recorder syntax | Passed |
+| Actual ARM modes | Normal, stationary, explicit IR, explicit encoder passed |
+| S1 static stack-frame chain | 1680 / 2048 bytes; external calls/runtime peak unmeasured |
+
+[Consolidated results](logs/2026-11-13-s1-batch-summary.json) identify every
+passing log and preserved earlier failure. The host codec excludes the
+board-only microsecond timer check; expected on-device S1 summary is
+24 checks including that check, not observed on this new image.
+Visual browser QA was not performed.
+
+### Firmware and resources
+
+Both final ARM links completed without compiler/linker warnings. Earlier
+build attempts exposed the kernel/newlib size_t header boundary and the
+project's single-trailing-underscore linker symbols. These were fixed before
+the successful links. The RAM report includes vector/data/BSS so it agrees
+with the actual section total.
+
+| Profile | text | data | BSS | linked static RAM | UF2 bytes |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Integrated normal TEST=0 | 355204 | 108 | 83248 | 83356 | 710656 |
+| Integrated stationary TEST=1 | 359204 | 108 | 83088 | 83196 | 718848 |
+
+Single retained file:
+build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2
+SHA-256: 13057e343727ce8e151784c944c86331f1f492c2e89959985b6628d86565e0f4
+
+The successful normal check UF2 was hashed, then removed; its SHA-256 was
+536a762f1b6663a15aff368a01713f7aec34a0f6ddce22ae3b27b7b1a1ad53a7.
+Both ELF hashes and section figures are preserved in
+[the artifact record](logs/2026-11-13-s1-batch-artifacts.json).
+
+S1 message-buffer requests are now zero, previously 192 bytes. The packed
+publication is 73 bytes plus four-byte time; the completed scan cache is
+462 bytes; resource publication 19 bytes, sampled minimum and requested-stack
+totals three bytes each. These are feature/cache costs, not a like-for-like
+whole-firmware RAM saving. The historical JSON-to-v2 69-to-6-byte result is
+preserved separately. Whole-device runtime peaks and group-wide application
+representation still need their own evidence.
+
+[Source/build fingerprint](logs/2026-11-13-s1-batch-fingerprint.json),
+[current bit table](S1_COMPLETION_BATCH.md),
+[producer handoff](PRODUCER_HANDOFF.md) and
+[one combined physical checklist](FINAL_ACCEPTANCE.md) describe the ready batch.
+Current-image accuracy, physical STOP, cadence/recovery, boot/power-bank and
+resource captures remain deferred. Missing producers and the final group
+demonstration remain owner/integration work. Credentials are excluded from
+the reports and fingerprints.
+
+
+## V4 collector regression and heap-lock correction ? 13 November 2026
+
+The user flashed the first v4 image and reported every measurement unavailable.
+A 20-second independent observation received 50 main frames among 62 packets,
+a matching STATUS in 32 ms and valid Control disabled / TEST=true, but all
+sensor fields were unavailable. The resource report retained static RAM 83196
+while other resource fields were unavailable. This is a real regression,
+not a broker/decoder setup failure.
+
+The serial tool observed:
+*** Hard fault ***  prc:2 ctxtsk:4
+The collector is task 4. The first filtered tool capture did not save the
+fault frame registers. The subsequent normal-restart serial capture has the
+24/24 on-board codec/clock summary but did not establish working sensors.
+Later observers received no Pico messages in their 12/30-second windows;
+do not count those as successful recovery.
+
+Code review found the new knl_Imeminfo used DI/EI, which only masks local
+interrupts. It is called directly by the collector on either core, while
+startup task/stack allocations may mutate the free queues on the other core.
+It now uses BEGIN/END_CRITICAL_SECTION, taking the recursive SMP kernel lock
+as allocating syscalls do. It still changes no allocator metadata. The
+host regression now explicitly requires that cross-core exclusion, and its
+actual-function free/bucket/empty/error tests pass.
+
+Corrected stationary ARM link: text 359276, data 108, BSS 83088; static RAM
+83196, UF2 718848 bytes; SHA-256
+16d737e9056637d168f95f543258af2a5b08c9711245dc6c4d328a3ce30b3491.
+This fixes a definite race but needs a new flash/live check before claiming
+the observed fault is fully resolved. No schema/sensor algorithm change.
+The prior normal ELF is historical; rebuild TEST=0 before future motor use.
+
+Evidence: logs/2026-11-13T09-02-24-418Z-controller-observation.json,
+logs/2026-11-13-v4-collector-fault-serial.txt, and
+logs/s1-batch-2026-11-13T09-09-58/heap-snapshot.txt.
+
+
+### Heap-only correction did not restore delivery; collector workspace reduced
+
+The user confirmed flashing 16d737e9 and restarting. The following observer
+window received no Pico messages. That correction is not a successful live
+fix, and the allocator race must not be claimed as the established sole
+cause of the original hard fault.
+
+The collector's 1680-byte static chain left only 368 bytes for additional
+kernel/library/interrupt frames. Its optional scan getter allocated a native
+736-byte profile and a second 453-byte packed scratch array on every call,
+even when no scan producer existed. The profile now uses one collector-owned
+static workspace; all points are validated before packing directly into the
+protected existing cache. Malformed/getter-busy input preserves the old cache.
+Actual bridge/layout/allocator checks pass after this change.
+
+ARM static collector chain is now 464 bytes, leaving 1584 of the configured
+2048 for external calls (still not runtime high-water). The regression limit
+is tightened to 768 bytes, reserving at least 1280 for external frames.
+The hard-fault reporter's FIRST line now includes captured PC/LR before
+scheduler diagnostics; this makes a repeated fault easier to locate.
+
+New stationary link: text 359316, data 108, BSS 83824, static RAM 83932.
+UF2 remains 718848 bytes, SHA-256
+fe80eb5972c21d66adf3ad8908ca7699f4b940a56049b5ae1d59d90dccad084d.
+No sensor algorithm, GPIO, motor behavior or binary schema changed.
+Live verification is pending. Prior correction/failure records stay preserved.
+
+
+### Definite initial-task stack overflow found and corrected
+
+After the user reported fe80eb59 still failed, the startup test/console call
+chain was compiled with ARM -fstack-usage. The initial task has only 1024 bytes
+(include/sys/inittask.h). Previous S1 test frame 872 + usermain 24 +
+tm_printf 32 + tm_vsprintf 96 + out_cons 16 = 1040 bytes, BEFORE additional
+initial-task, USB/driver/kernel and interrupt frames. Thus the new test code
+could corrupt memory even while every printed condition passed.
+
+Only the large S1 pure-code test fixtures were moved to static TEST-only
+storage. The current test frame is 144, known chain 312 / 1024. The regression
+now checks the startup path as well as the collector; both pass. All 23 host
+codec plus 25 actual collector checks still pass. No teammate algorithm change.
+The source audit verifies all 22 recorded S2/S3/S4 files still match the
+preceding successful normal-v3 source fingerprint.
+
+Current stationary image: 719360 bytes, text 359332, data 108, BSS 84560,
+static RAM 84668. SHA-256
+390c589344927280ab77175a1cee2d04a07beacad2d522d63760146ad30f6f55.
+The added 736-byte TEST-only fixture storage does not exist in normal mode.
+Live sensor restoration remains pending this final flash; do not present
+the previous heap/collector-only attempts as resolved hardware failures.
+
+See logs/2026-11-13-v4-startup-stack-check.txt and
+logs/2026-11-13-v4-owner-source-audit.json.
+
+
+### Corrected image restores real measurements
+
+The user explicitly confirmed flashing 390c5893 and restarting. Serial now
+completes calibration, with on-board S1 24/24 and no hard-fault line in the
+corrected capture. The independent 35-second observer received:
+86 main frames, all 86 with valid ultrasonic distance (366..542 mm) and pitch
+(-0.5..7.6 degrees); IR values 4,5,6,7; nine heartbeats; seven diagnostics;
+one matching STATUS in 41 ms; zero decode errors. The user confirms the
+refreshed/reconnected dashboard updates again.
+
+Latest resources: static RAM 84668; free/largest/minimum-sampled heap
+150384; requested application stacks 10240; unsupported stack high-water
+unavailable. MQTT connection count remained one. Fifteen publication error
+events were reported cumulatively; these are not silently treated as zero.
+These resource samples are not exact heap peaks or stack high-water.
+
+This establishes stationary functional restoration after the startup-test
+stack correction. It does not establish calibrated distance/height accuracy,
+controlled target-to-IR mapping, moving-motor STOP, repeated cold boots,
+outage restoration or strict cadence acceptance on the new image.
+No further flash is needed for this restored stationary session.
+
+[Restoration summary](logs/2026-11-13-v4-restored-measurements-summary.json),
+[corrected source/image identity](logs/2026-11-13-v4-startup-stack-fingerprint.json),
+[source-owner audit](logs/2026-11-13-v4-owner-source-audit.json).
+
+
+## Sensor branch downloaded and reviewed ? 13 November 2026
+
+At the user's request, fetched origin/sensor (c8a789b, Add servo obstacle
+avoidance). It is one commit ahead of the shared f37055f base and changes
+five files. No merge/checkout/stash/commit/flash occurred. The existing
+startup correction, main/source state and working 390c5893 UF2 are verified
+unchanged. Only review notes/evidence/progress were added.
+
+Temporary three-way simulation found conflicts in app.h, app_main.c and
+S5 C. Actual temporary ARM probes show remote S5 cannot compile against our
+current S1 headers: it uses removed S1_TELEMETRY/make/submit APIs in both
+TEST modes. This is not a failure claim about its standalone branch.
+The actual branch decision function also selects blocked left 240 mm over
+clear right 260 mm due to its 30 mm preference around the 250 mm threshold.
+
+The branch disables line following, commands S2 from S5 outside the current
+controller latch and moves the servo without an APP_TEST guard. It does not
+publish telemetry_get_scan, so S1's prepared scan path is not activated yet.
+Do not treat a branch pull as integrated STOP or stationary validation.
+A controller-owned motion handoff and passive S5 profile publication are the
+concrete integration needs; no teammate algorithm was changed in this review.
+
+[Full review](SENSOR_BRANCH_REVIEW.md) links merge, policy and compile evidence.
+
+
+## Sensor branch integrated through the controller - 13 November 2026
+
+The user explicitly authorized integrating sensor c8a789b with the latest
+working source: current S1 API, preserved line following, authoritative STOP
+and scan publication. A source/artifact rollback ZIP was created first;
+[backup identity](logs/2026-11-13-before-sensor-integration-backup.json).
+
+Adapted S5 servo/range/obstacle code and app_main controller arbitration.
+APP_LINE_FOLLOW_ENABLED stays 1. S5 calls no S2 wheel API: it publishes phase/
+time and immutable scan snapshots through the existing range semaphore.
+Normal controller gates startup, STOP, faults, fresh line/motion and fresh
+S5 intent before every wheel request. Clear front uses unchanged line
+targets; scanning/unknown/busy/stale/blocked stops; clear-side intent permits
+a brief controller-owned turn, then a fresh centre check.
+The blocked-left/tie-margin case from the branch review is fixed.
+
+The strong telemetry_get_scan automatically activates the existing S1 v4
+transport/display, with sorted 30/90/150 points and null for missing echoes.
+Front distance remains an actual centre sample, never a side reading.
+The wheel-disabled TEST image now operates the servo. No new task/queue/
+semaphore. S1/S2/S3/S4/browser/latch source and the line-enable flag were
+verified unchanged against the rollback source archive. No Git checkout,
+merge commit or push was made.
+
+### Offline and build results
+
+All 17 groups pass: 8 actual S5 task/IRQ/publication/serialization checks in
+each mode; 22 actual controller/PID/motor checks (including STOP during
+avoidance and later phase changes); existing 42 dashboard, 51 MQTT-port,
+23 codec + 25 collector, 17 controller-owner per mode, 20,089 cross-language
+vectors, 8 recorder, allocator, analog/barcode and shared GPIO checks.
+The first producer-linkage run was blocked by WSL/E_ACCESSDENIED in the
+sandbox, not a code failure; the authorized rerun passed. The initial new
+motor-path test stub had a static/external declaration mismatch; corrected
+before all actual controller/motor checks passed. Failed logs remain intact.
+
+Four actual ARM profiles pass, with no S5 imports of subsystem2_set_*.
+Both forced full links have zero warnings. Strong telemetry_get_scan is
+verified in normal and stationary ELF; no new decoder or topic.
+Stack budgets: collector 464/2048; S5 sensing chain 136/2048;
+initial-task test/console chains S1 312/1024 and S5 208/1024.
+Controller frame is within its 768-byte budget. These are static guards,
+not measured runtime high-water.
+
+| Build | text | data | BSS | static RAM | UF2 bytes |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Normal | 356864 | 108 | 84008 | 84116 | 714240 |
+| Stationary | 361420 | 108 | 84584 | 84692 | 723456 |
+
+Stationary static RAM is 24 bytes more than the preceding 84668-byte
+390c5893 image: 18 packed publication bytes plus alignment. Normal also
+contains earlier collector fixes absent from the older historical normal
+artifact, so do not call its total difference a pure S5 feature cost.
+S1 queue requests remain zero; no additional task stack allocation.
+
+Current single UF2:
+build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2
+SHA-256 3a8b79c37a01cfa92615db69e62d2817795ab53ec9decae5e33c4faa19f3aaf6
+The normal check image was hashed then removed; its ELF/hash/log remain in
+[the artifact record](logs/2026-11-13-sensor-integrated-artifacts.json).
+[Software summary](logs/2026-11-13-sensor-integration-checks.json).
+
+### User flash and stationary physical confirmation
+
+The user confirmed flashing 3a8b79c3 with the servo free to move.
+Read-only STATUS confirmed Control disabled / TEST=true in 30 ms.
+A 90-second observer recorded 220 main frames, all with valid centre distance
+and pitch; line_bits 5; 26 completed three-point scan packets; 22 heartbeats;
+zero decode errors. One actual profile was right30=229, centre90=90,
+left150=81 mm. Serial summaries were S1 24/24 and S5 software 6/6; S4
+completed calibration. The user confirms the servo sweeps, the profile
+appears, and distance/IR/pitch still update.
+
+Latest resources: static84692, free/largest/min-sampled heap150360,
+requested app stacks10240. Cumulative publish errors25, MQTT connections1,
+snapshot contention1; no zero-error publication or exact high-water claim.
+All data are stationary observations, not calibrated reference readings.
+No moving-wheel normal test, physical STOP during avoidance, controlled
+orientation/settling test, floor trajectory or repeated recovery series was
+performed for this image. Those remain on the combined checklist.
+
+The diagnostic tool sent read-only STATUS only; the user operated the flash
+and target. No broker interruption or automated motor command occurred.
+[Live summary](logs/2026-11-13-sensor-integrated-live-summary.json),
+[integration contract](SENSOR_INTEGRATION.md),
+[remaining physical checklist](FINAL_ACCEPTANCE.md).

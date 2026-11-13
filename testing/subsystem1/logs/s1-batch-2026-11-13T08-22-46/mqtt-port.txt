@@ -1,0 +1,16 @@
+In file included from C:\Users\wilso\OneDrive\Desktop\INF2004 Embedded Systems Programming\INF2004_RoboCarProject\testing\subsystem1\host\test_status_mqtt.c:12:
+C:/Users/wilso/OneDrive/Desktop/INF2004 Embedded Systems Programming/INF2004_RoboCarProject/app_program/subsystem1/s1_protocol.c: In function 's1_pack_heartbeat':
+C:/Users/wilso/OneDrive/Desktop/INF2004 Embedded Systems Programming/INF2004_RoboCarProject/app_program/subsystem1/s1_protocol.c:159:5: error: this 'if' clause does not guard... [-Werror=misleading-indentation]
+  159 |     if(!out||capacity<5)return -1;out[0]=0x80;s1_write_u32(out+1,counter);return 5;
+      |     ^~
+C:/Users/wilso/OneDrive/Desktop/INF2004 Embedded Systems Programming/INF2004_RoboCarProject/app_program/subsystem1/s1_protocol.c:159:35: note: ...this statement, but the latter is misleadingly indented as if it were guarded by the 'if'
+  159 |     if(!out||capacity<5)return -1;out[0]=0x80;s1_write_u32(out+1,counter);return 5;
+      |                                   ^~~
+C:\Users\wilso\OneDrive\Desktop\INF2004 Embedded Systems Programming\INF2004_RoboCarProject\testing\subsystem1\host\test_status_mqtt.c: In function 's1_network_aux':
+C:\Users\wilso\OneDrive\Desktop\INF2004 Embedded Systems Programming\INF2004_RoboCarProject\testing\subsystem1\host\test_status_mqtt.c:86:5: error: this 'if' clause does not guard... [-Werror=misleading-indentation]
+   86 |     if(!aux_available)return -50;aux_available=0;
+      |     ^~
+C:\Users\wilso\OneDrive\Desktop\INF2004 Embedded Systems Programming\INF2004_RoboCarProject\testing\subsystem1\host\test_status_mqtt.c:86:34: note: ...this statement, but the latter is misleadingly indented as if it were guarded by the 'if'
+   86 |     if(!aux_available)return -50;aux_available=0;
+      |                                  ^~~~~~~~~~~~~
+cc1.exe: all warnings being treated as errors

@@ -1,0 +1,1 @@
+PASS: current C / JavaScript / MQTT vectors {"empty":1,"base":19906,"motion":49,"barcode":86,"imu":25,"status":2,"stop":6,"scan":12,"resources":1,"heartbeat":1}

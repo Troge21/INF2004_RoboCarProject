@@ -1,0 +1,1 @@
+PASS: current stationary ELF contains S1, analog S3 and controller tasks; no motor task, powered bench or digital barcode capture.

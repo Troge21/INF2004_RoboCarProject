@@ -1,0 +1,23 @@
+APP_TEST=0
+/tmp/robocar-sensor-arm-o9wio4di/app_program/subsystem5/subsystem5.c: In function 'ultrasonic_task':
+/tmp/robocar-sensor-arm-o9wio4di/app_program/subsystem5/subsystem5.c:180:9: error: unknown type name 'S1_TELEMETRY'
+  180 |         S1_TELEMETRY sample = {0};
+      |         ^~~~~~~~~~~~
+/tmp/robocar-sensor-arm-o9wio4di/app_program/subsystem5/subsystem5.c:181:14: error: implicit declaration of function 's1_make_telemetry' [-Wimplicit-function-declaration]
+  181 |         er = s1_make_telemetry(&sample, sequence++, centre_mm,
+      |              ^~~~~~~~~~~~~~~~~
+/tmp/robocar-sensor-arm-o9wio4di/app_program/subsystem5/subsystem5.c:185:30: error: implicit declaration of function 's1_submit_telemetry' [-Wimplicit-function-declaration]
+  185 |         if (er == E_OK) er = s1_submit_telemetry(&sample);
+      |                              ^~~~~~~~~~~~~~~~~~~
+
+APP_TEST=1
+/tmp/robocar-sensor-arm-o9wio4di/app_program/subsystem5/subsystem5.c: In function 'ultrasonic_task':
+/tmp/robocar-sensor-arm-o9wio4di/app_program/subsystem5/subsystem5.c:180:9: error: unknown type name 'S1_TELEMETRY'
+  180 |         S1_TELEMETRY sample = {0};
+      |         ^~~~~~~~~~~~
+/tmp/robocar-sensor-arm-o9wio4di/app_program/subsystem5/subsystem5.c:181:14: error: implicit declaration of function 's1_make_telemetry' [-Wimplicit-function-declaration]
+  181 |         er = s1_make_telemetry(&sample, sequence++, centre_mm,
+      |              ^~~~~~~~~~~~~~~~~
+/tmp/robocar-sensor-arm-o9wio4di/app_program/subsystem5/subsystem5.c:185:30: error: implicit declaration of function 's1_submit_telemetry' [-Wimplicit-function-declaration]
+  185 |         if (er == E_OK) er = s1_submit_telemetry(&sample);
+      |                              ^~~~~~~~~~~~~~~~~~~

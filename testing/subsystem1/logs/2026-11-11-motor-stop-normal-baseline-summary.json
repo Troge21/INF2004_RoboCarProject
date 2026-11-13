@@ -1,0 +1,67 @@
+{
+  "evidence": "Live read-only observer following user-confirmed normal flash and USB reconnect",
+  "capture": {
+    "path": "testing/subsystem1/logs/2026-11-11-motor-stop-after-usb-reconnect.json",
+    "sha256": "6873400615f689a44fe555c1f1d37f3f0c61af5b670a22822e907d2cde3d007a",
+    "started_utc": "2026-11-11T07:49:38.187Z",
+    "finished_utc": "2026-11-11T07:49:58.221Z"
+  },
+  "local_intended_UF2": {
+    "path": "C:\\Users\\wilso\\OneDrive\\Desktop\\INF2004 Embedded Systems Programming\\INF2004_RoboCarProject\\build_make\\mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt.uf2",
+    "bytes": 694784,
+    "sha256": "fa871dff33210a77bf3166baed8f29e4dcd65342868e3a1c2a3103ae5752bf55",
+    "note": "Intended local file only, no flash readback"
+  },
+  "packet_count": 64,
+  "packet_lengths": {
+    "11": 39,
+    "6": 20,
+    "26": 1,
+    "5": 4
+  },
+  "decoder_errors": [],
+  "matching_STATUS": [
+    {
+      "round_trip_ms": 24,
+      "decoded": {
+        "request_id": 1192588804,
+        "uptime_ms": 17750,
+        "session_token": 3329246010,
+        "controller_word": 5,
+        "controller_state_code": 5,
+        "controller_state": "Waiting for line",
+        "controller_valid": true,
+        "stop_latched": false,
+        "test_build": false,
+        "sample_age_ms": 250,
+        "snapshot": {
+          "sequence": 34,
+          "obstacle_valid": true,
+          "obstacle_mm": 652,
+          "line_bits": 0,
+          "ir": [
+            null,
+            null,
+            null
+          ],
+          "pitch_deg": null,
+          "hump_mm": null,
+          "max_hump_mm": null,
+          "imu_state": "Monitoring",
+          "imu_flags": 1,
+          "imu_speed_source": "nominal",
+          "state": null,
+          "left_mps": null,
+          "right_mps": null,
+          "distance_m": null,
+          "barcode": null,
+          "faults": null,
+          "scan": null
+        }
+      }
+    }
+  ],
+  "USB_observation": "COM5 / Pico USB enumerated after user normal reconnect; not present before reconnect",
+  "conclusion": "Normal build and recent read-only STATUS/telemetry verified; unlatched Waiting for line observed",
+  "limits": "No flash readback, physical wheel behavior or hard real-time stopping measurement. Earlier silent preflight preserved. No code change/reflash performed by agent."
+}

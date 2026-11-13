@@ -1,0 +1,9 @@
+PASS: actual controller starts both wheels only after startup delay
+PASS: expired STOP cannot inhibit the running controller
+PASS: controller snapshot contention requests zero through real S2 loop
+PASS: busy S2 handoff cannot acknowledge STOP before accepting zero duty
+PASS: normal-mode STOP result follows accepted zero duty and actual S2 loop output
+PASS: persistent normal controller loop cannot resume PWM on any line pattern or stale snapshot
+PASS: STOP is serviced during startup before normal steering is enabled
+PASS: startup STOP remains latched beyond startup despite both-black input
+SUMMARY: 8 integration checks passed; no hardware or sockets used.

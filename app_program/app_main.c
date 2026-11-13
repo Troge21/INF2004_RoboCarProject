@@ -1,116 +1,136 @@
 /* Application lifecycle: create all subsystem objects, then start tasks.
  * S1: WiFi status and telemetry forwarding.
  * S2: motor PWM command consumer; optional encoder calibration in TEST=1.
- * S3: centre/right line sensing and LEFT-sensor barcode decoding.
+ * S3: AO line sensing; GP28 reserved for future barcode decoding.
  * S4: IMU/hump sensing.
- * IR steering/recovery runs alongside barcode diagnostics.
- * S5: fixed-position HC-SR04 measurements.
+ * Analog steering is controller-owned; diagnostic benches are explicit modes.
+ * S5: HC-SR04/servo snapshots; controller arbitrates obstacle and line requests.
  * Former producer/consumer/monitor sample tasks and interfaces are retired.
  * Returning from usermain shuts down the kernel; leave it sleeping instead.
  */
 
 #include "app.h"
+#include "controller.h"
+#include "subsystem1/subsystem1.h"
 #include "subsystem2/subsystem2.h"
 #include "subsystem3/subsystem3.h"
+#include "subsystem5/subsystem5.h"
 
 /* Standalone analog IR/steering test; other normal subsystem tasks stay off. */
 extern void ir_adc_test(void) __attribute__((noreturn));
 
-#if !APP_TEST
-/* Barcode diagnostics run independently of line following.
- * Deliberately no letter-to-turn mapping: A-D in the brief were examples. */
-static void barcode_report_task(INT stacd, void *exinf)
+#if APP_LINE_FOLLOW_ENABLED && !APP_TEST
+/* Preserve the teammate's AO policy. Both white is centered/forward;
+ * both black crosses a junction. Pattern: centre/left=2, right=1. */
+static void app_line_targets(UINT pattern, INT *left, INT *right)
+{
+#if S2_LINE_USE_RPM_CONTROL
+    const INT forward = S2_LINE_FORWARD_RPM_X10, inner = S2_LINE_INNER_RPM_X10;
+#else
+    const INT forward = APP_FORWARD_DUTY, inner = APP_INNER_DUTY;
+#endif
+    *left = *right = 0;
+    if (pattern > 3U) return;
+    *left = pattern == 2U ? inner : forward;
+    *right = pattern == 1U ? inner : forward;
+}
+static ER app_motor_request(INT left, INT right)
+{
+#if S2_LINE_USE_RPM_CONTROL
+    return subsystem2_set_rpm_x10(left, right);
+#else
+    return subsystem2_set_duty(left, right);
+#endif
+}
+/* Sole integrated steering owner; S2 retains PWM/encoder/PID ownership. */
+static void app_controller_step(UW started_ms)
+{
+        S3_LINE_DATA line = {0};
+        S2_MOTION_DATA motion = {0};
+        S5_NAV_DATA navigation = {0};
+        SYSTIM now = {0}, operating = {0};
+        INT left = 0, right = 0;
+        unsigned state = APP_CTRL_STARTING;
+        unsigned inhibit = app_controller_poll();
+        ER line_er = subsystem3_get_line(&line);
+        ER motion_er = subsystem2_get_motion(&motion);
+        ER navigation_er = subsystem5_get_navigation(&navigation);
+        BOOL fresh, motion_fresh, navigation_fresh;
+        ER er;
+        (void)tk_get_tim(&now); (void)tk_get_otm(&operating);
+        fresh = line_er == E_OK && line.valid && line.pattern <= 3U &&
+            (UW)(now.lo - line.timestamp_ms) <= APP_IR_MAX_AGE_MS;
+        motion_fresh = motion_er == E_OK &&
+            (UW)(now.lo - motion.timestamp_ms) <= S2_FEEDBACK_MAX_AGE_MS;
+        navigation_fresh = navigation_er == E_OK &&
+            (UW)(now.lo - navigation.timestamp_ms) <= S5_NAV_MAX_AGE_MS;
+        if (inhibit & APP_CTRL_LATCH) state = APP_CTRL_STOP_LATCHED;
+        else if (inhibit & APP_CTRL_POLL_BUSY) state = APP_CTRL_WAITING_LINE;
+        else if ((UW)(operating.lo - started_ms) >= APP_START_DELAY_MS) {
+            if (fresh && motion_fresh &&
+                (!S2_LINE_USE_RPM_CONTROL || motion.speed_valid)) {
+                /* S5 publishes intent only. This is the sole wheel requester,
+                 * after latch/startup/feedback/line gates on every 20 ms step. */
+                state = APP_CTRL_STOPPED;
+                if (navigation_fresh) {
+                    switch (navigation.phase) {
+                    case S5_NAV_CLEAR:
+                        app_line_targets(line.pattern, &left, &right);
+                        state = APP_CTRL_FOLLOWING;
+                        break;
+                    case S5_NAV_SCANNING:
+                        state = APP_CTRL_SCANNING;
+                        break;
+                    case S5_NAV_LEFT:
+#if S2_LINE_USE_RPM_CONTROL
+                        left = S5_TURN_INNER_RPM_X10;
+                        right = S5_TURN_OUTER_RPM_X10;
+#else
+                        right = APP_FORWARD_DUTY;
+#endif
+                        state = APP_CTRL_TURNING_LEFT;
+                        break;
+                    case S5_NAV_RIGHT:
+#if S2_LINE_USE_RPM_CONTROL
+                        left = S5_TURN_OUTER_RPM_X10;
+                        right = S5_TURN_INNER_RPM_X10;
+#else
+                        left = APP_FORWARD_DUTY;
+#endif
+                        state = APP_CTRL_TURNING_RIGHT;
+                        break;
+                    default: break; /* blocked/unknown: zero */
+                    }
+                }
+            } else state = APP_CTRL_WAITING_LINE;
+        }
+        if (motion_fresh && motion.faults != 0U) {
+            left = right = 0; state = APP_CTRL_FAULT;
+        }
+        er = app_motor_request(left, right);
+        if (er != E_OK) (void)app_motor_request(0, 0);
+        app_controller_publish(state, er);
+}
+static void vehicle_controller_task(INT stacd, void *exinf)
+{
+    SYSTIM started = {0};
+    (void)stacd; (void)exinf;
+    (void)tk_get_otm(&started);
+    tm_printf((UB *)"[CTRL] Integrated AO controller; startup=%d ms, RPM mode=%u.\n",
+              APP_START_DELAY_MS, (UINT)S2_LINE_USE_RPM_CONTROL);
+    for (;;) {
+        app_controller_step(started.lo);
+        (void)tk_dly_tsk(APP_CONTROL_PERIOD_MS);
+    }
+}
+#else
+/* Stationary integrated mode never calls S2. */
+static void vehicle_controller_task(INT stacd, void *exinf)
 {
     (void)stacd; (void)exinf;
     for (;;) {
-        UINT i;
-        for (i = 0; i < 8U; ++i) {
-            UB code;
-            if (subsystem3_get_barcode(&code) != E_OK) break;
-            tm_printf((UB *)"[BARCODE] '%c' scan=%s (character only; no motor action)\n",
-                      s3_barcode_character(code),
-                      (code & S3_BC_REVERSED) ? "reverse" : "forward");
-        }
-        (void)tk_dly_tsk(20);
-    }
-}
-#endif
-
-#if APP_LINE_FOLLOW_ENABLED && !APP_TEST
-/* Controller owns IR interpretation; S2 owns motor hardware. */
-typedef struct {
-    INT last_side; /* -1 centre/left side, +1 right, 0 unknown */
-    BOOL searching;
-    UW search_start_ms;
-} APP_LINE_TRACKER;
-
-/* Line steering: convert the centre/right pattern into motor duty requests. */
-static void app_line_speeds(UINT pattern, INT *left, INT *right)
-{
-    if (left == NULL || right == NULL) return;
-    *left = 0;
-    *right = 0;
-    switch (pattern) {
-    /* Centre is the left member of the centre/right tracking pair. */
-    case 3: *left = APP_FORWARD_DUTY; *right = APP_FORWARD_DUTY; break;
-    case 2: *left = APP_INNER_DUTY; *right = APP_FORWARD_DUTY; break;
-    case 1: *left = APP_FORWARD_DUTY; *right = APP_INNER_DUTY; break;
-    default: break; /* No black or unsupported pattern: stop both motors. */
-    }
-}
-
-/* Line recovery: on both-white, search toward the last known side for a
- * bounded time. Missing/stale data, no side history or timeout means stop;
- * detecting black again resumes tracking. */
-static void app_track_line(APP_LINE_TRACKER *tracker, UINT pattern,
-                           BOOL fresh, UW now_ms, INT *left, INT *right)
-{
-    if (tracker == NULL || left == NULL || right == NULL) return;
-    *left = 0;
-    *right = 0;
-    if (!fresh || pattern > 3U) {
-        tracker->last_side = 0;
-        tracker->searching = FALSE;
-        return;
-    }
-    if (pattern != 0U) {
-        tracker->searching = FALSE;
-        if (pattern == 2U) tracker->last_side = -1;
-        if (pattern == 1U) tracker->last_side = 1;
-        app_line_speeds(pattern, left, right);
-        return;
-    }
-    if (tracker->last_side == 0) return;
-    if (!tracker->searching) {
-        tracker->searching = TRUE;
-        tracker->search_start_ms = now_ms;
-    }
-    if ((UW)(now_ms - tracker->search_start_ms) >= APP_RECOVERY_TIMEOUT_MS) return;
-    if (tracker->last_side < 0) *right = APP_RECOVERY_DUTY;
-    else *left = APP_RECOVERY_DUTY;
-}
-
-/* Controller: read fresh S3 data, apply steering/recovery, send requests to S2. */
-static void vehicle_controller_task(INT stacd, void *exinf)
-{
-    APP_LINE_TRACKER tracker = {0};
-    (void)stacd;
-    (void)exinf;
-    tm_printf((UB *)"[CTRL] Line follower starts in %d ms; duty=%d%%.\n",
-              APP_START_DELAY_MS, APP_FORWARD_DUTY);
-    (void)tk_dly_tsk(APP_START_DELAY_MS);
-    for (;;) {
-        S3_LINE_DATA line;
-        SYSTIM now;
-        INT left = 0, right = 0;
-        ER er = subsystem3_get_line(&line);
-        (void)tk_get_tim(&now);
-        BOOL fresh = er == E_OK &&
-            (UW)((UW)now.lo - line.timestamp_ms) <= APP_IR_MAX_AGE_MS;
-        app_track_line(&tracker, fresh ? line.pattern : 0U,
-                       fresh, (UW)now.lo, &left, &right);
-        er = subsystem2_set_duty(left, right);
-        if (er != E_OK && er != E_TMOUT) CHECK(er, "controller motor command");
+        (void)app_controller_poll();
+        app_controller_publish(APP_CTRL_DISABLED, E_OK);
         (void)tk_dly_tsk(APP_CONTROL_PERIOD_MS);
     }
 }
@@ -154,6 +174,9 @@ EXPORT ID app_start_task(FP entry, PRI pri, UW prc, const char *name)
 		(void)tk_del_tsk(tid);
 		return er;
 	}
+#if APP_BENCH_MODE == APP_BENCH_INTEGRATED
+    s1_resource_add_stack(TASK_STACK_SIZE);
+#endif
 	return tid;
 }
 
@@ -161,14 +184,14 @@ EXPORT INT usermain(void)
 {
 	T_RVER	ver;
 
-#if APP_TEST && S2_ENCODER_CALIBRATION
-    /* Exclusive encoder bench; powered mode starts only S2 motor PWM. */
+#if APP_BENCH_MODE == APP_BENCH_ENCODER
+    /* Explicit exclusive encoder bench; powered mode starts only S2 motor PWM. */
     subsystem2_test();
     for (;;) {
         (void)tk_dly_tsk(2000);
         subsystem2_test_status();
     }
-#else
+#elif APP_BENCH_MODE == APP_BENCH_IR
     ir_adc_test();
 #endif
 
@@ -189,6 +212,7 @@ EXPORT INT usermain(void)
 	CHECK(subsystem3_init(), "subsystem3_init");
 	CHECK(subsystem4_init(), "subsystem4_init");
 	CHECK(subsystem5_init(), "subsystem5_init");
+    CHECK(app_controller_init(), "controller_init");
 
 	/* Phase 2: every subsystem starts its tasks */
 	CHECK(subsystem1_start(), "subsystem1_start");
@@ -197,15 +221,8 @@ EXPORT INT usermain(void)
 	CHECK(subsystem4_start(), "subsystem4_start");
 	CHECK(subsystem5_start(), "subsystem5_start");
 
-#if !APP_TEST
-    CHECK(app_start_task((FP)barcode_report_task, 16, TP_PRC1,
-                         "barcode_report"), "start barcode reporter");
-#endif
-
-#if APP_LINE_FOLLOW_ENABLED && !APP_TEST
     CHECK(app_start_task((FP)vehicle_controller_task, APP_PRI_CONTROLLER,
                          TP_PRC1, "vehicle_controller"), "start controller");
-#endif
 
 	tm_printf((UB*)"all subsystems started\n\n");
 

@@ -1,0 +1,337 @@
+{
+  "recorded_at_utc": "2026-11-11T07:38:43.069149+00:00",
+  "base_commit": "b11c682808c3e82caae907fba0d1ef5c3c69311c",
+  "source_state": "Same firmware sources as preceding stationary controller build; new host tests/observer/docs only; local changes not committed",
+  "build": {
+    "profile": "NET=lwip MQTT=1 TEST=0",
+    "sdk": "/opt/robocar/pico-sdk-2.2.0",
+    "forced_rebuild": true,
+    "APP_TEST_0_application_compiles_verified": true
+  },
+  "artifact": {
+    "path": "build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt.uf2",
+    "bytes": 694784,
+    "sha256": "fa871dff33210a77bf3166baed8f29e4dcd65342868e3a1c2a3103ae5752bf55"
+  },
+  "linked_sections": {
+    "text": 347276,
+    "data": 104,
+    "bss": 82592,
+    "static_ram": 82696
+  },
+  "profile_cost": "Normal motor/barcode tasks each request 2048-byte dynamic stacks plus kernel overhead; S1 queues remain 192 bytes; peak heap/stack not measured. Different profiles are not like-for-like RAM comparisons.",
+  "checks": {
+    "actual_normal_controller_latch_S2_loop_integration": 8,
+    "existing_S2_line_policy": "passed unchanged",
+    "existing_S2_motor_commands": "passed unchanged",
+    "ARM_normal_build": "passed without warnings",
+    "read_only_observer": "syntax check passed; live check pending",
+    "prior_shared_source_validation": "see original controller fingerprint; firmware/decoder source hashes match"
+  },
+  "physical_preparation": "User confirms car available, wheels raised securely, battery off",
+  "physical_validation": "Normal UF2 not yet flashed; actual motor stopping not yet observed; previous stationary five tests are user-reported passes",
+  "old_stationary_artifact": "eb29f4ab661a6810fbf43095cbf9052e4fac4100870de6cb158787e8bf9f412b; removed after verification, original logs/fingerprint preserved",
+  "credentials": "Private WiFi secrets excluded",
+  "files": [
+    {
+      "path": "TEAM.md",
+      "bytes": 18723,
+      "sha256": "118af4d369802885fa10ae464c81951e346f99fc7bbec7a480ab4b66c93296f6"
+    },
+    {
+      "path": "TEMP_S1_PROGRESS_AND_PLANS.md",
+      "bytes": 13463,
+      "sha256": "7d242c8b597053b592fd16d597f1a2a5f24fa7b16407157fbba3d67be8f0002c"
+    },
+    {
+      "path": "app_program/app.h",
+      "bytes": 3566,
+      "sha256": "c574a31c26c47817f825b33b0ecd17977a8dc3bccce745a2aeb41e1f23700a95"
+    },
+    {
+      "path": "app_program/app_main.c",
+      "bytes": 8638,
+      "sha256": "0056ff3dcb0b869794778de8630df96446fc519b9645f104e413997e2260e3a2"
+    },
+    {
+      "path": "app_program/controller.c",
+      "bytes": 4849,
+      "sha256": "07e44278d82b071f295c69873d779b458e617769292a5ebc0eca761b7a04afe4"
+    },
+    {
+      "path": "app_program/controller.h",
+      "bytes": 1385,
+      "sha256": "7fd139e01b6098ff6c48af8e63b4878789095b4b47b87befc52bb05dbaaf68c0"
+    },
+    {
+      "path": "app_program/subsystem1/s1_protocol.c",
+      "bytes": 10040,
+      "sha256": "c5c912f5eab74b8074f7eff33cbfcd52ba9d435de770f33bbcd5d29be60bc65d"
+    },
+    {
+      "path": "app_program/subsystem1/s1_protocol.h",
+      "bytes": 4616,
+      "sha256": "e770dc95cdd16609c117bb14fcd7ae65e3be0a50e8bc6002b9a9af6b72585082"
+    },
+    {
+      "path": "app_program/subsystem1/subsystem1.c",
+      "bytes": 10318,
+      "sha256": "9d7323edce0bc3a5aa7be142c135b4a570829e6fb4ea19098c945d3a394b78ed"
+    },
+    {
+      "path": "app_program/subsystem1/subsystem1.h",
+      "bytes": 1690,
+      "sha256": "757ae59e3887d6be21e5e955d7553c569f05bba583d7bfee321ddb2508051222"
+    },
+    {
+      "path": "app_program/subsystem1/subsystem1_test.c",
+      "bytes": 14582,
+      "sha256": "217094249db9d92143a7e5f43329af7927dcb6194164c001725124aa0ca593ac"
+    },
+    {
+      "path": "app_program/subsystem2/subsystem2.c",
+      "bytes": 4139,
+      "sha256": "eefc2832ae23a10623d6b1d521dccc83ed1dbff3ace388f8b4a162a6cdc81ba6"
+    },
+    {
+      "path": "app_program/subsystem2/subsystem2.h",
+      "bytes": 1362,
+      "sha256": "4fe3a6abfe2939b39d560bf47d944b0e6d5108b7c30186e658a65efc76c9f62e"
+    },
+    {
+      "path": "app_program/subsystem3/subsystem3.c",
+      "bytes": 5883,
+      "sha256": "268cba9340daff22b05d968cf2888140a6470c5dafbf6d9730a43d2bd8f62874"
+    },
+    {
+      "path": "app_program/subsystem3/subsystem3.h",
+      "bytes": 1108,
+      "sha256": "31f9425df94dad7e10f2148ba1348dfc9ebc1e5c8e9a50b5a7dacd133ba329de"
+    },
+    {
+      "path": "app_program/subsystem4/subsystem4.c",
+      "bytes": 19707,
+      "sha256": "8daffb73aa163ae4b2c6e74d186de78d7348e768dac39de84fec29cf1e68de69"
+    },
+    {
+      "path": "app_program/subsystem4/subsystem4.h",
+      "bytes": 5139,
+      "sha256": "c90d9144efa1a05783ae25aeebb87ca0fe43c671d0d58da0d914a59b718624c2"
+    },
+    {
+      "path": "app_program/subsystem5/subsystem5.c",
+      "bytes": 5721,
+      "sha256": "6d2b97b7b93e52b659c642022e918069b646eca85ee5a34ba8fc2d1c311b31e8"
+    },
+    {
+      "path": "app_program/subsystem5/subsystem5.h",
+      "bytes": 523,
+      "sha256": "cce73bae16059e36d0951ff68dd9f046c91635904b1527cf2d5e2679be9d54de"
+    },
+    {
+      "path": "build_make/Makefile",
+      "bytes": 2704,
+      "sha256": "a0e159a02c04e58029e6690a9109a9177984ee9f0e7c4dd8f188c044e73bccec"
+    },
+    {
+      "path": "config/config.h",
+      "bytes": 6482,
+      "sha256": "afc5e0df62d0245f455fb5bcf3b077a31bdabd058e9498372755379a4e85a712"
+    },
+    {
+      "path": "config/wifi_secrets.example.h",
+      "bytes": 1105,
+      "sha256": "d1cdf77188fc12cf1497deeafa266c02d7f572e60124697816cd0acd5a4ee854"
+    },
+    {
+      "path": "dashboard/README.md",
+      "bytes": 22858,
+      "sha256": "145696a7710f4f851de729200d11ca4eb4d1ac8d645842e5493abe98c7e5ab2d"
+    },
+    {
+      "path": "dashboard/dist/app.js",
+      "bytes": 37283,
+      "sha256": "2c6e7b636a9c6806bdde066b48d00dcf0ae0043336dad6e1da67219533a89f33"
+    },
+    {
+      "path": "dashboard/dist/index.html",
+      "bytes": 6769,
+      "sha256": "8b0330818645a96ec3d8e276ed581bc3009578c4b0257a8b08132482669f3532"
+    },
+    {
+      "path": "dashboard/dist/mqtt.js",
+      "bytes": 6436,
+      "sha256": "4fe0ce715a26aabd2b3e7628413b0e7597eeac7bd62b76fc84ffa8e5042f51bb"
+    },
+    {
+      "path": "dashboard/dist/protocol.js",
+      "bytes": 16834,
+      "sha256": "1ea8058652c88d466024806058c8abdf941638f5a849ca4c46a42ccc9eaf5c84"
+    },
+    {
+      "path": "dashboard/tests/controller.test.mjs",
+      "bytes": 5335,
+      "sha256": "09ba74d20134c856bcf6a0833e14f9eeecf66c7e5afa2ed3d8d071e679bd9b3c"
+    },
+    {
+      "path": "dashboard/tests/fixtures.mjs",
+      "bytes": 1571,
+      "sha256": "9c92ecad14027e0848fe1a856190882682fe8f450fba02b8a01c51b67405fb59"
+    },
+    {
+      "path": "dashboard/tests/protocol.test.mjs",
+      "bytes": 11904,
+      "sha256": "7136d585d0dbd81b17694dffbb3d317b3c59efdf1e4b23a59079320807d59be7"
+    },
+    {
+      "path": "lib/liblwip/sysdepend/pico_rp2040/mqtt_utk.c",
+      "bytes": 14394,
+      "sha256": "de8f9e5d765a062c04d9a452c7378d6221f272b0960ad87df6bb25934e54182c"
+    },
+    {
+      "path": "lib/liblwip/sysdepend/pico_rp2040/mqtt_utk.h",
+      "bytes": 1616,
+      "sha256": "e214329e371d21a6d9558653ed47ed768befd5e0f3473bb63ccfb096f5f2bd49"
+    },
+    {
+      "path": "lib/libwifi/sysdepend/pico_rp2040/cyw43_utk.c",
+      "bytes": 13590,
+      "sha256": "b966652fd49d2df9ed5590cc8547141accf7b1633f05bd903cc45d17f9b73e63"
+    },
+    {
+      "path": "lib/libwifi/sysdepend/pico_rp2040/wifi_recovery.h",
+      "bytes": 856,
+      "sha256": "597dc8a7e9c6d43f7aa6d8b8c2fc002b54c4445c0e07d7051dcfa22f81dc60d9"
+    },
+    {
+      "path": "testing/subsystem1/CHANGE_REQUIREMENT_1.md",
+      "bytes": 23358,
+      "sha256": "d1ede79191ce28c6994f96fecadeb5aa51bb512bacbe0175b6e2d7a903f69a46"
+    },
+    {
+      "path": "testing/subsystem1/CONTROLLER_COMMANDS.md",
+      "bytes": 12126,
+      "sha256": "855f941f47b1b0a50ccaf7976f0443b37c9bb70b7aecc7a962101248ff27846c"
+    },
+    {
+      "path": "testing/subsystem1/MOTOR_STOP_TEST.md",
+      "bytes": 6440,
+      "sha256": "0d665330bf72a14972733b3a323bd4cc4e42bc8f80874e78141f218298fc376c"
+    },
+    {
+      "path": "testing/subsystem1/RECOVERY_TESTS.md",
+      "bytes": 12296,
+      "sha256": "2c49a36eee8af2475134953c8586abfb5268d7fa0903ff5e5f2bd5fa77ef3f8f"
+    },
+    {
+      "path": "testing/subsystem1/TEST_LOG.md",
+      "bytes": 71572,
+      "sha256": "b19ab25f2fae335917658251ade6917df462d4ef4aa141508028c87418f563de"
+    },
+    {
+      "path": "testing/subsystem1/host/check_wire.mjs",
+      "bytes": 5078,
+      "sha256": "336309947eca84a293fdcb09687883313e572e1a9f72741f42a34483ae1e43af"
+    },
+    {
+      "path": "testing/subsystem1/host/emit_frames.c",
+      "bytes": 6903,
+      "sha256": "41089542364907d424e5bd5ab832cfb6b4bbc9096e8af72e519a0ccd62c9a369"
+    },
+    {
+      "path": "testing/subsystem1/host/test_controller.c",
+      "bytes": 4980,
+      "sha256": "652a9241c779ba7a12b11a1ef5e3415b967b0d4bf158dac536b1aee16c52e6a2"
+    },
+    {
+      "path": "testing/subsystem1/host/test_status_mqtt.c",
+      "bytes": 19405,
+      "sha256": "14c35ec0f97edd6f6cfe28a5ae41c36833497f762b14da216e8ee9a90bd3ebeb"
+    },
+    {
+      "path": "testing/subsystem1/host/test_telemetry.c",
+      "bytes": 15141,
+      "sha256": "2633f9f5b5504f98c9ddec39d3eaee4604d6cff70ea7026499e1bed7e8bc3e9c"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-11-controller-build.txt",
+      "bytes": 14930,
+      "sha256": "0eccef07238d320126422bd8305752f9479c3aa550b9dbd65b9af99c9303ad3d"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-11-controller-dashboard-tests.txt",
+      "bytes": 4070,
+      "sha256": "116fce81a6b18b72183b7d57bdd4450bd512660872c1e89caf1f8a3bcd3a56fd"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-11-controller-line-policy-tests.txt",
+      "bytes": 93,
+      "sha256": "9232f6770016b93bc2d47b3e101c899fc875ef3974323c4f45fa01a1eb4c6dd9"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-11-controller-mqtt-tests.txt",
+      "bytes": 4051,
+      "sha256": "38cfdfac59e7b02dc7a4206542ac55a7e772089fb6cf4cfca6b53887ff7b07a1"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-11-controller-normal-compile.txt",
+      "bytes": 186,
+      "sha256": "c66bf9510c57d7cd5548e44901c7ac4f6c50cde4610507048f3d927f8a14da28"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-11-controller-owner-tests.txt",
+      "bytes": 2388,
+      "sha256": "f0c0868c8c3bc70a797e7fb1c5da4dd37fb010e6dcc4db2285307074d76caa6f"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-11-controller-recovery-probe-tests.txt",
+      "bytes": 865,
+      "sha256": "d756debf87e531c3d686ffbb135e1701165e8c77619f47ea0c78500a23096415"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-11-controller-s1-tests.txt",
+      "bytes": 4795,
+      "sha256": "3a3c36931cd0fdafe54ade80358fd6b7dd4ee1de72ccdea151676296dd9f2945"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-11-controller-user-bench-observation.md",
+      "bytes": 2220,
+      "sha256": "ece96e6349b5c6a07b18622b1108392995eb61be643da1d287d10bf77849cbfd"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-11-controller-wire-tests.txt",
+      "bytes": 491,
+      "sha256": "30e28f074119d3a9ba2eb8ff624ec77366431311bc06748d131a44fd42467729"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-11-motor-stop-build.txt",
+      "bytes": 567598,
+      "sha256": "1b310227a8bb5eff8c962b6a18d9733efe10389f187c12ce4133fcf5e72b7004"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-11-motor-stop-path-tests.txt",
+      "bytes": 672,
+      "sha256": "b6e56571c9bac1a4a27c86ddc96d6cec0f33854a4e30db1ff2893e575ace8111"
+    },
+    {
+      "path": "testing/subsystem1/logs/2026-11-11-motor-stop-s2-tests.txt",
+      "bytes": 186,
+      "sha256": "c2b72280507896d4f752d1e090d65fabbd3767a0f4c56ba3d219fe6d7d8f60bd"
+    },
+    {
+      "path": "testing/subsystem1/observe_controller.mjs",
+      "bytes": 5550,
+      "sha256": "08efa3019d461d0be580f7293af6fb7c2378bf7aafe26767723e53330f7bef36"
+    },
+    {
+      "path": "testing/subsystem1/recovery_probe.mjs",
+      "bytes": 13482,
+      "sha256": "936a29fccbe736a352e57279889c347586e9de11dfd5f07fcb4d69c0b1870ac5"
+    },
+    {
+      "path": "testing/subsystem1/test_motor_stop_path.py",
+      "bytes": 6769,
+      "sha256": "9e29a11a7521c71372dac04e5a69401c0cd8016509aa7361817c60577ffc2b8a"
+    }
+  ]
+}

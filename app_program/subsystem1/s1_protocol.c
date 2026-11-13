@@ -1,199 +1,218 @@
 #include "s1_protocol.h"
-
-static unsigned read_word(const S1_TELEMETRY *sample)
-{
-    return (unsigned)sample->bytes[4] | ((unsigned)sample->bytes[5] << 8);
+#include <string.h>
+#include <limits.h>
+#define SPEED_NULL 16383U
+#define SIGNED_NULL 0x80000000U
+#define FAULT_MOTOR 63U
+#define FAULT_IMU 64U
+#define FAULT_CONTROL 128U
+uint32_t s1_read_u32(const uint8_t *b) {
+    return (uint32_t)b[0]|((uint32_t)b[1]<<8)|((uint32_t)b[2]<<16)|((uint32_t)b[3]<<24);
 }
-static int valid_line(unsigned bits)
-{
-    return bits == 0U || (bits >= S1_LINE_VALID && bits <= 7U);
+void s1_write_u32(uint8_t *b,uint32_t v) {
+    unsigned i;for(i=0;i<4;++i)b[i]=(uint8_t)(v>>(8U*i));
 }
-uint32_t s1_read_u32(const uint8_t *bytes)
-{
-    return (uint32_t)bytes[0] | ((uint32_t)bytes[1] << 8) |
-           ((uint32_t)bytes[2] << 16) | ((uint32_t)bytes[3] << 24);
+uint32_t s1_get_bits(const uint8_t *b,unsigned bit,unsigned width) {
+    uint32_t v=0;unsigned i;
+    for(i=0;i<width;++i)v|=(uint32_t)((b[(bit+i)/8]>>((bit+i)%8))&1U)<<i;
+    return v;
 }
-void s1_write_u32(uint8_t *bytes, uint32_t value)
-{
-    unsigned i;
-    for (i = 0; i < 4; ++i) bytes[i] = (uint8_t)(value >> (8U * i));
-}
-int s1_make_telemetry(S1_TELEMETRY *out, uint32_t sequence,
-                      uint32_t distance_mm, unsigned valid)
-{
-    unsigned word;
-    if (out == 0 || valid > 1U ||
-        (valid && (distance_mm < 20U || distance_mm > 4000U)))
-        return S1_CODEC_INVALID;
-    word = S1_V2_TAG | (valid ? (unsigned)distance_mm : 0U);
-    s1_write_u32(out->bytes, sequence);
-    out->bytes[4] = (uint8_t)word;
-    out->bytes[5] = (uint8_t)(word >> 8);
-    return S1_CODEC_OK;
-}
-int s1_validate_telemetry(const S1_TELEMETRY *sample)
-{
-    unsigned word, distance;
-    if (sample == 0) return S1_CODEC_INVALID;
-    word = read_word(sample);
-    distance = word & S1_DISTANCE_MASK;
-    if (!(word & S1_V2_TAG) ||
-        (distance != 0U && (distance < 20U || distance > 4000U)) ||
-        !valid_line((word & S1_LINE_MASK) >> 12)) return S1_CODEC_INVALID;
-    return S1_CODEC_OK;
-}
-uint32_t s1_sequence(const S1_TELEMETRY *sample)
-{
-    return s1_read_u32(sample->bytes);
-}
-unsigned s1_distance(const S1_TELEMETRY *sample)
-{
-    return read_word(sample) & S1_DISTANCE_MASK;
-}
-unsigned s1_line_bits(const S1_TELEMETRY *sample)
-{
-    return (read_word(sample) & S1_LINE_MASK) >> 12;
-}
-int s1_make_line(S1_LINE_TELEMETRY *out, unsigned pattern, unsigned valid,
-                 uint32_t sampled_ms)
-{
-    if (out == 0 || pattern > 3U || valid > 1U) return S1_CODEC_INVALID;
-    s1_write_u32(out->bytes, valid ? sampled_ms : 0U);
-    out->bytes[4] = valid ? (uint8_t)(S1_LINE_VALID | pattern) : 0U;
-    return S1_CODEC_OK;
-}
-int s1_pack_telemetry(const S1_TELEMETRY *sample,
-                      const S1_LINE_TELEMETRY *line, uint32_t now_ms,
-                      uint32_t max_line_age_ms, uint8_t *out, unsigned capacity)
-{
-    unsigned bits = 0, word, i;
-    if (out == 0 || capacity < S1_TELEMETRY_BYTES ||
-        s1_validate_telemetry(sample) != S1_CODEC_OK) return S1_CODEC_INVALID;
-    if (line != 0) {
-        if (!valid_line(line->bytes[4])) return S1_CODEC_INVALID;
-        if ((uint32_t)(now_ms - s1_read_u32(line->bytes)) <= max_line_age_ms)
-            bits = line->bytes[4];
+void s1_set_bits(uint8_t *b,unsigned bit,unsigned width,uint32_t v) {
+    unsigned i;for(i=0;i<width;++i) {
+        unsigned n=bit+i,mask=1U<<(n%8);
+        b[n/8]=(uint8_t)((b[n/8]&~mask)|(((v>>i)&1U)<<(n%8)));
     }
-    word = S1_V2_TAG | s1_distance(sample) | (bits << 12);
-    /* Permit in-place serialization, but validate everything before writing. */
-    for (i = 0; i < 4; ++i) out[i] = sample->bytes[i];
-    out[4] = (uint8_t)word;
-    out[5] = (uint8_t)(word >> 8);
-    return S1_TELEMETRY_BYTES;
 }
-int s1_pack_heartbeat(uint32_t counter, uint8_t *out, unsigned capacity)
-{
-    if (out == 0 || capacity < S1_HEARTBEAT_BYTES) return S1_CODEC_INVALID;
-    out[0] = 0x80U;
-    s1_write_u32(out + 1, counter);
-    return S1_HEARTBEAT_BYTES;
+static uint64_t get_imu(const uint8_t *b) {
+    return s1_get_bits(b,S1_B_IMU,32)|((uint64_t)s1_get_bits(b,S1_B_IMU+32,2)<<32);
 }
-
-static uint64_t imu_word(const uint8_t *bytes)
-{
-    return (uint64_t)s1_read_u32(bytes) | ((uint64_t)bytes[4] << 32);
+static void put_imu(uint8_t *b,uint64_t v) {
+    s1_set_bits(b,S1_B_IMU,32,(uint32_t)v);s1_set_bits(b,S1_B_IMU+32,2,(uint32_t)(v>>32));
 }
-static int valid_height(unsigned height)
-{
-    return height == 0U || (height >= 6U && height <= 80U);
+static int height_ok(unsigned h) {return !h||(h>=6&&h<=80);}
+static int imu_ok(uint64_t v) {
+    unsigned p=v&2047U,h=(v>>11)&127U,m=(v>>18)&127U,s=(v>>25)&7U,f=(v>>28)&63U;
+    if(v>>34||p>1801||!height_ok(h)||!height_ok(m)||h>m)return 0;
+    if(s==7)return v==((uint64_t)7<<25);
+    return !((f&1U)&&(f&32U))&&(!p||((f&1U)&&!(f&32U)&&s>=2&&s<=5));
 }
-static int valid_imu(uint64_t word)
-{
-    unsigned pitch = (unsigned)(word & 0x7ffU);
-    unsigned current = (unsigned)((word >> 11) & 127U);
-    unsigned max = (unsigned)((word >> 18) & 127U);
-    unsigned state = (unsigned)((word >> 25) & 7U);
-    unsigned flags = (unsigned)((word >> 28) & 63U);
-    if ((word >> 34) != 0U || pitch > 1801U ||
-        !valid_height(current) || !valid_height(max) || current > max)
-        return 0;
-    if (state == 7U) return word == ((uint64_t)7U << 25);
-    if ((flags & 1U) && (flags & 32U)) return 0;
-    if (pitch && (!(flags & 1U) || (flags & 32U) || state < 2U || state > 5U))
-        return 0;
-    return 1;
+static void time_set(S1_SNAPSHOT *s,unsigned field,uint32_t t){s1_write_u32(s->timestamp[field],t);}
+static int expired(const S1_SNAPSHOT *s,unsigned field,uint32_t now,unsigned limit) {
+    return (uint32_t)(now-s1_read_u32(s->timestamp[field]))>limit;
 }
-int s1_make_imu(S1_IMU_TELEMETRY *out, int pitch_x10, unsigned current_mm,
-                unsigned max_mm, unsigned state, unsigned flags,
-                uint32_t sampled_ms, uint32_t pitch_sampled_ms)
-{
-    uint64_t word;
-    unsigned pitch, compact_flags, i;
-    if (out == 0 || state > 7U || (flags & ~0xbfU) ||
-        !valid_height(current_mm) || !valid_height(max_mm) || current_mm > max_mm ||
-        ((flags & S1_IMU_PITCH_VALID) && (pitch_x10 < -900 || pitch_x10 > 900)))
-        return S1_CODEC_INVALID;
-    pitch = flags & S1_IMU_PITCH_VALID ? (unsigned)(pitch_x10 + 901) : 0U;
-    compact_flags = (flags & 15U) | ((flags & S1_IMU_SPEED_SUPPLIED) >> 1) |
-                    ((flags & S1_IMU_FAULT) >> 2);
-    word = pitch | ((uint64_t)current_mm << 11) | ((uint64_t)max_mm << 18) |
-           ((uint64_t)state << 25) | ((uint64_t)compact_flags << 28);
-    if (!valid_imu(word)) return S1_CODEC_INVALID;
-    for (i = 0; i < S1_IMU_BYTES; ++i) out->bytes[i] = (uint8_t)(word >> (8U * i));
-    s1_write_u32(out->bytes + S1_IMU_BYTES, sampled_ms);
-    s1_write_u32(out->bytes + S1_IMU_BYTES + 4U, pitch_sampled_ms);
-    return S1_CODEC_OK;
+static void faults(uint8_t *b,unsigned mask,unsigned known,unsigned active) {
+    unsigned k=s1_get_bits(b,S1_B_KNOWN,11),a=s1_get_bits(b,S1_B_FAULT,11);
+    s1_set_bits(b,S1_B_KNOWN,11,(k&~mask)|(known&mask));
+    s1_set_bits(b,S1_B_FAULT,11,(a&~mask)|(active&known&mask));
 }
-int s1_pack_frame(const S1_TELEMETRY *sample, const S1_LINE_TELEMETRY *line,
-                  const S1_IMU_TELEMETRY *imu, uint32_t now_ms,
-                  uint32_t max_line_age_ms, uint8_t *out, unsigned capacity)
-{
-    uint8_t frame[S1_FRAME_BYTES];
-    uint64_t word = (uint64_t)7U << 25; /* unavailable, not an all-zero reading */
-    unsigned i;
-    if (out == 0 || capacity < S1_FRAME_BYTES ||
-        s1_pack_telemetry(sample, line, now_ms, max_line_age_ms, frame,
-                          S1_TELEMETRY_BYTES) != (int)S1_TELEMETRY_BYTES)
-        return S1_CODEC_INVALID;
-    if (imu != 0) {
-        uint64_t candidate = imu_word(imu->bytes);
-        if (!valid_imu(candidate)) return S1_CODEC_INVALID;
-        if ((uint32_t)(now_ms - s1_read_u32(imu->bytes + S1_IMU_BYTES)) <= S1_IMU_MAX_AGE_MS) {
-            word = candidate;
-            /* A queued angle can expire before the status/retained heights. */
-            if ((uint32_t)(now_ms - s1_read_u32(imu->bytes + S1_IMU_BYTES + 4U)) > 100U)
-                word &= ~((uint64_t)0x7ffU);
-        }
+void s1_snapshot_init(S1_SNAPSHOT *s,uint32_t seq) {
+    memset(s,0,sizeof(*s));s1_write_u32(s->sequence,seq);
+    put_imu(s->body,(uint64_t)7<<25);
+    s1_set_bits(s->body,S1_B_LEFT,14,SPEED_NULL);s1_set_bits(s->body,S1_B_RIGHT,14,SPEED_NULL);
+    s1_set_bits(s->body,S1_B_COUNT_L,32,SIGNED_NULL);s1_set_bits(s->body,S1_B_COUNT_R,32,SIGNED_NULL);
+    s1_set_bits(s->body,S1_B_NET,32,SIGNED_NULL);s1_set_bits(s->body,S1_B_TRAVEL,32,UINT32_MAX);
+    s1_set_bits(s->body,S1_B_MODE,2,3);s1_set_bits(s->body,S1_B_REASON,3,7);
+}
+int s1_set_range(S1_SNAPSHOT *s,uint32_t mm,unsigned valid,uint32_t t) {
+    if(!s||valid>1||(valid&&(mm<20||mm>4000)))return -1;
+    s1_set_bits(s->body,S1_B_RANGE,12,valid?mm:0);time_set(s,S1_AGE_RANGE,t);return 0;
+}
+int s1_set_line(S1_SNAPSHOT *s,unsigned pattern,unsigned valid,uint32_t t) {
+    if(!s||valid>1||pattern>3)return -1;
+    s1_set_bits(s->body,S1_B_LINE,3,valid?4U|pattern:0);time_set(s,S1_AGE_LINE,t);return 0;
+}
+int s1_set_imu(S1_SNAPSHOT *s,int pitch,unsigned h,unsigned m,unsigned state,
+                unsigned flags,uint32_t t,uint32_t pt) {
+    uint64_t v;unsigned compact;
+    if(!s||state>7||(flags&~0xbfU)||!height_ok(h)||!height_ok(m)||h>m||
+       ((flags&16U)&&(pitch< -900||pitch>900)))return -1;
+    compact=(flags&15U)|((flags&32U)>>1)|((flags&128U)>>2);
+    v=((flags&16U)?(unsigned)(pitch+901):0U)|((uint64_t)h<<11)|
+        ((uint64_t)m<<18)|((uint64_t)state<<25)|((uint64_t)compact<<28);
+    if(!imu_ok(v))return -1;
+    put_imu(s->body,v);time_set(s,S1_AGE_IMU,t);time_set(s,S1_AGE_PITCH,pt);
+    faults(s->body,FAULT_IMU,((flags&129U)||state==6)?FAULT_IMU:0,
+           ((flags&128U)||state==6)?FAULT_IMU:0);
+    return 0;
+}
+static uint32_t signed_value(int64_t n,unsigned valid) {
+    return valid&&n>=-2147483647LL&&n<=2147483647LL?(uint32_t)n:SIGNED_NULL;
+}
+int s1_set_motion(S1_SNAPSHOT *s,const S1_MOTION_INPUT *m) {
+    if(!s||!m||m->encoder_valid>1||m->speed_valid>1||m->mode>2||
+       m->stop_reason>5||(m->faults&~FAULT_MOTOR))return -1;
+    s1_set_bits(s->body,S1_B_LEFT,14,m->speed_valid&&m->left_speed_x10>=-5000&&m->left_speed_x10<=5000?
+                (uint32_t)(m->left_speed_x10+5000):SPEED_NULL);
+    s1_set_bits(s->body,S1_B_RIGHT,14,m->speed_valid&&m->right_speed_x10>=-5000&&m->right_speed_x10<=5000?
+                (uint32_t)(m->right_speed_x10+5000):SPEED_NULL);
+    s1_set_bits(s->body,S1_B_COUNT_L,32,signed_value(m->left_count,m->encoder_valid));
+    s1_set_bits(s->body,S1_B_COUNT_R,32,signed_value(m->right_count,m->encoder_valid));
+    s1_set_bits(s->body,S1_B_NET,32,signed_value(m->net_mm_x10,m->encoder_valid));
+    s1_set_bits(s->body,S1_B_MODE,2,m->mode);s1_set_bits(s->body,S1_B_REASON,3,m->stop_reason);
+    faults(s->body,FAULT_MOTOR,FAULT_MOTOR,m->faults);
+    time_set(s,S1_AGE_MOTION,m->timestamp_ms);time_set(s,S1_AGE_SPEED,m->speed_timestamp_ms);return 0;
+}
+int s1_set_travel(S1_SNAPSHOT *s,uint64_t mm,uint32_t t) {
+    if(!s||mm>=UINT32_MAX)return -1;
+    s1_set_bits(s->body,S1_B_TRAVEL,32,(uint32_t)mm);time_set(s,S1_AGE_TRAVEL,t);return 0;
+}
+int s1_set_barcode(S1_SNAPSHOT *s,unsigned code,unsigned navigation,uint16_t seq,uint32_t t) {
+    unsigned compact=0;
+    if(!s||navigation>4||(!code&&navigation)||code>255||(code&&(!(code&128U)||(code&63U)>=43)))return -1;
+    if(code)compact=(code&64U)|((code&63U)+1U);
+    s1_set_bits(s->body,S1_B_BARCODE,7,compact);s1_set_bits(s->body,S1_B_EVENT,16,code?seq:0);
+    s1_set_bits(s->body,S1_B_NAV,3,navigation);
+    time_set(s,S1_AGE_BARCODE,t);return 0;
+}
+int s1_set_faults(S1_SNAPSHOT *s,unsigned known,unsigned active,uint32_t t) {
+    if(!s||(known&~S1_EXTERNAL_FAULT_MASK)||(active&~known))return -1;
+    faults(s->body,S1_EXTERNAL_FAULT_MASK,known,active);time_set(s,S1_AGE_FAULTS,t);return 0;
+}
+int s1_valid_control_word(unsigned w) {
+    unsigned s=w&APP_CTRL_STATE_MASK;
+    return w<=APP_CTRL_WORD_MASK&&s<=APP_CTRL_STOPPED&&
+        (s!=APP_CTRL_STOP_LATCHED||(w&APP_CTRL_LATCH))&&
+        (!(w&APP_CTRL_LATCH)||s==APP_CTRL_DISABLED||s==APP_CTRL_STOP_LATCHED||s==APP_CTRL_FAULT);
+}
+static int body_ok(const uint8_t *b) {
+    unsigned d=s1_get_bits(b,S1_B_RANGE,12),l=s1_get_bits(b,S1_B_LINE,3);
+    unsigned a=s1_get_bits(b,S1_B_LEFT,14),c=s1_get_bits(b,S1_B_RIGHT,14);
+    unsigned bc=s1_get_bits(b,S1_B_BARCODE,7),reason=s1_get_bits(b,S1_B_REASON,3);
+    return s1_get_bits(b,S1_B_NAV,3)<=4&&(!s1_get_bits(b,S1_B_NAV,3)||bc)&&
+        (!d||(d>=20&&d<=4000))&&(!l||l>=4)&&
+        imu_ok(get_imu(b))&&(a<=10000||a==SPEED_NULL)&&(c<=10000||c==SPEED_NULL)&&
+        (!bc||((bc&63U)>=1&&(bc&63U)<=43))&&(bc||!s1_get_bits(b,S1_B_EVENT,16))&&
+        !(s1_get_bits(b,S1_B_FAULT,11)&~s1_get_bits(b,S1_B_KNOWN,11))&&
+        s1_valid_control_word(s1_get_bits(b,S1_B_CONTROL,6))&&(reason<=5||reason==7);
+}
+int s1_validate_frame(const uint8_t *b,unsigned len) {
+    return b&&len==S1_FRAME_BYTES&&b[0]==0xb4U&&s1_read_u32(b+9)&&body_ok(b+13)?0:-1;
+}
+int s1_pack_frame(const S1_SNAPSHOT *s,uint32_t now,uint32_t boot,uint32_t session,
+                   unsigned control,uint8_t *out,unsigned capacity) {
+    uint8_t f[S1_FRAME_BYTES]={0},*b=f+13;unsigned state=control&APP_CTRL_STATE_MASK;
+    if(!s||!out||capacity<sizeof(f)||!session||!s1_valid_control_word(control)||!body_ok(s->body))return -1;
+    memcpy(b,s->body,S1_BODY_BYTES);
+    if(expired(s,S1_AGE_RANGE,now,2000))s1_set_bits(b,S1_B_RANGE,12,0);
+    if(expired(s,S1_AGE_LINE,now,100))s1_set_bits(b,S1_B_LINE,3,0);
+    if(expired(s,S1_AGE_IMU,now,1000)){put_imu(b,(uint64_t)7<<25);faults(b,FAULT_IMU,0,0);}
+    else if(expired(s,S1_AGE_PITCH,now,100))put_imu(b,get_imu(b)&~(uint64_t)2047);
+    if(expired(s,S1_AGE_MOTION,now,500)) {
+        s1_set_bits(b,S1_B_COUNT_L,32,SIGNED_NULL);s1_set_bits(b,S1_B_COUNT_R,32,SIGNED_NULL);
+        s1_set_bits(b,S1_B_NET,32,SIGNED_NULL);s1_set_bits(b,S1_B_MODE,2,3);
+        s1_set_bits(b,S1_B_REASON,3,7);faults(b,FAULT_MOTOR,0,0);
+        s1_set_bits(b,S1_B_LEFT,14,SPEED_NULL);s1_set_bits(b,S1_B_RIGHT,14,SPEED_NULL);
+    } else if(expired(s,S1_AGE_SPEED,now,500)) {
+        s1_set_bits(b,S1_B_LEFT,14,SPEED_NULL);s1_set_bits(b,S1_B_RIGHT,14,SPEED_NULL);
     }
-    for (i = 0; i < S1_IMU_BYTES; ++i) frame[S1_TELEMETRY_BYTES + i] = (uint8_t)(word >> (8U * i));
-    for (i = 0; i < S1_FRAME_BYTES; ++i) out[i] = frame[i];
-    return S1_FRAME_BYTES;
+    if(expired(s,S1_AGE_TRAVEL,now,2000))s1_set_bits(b,S1_B_TRAVEL,32,UINT32_MAX);
+    if(expired(s,S1_AGE_BARCODE,now,2000)){
+        s1_set_bits(b,S1_B_BARCODE,7,0);s1_set_bits(b,S1_B_EVENT,16,0);s1_set_bits(b,S1_B_NAV,3,0);
+    }
+    if(expired(s,S1_AGE_FAULTS,now,2000))faults(b,S1_EXTERNAL_FAULT_MASK,0,0);
+    faults(b,FAULT_CONTROL,state?FAULT_CONTROL:0,state==APP_CTRL_FAULT?FAULT_CONTROL:0);
+    s1_set_bits(b,S1_B_CONTROL,6,control);
+    f[0]=0xb4;s1_write_u32(f+1,s1_read_u32(s->sequence));s1_write_u32(f+5,boot);
+    s1_write_u32(f+9,session);memcpy(out,f,sizeof(f));return sizeof(f);
 }
-
-int s1_parse_status_request(const uint8_t *bytes, unsigned length, uint32_t *id)
-{
-    uint32_t value;
-    if (bytes == 0 || id == 0 || length != S1_STATUS_REQUEST_BYTES || bytes[0] != 0xa0U)
-        return S1_CODEC_INVALID;
-    value = s1_read_u32(bytes + 1);
-    if (value == 0U) return S1_CODEC_INVALID;
-    *id = value;
-    return S1_CODEC_OK;
+int s1_pack_heartbeat(uint32_t counter,uint8_t *out,unsigned capacity) {
+    if(!out||capacity<5)return -1;
+    out[0]=0x80;s1_write_u32(out+1,counter);return 5;
 }
-int s1_pack_status_reply(uint32_t id, uint32_t uptime_ms, unsigned sample_age_ms,
-                         unsigned test_build, const uint8_t *frame,
-                         uint8_t *out, unsigned capacity)
-{
-    uint8_t reply[S1_STATUS_MAX_BYTES];
-    unsigned length = S1_STATUS_HEADER_BYTES, word, i;
-    if (id == 0U || test_build > 1U || out == 0 ||
-        (sample_age_ms > 2000U && sample_age_ms != S1_STATUS_NO_SAMPLE))
-        return S1_CODEC_INVALID;
-    if (sample_age_ms != S1_STATUS_NO_SAMPLE) {
-        S1_TELEMETRY sample;
-        if (frame == 0) return S1_CODEC_INVALID;
-        for (i = 0; i < S1_TELEMETRY_BYTES; ++i) sample.bytes[i] = frame[i];
-        if (s1_validate_telemetry(&sample) != S1_CODEC_OK || !valid_imu(imu_word(frame + 6)))
-            return S1_CODEC_INVALID;
-        length += S1_FRAME_BYTES;
-    } else if (frame != 0) return S1_CODEC_INVALID;
-    if (capacity < length) return S1_CODEC_INVALID;
-    reply[0] = 0xa1U;
-    s1_write_u32(reply + 1, id);
-    s1_write_u32(reply + 5, uptime_ms);
-    word = sample_age_ms | (test_build << 11);
-    reply[9] = (uint8_t)word; reply[10] = (uint8_t)(word >> 8);
-    for (i = S1_STATUS_HEADER_BYTES; i < length; ++i) reply[i] = frame[i - S1_STATUS_HEADER_BYTES];
-    for (i = 0; i < length; ++i) out[i] = reply[i];
-    return (int)length;
+int s1_parse_status_request(const uint8_t *b,unsigned n,uint32_t *id) {
+    if(!b||!id||n!=5||b[0]!=0xa0||!s1_read_u32(b+1))return -1;
+    *id=s1_read_u32(b+1);return 0;
+}
+int s1_parse_stop_request(const uint8_t *b,unsigned n,uint32_t *id,uint32_t *session,uint32_t *deadline) {
+    if(!b||!id||!session||!deadline||n!=13||b[0]!=0xa2||!s1_read_u32(b+1)||!s1_read_u32(b+5))return -1;
+    *id=s1_read_u32(b+1);*session=s1_read_u32(b+5);*deadline=s1_read_u32(b+9);return 0;
+}
+int s1_pack_status_reply(uint32_t id,uint32_t uptime,unsigned age,unsigned control,
+                          uint32_t session,const uint8_t *frame,uint8_t *out,unsigned capacity) {
+    uint8_t b[S1_STATUS_MAX_BYTES]={0};unsigned n=S1_STATUS_HEADER_BYTES,word=age|(control<<11);
+    if(!id||!session||!out||!s1_valid_control_word(control)||(age>2000&&age!=2047))return -1;
+    if(age==2047){if(frame)return -1;}
+    else {
+        if(s1_validate_frame(frame,S1_FRAME_BYTES)||s1_read_u32(frame+9)!=session||
+           s1_read_u32(frame+5)!=uptime||s1_get_bits(frame+13,S1_B_CONTROL,6)!=control)return -1;
+        n+=S1_FRAME_BYTES;memcpy(b+S1_STATUS_HEADER_BYTES,frame,S1_FRAME_BYTES);
+    }
+    if(capacity<n)return -1;
+    b[0]=0xa1;s1_write_u32(b+1,id);s1_write_u32(b+5,uptime);
+    b[9]=word;b[10]=word>>8;b[11]=word>>16;s1_write_u32(b+12,session);
+    memcpy(out,b,n);return n;
+}
+int s1_pack_stop_reply(uint32_t id,uint32_t session,unsigned result,unsigned control,uint8_t *out,unsigned capacity) {
+    unsigned word=control|(result<<6);
+    if(!id||!session||result>5||!out||capacity<11||!s1_valid_control_word(control)||
+       (!result&&(!(control&APP_CTRL_LATCH)||(control&APP_CTRL_STATE_MASK)==APP_CTRL_FAULT)))return -1;
+    out[0]=0xa4;s1_write_u32(out+1,id);s1_write_u32(out+5,session);out[9]=word;out[10]=word>>8;return 11;
+}
+int s1_pack_scan(uint32_t session,uint32_t sequence,uint32_t boot,const uint8_t *scan,
+                  unsigned total,unsigned start,uint8_t *out,unsigned capacity) {
+    uint8_t b[S1_SCAN_PACKET_BYTES]={0};unsigned i,count,n,previous=0;
+    if(!session||!scan||!out||!total||total>181||start>=total)return -1;
+    for(i=0;i<total;++i) {
+        unsigned a=s1_get_bits(scan,20*i,8),d=s1_get_bits(scan,20*i+8,12);
+        if(a>180||(i&&a<=previous)||(d&&(d<20||d>4000)))return -1;
+        previous=a;
+    }
+    count=total-start;if(count>S1_SCAN_CHUNK_POINTS)count=S1_SCAN_CHUNK_POINTS;
+    n=S1_SCAN_HEADER_BYTES+(count*20+7)/8;if(capacity<n)return -1;
+    b[0]=0xb5;s1_write_u32(b+1,session);s1_write_u32(b+5,sequence);s1_write_u32(b+9,boot);
+    b[13]=total;b[14]=start;b[15]=count;
+    for(i=0;i<count;++i)s1_set_bits(b+16,20*i,20,s1_get_bits(scan,20*(start+i),20));
+    memcpy(out,b,n);return n;
+}
+int s1_pack_diagnostics(uint32_t session,uint32_t uptime,const uint32_t values[6],
+                         const uint32_t counters[4],uint8_t *out,unsigned capacity) {
+    uint8_t b[S1_DIAGNOSTIC_BYTES]={0};unsigned i;
+    if(!session||!values||!counters||!out||capacity<sizeof(b))return -1;
+    b[0]=0xb6;s1_write_u32(b+1,session);s1_write_u32(b+5,uptime);
+    for(i=0;i<6;++i) {
+        uint32_t v=values[i];if(v>270336U)v=S1_RESOURCE_UNKNOWN;
+        s1_set_bits(b+9,19*i,19,v);
+    }
+    for(i=0;i<4;++i)s1_write_u32(b+24+4*i,counters[i]);
+    memcpy(out,b,sizeof(b));return sizeof(b);
 }

@@ -1,0 +1,62 @@
+{
+  "capture": "testing/subsystem1/logs/2026-11-13T10-13-15-956Z-controller-observation.json",
+  "main_frames": 220,
+  "scan_chunks": 26,
+  "heartbeats": 22,
+  "matching_status_rtt_ms": [
+    30
+  ],
+  "decode_errors": [],
+  "valid_distance_frames": 220,
+  "valid_pitch_frames": 220,
+  "line_bits_observed": [
+    5
+  ],
+  "latest_scan": {
+    "session_token": 3533224584,
+    "scan_sequence": 40,
+    "uptime_ms": 139510,
+    "total": 3,
+    "start": 0,
+    "points": [
+      {
+        "angle": 30,
+        "distance_mm": 229
+      },
+      {
+        "angle": 90,
+        "distance_mm": 90
+      },
+      {
+        "angle": 150,
+        "distance_mm": 81
+      }
+    ]
+  },
+  "latest_resources": {
+    "session_token": 3533224584,
+    "uptime_ms": 139790,
+    "static_ram_bytes": 84692,
+    "heap_free_bytes": 150360,
+    "largest_free_block_bytes": 150360,
+    "sampled_min_heap_free_bytes": 150360,
+    "task_stack_capacity_bytes": 10240,
+    "stack_high_water_bytes": null,
+    "publish_errors": 25,
+    "rejected_commands": 0,
+    "mqtt_connections": 1,
+    "snapshot_contention": 1
+  },
+  "expected_local_image": {
+    "path": "C:\\Users\\wilso\\OneDrive\\Desktop\\INF2004 Embedded Systems Programming\\INF2004_RoboCarProject\\build_make\\mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2",
+    "bytes": 723456,
+    "sha256": "3a8b79c37a01cfa92615db69e62d2817795ab53ec9decae5e33c4faa19f3aaf6",
+    "note": "Intended local file, not flash readback"
+  },
+  "limits": "Stationary sensor/servo transport only. No normal physical line/avoidance/STOP trajectory or calibrated angle/distance claim.",
+  "user_reports_flash": true,
+  "user_reports_servo_sweeps": true,
+  "user_reports_dashboard_profile": true,
+  "user_reports_existing_readings_update": true,
+  "diagnostic_packets": 18
+}

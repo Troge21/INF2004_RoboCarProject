@@ -1,5 +1,18 @@
 # S1 integration: real IMU pitch and hump estimates
 
+**Historical stage report. Current contract: 13 November Packed v4.**
+Use [the current field/resource table](S1_COMPLETION_BATCH.md),
+[producer handoff](PRODUCER_HANDOFF.md) and [controller contract](CONTROLLER_COMMANDS.md).
+Descriptions of v2/v3, earlier queue sizes and earlier firmware below belong
+to those recorded stages; they are not current flash instructions.
+The new main packet is 46 bytes; it adds measured motion, fault coverage,
+barcode/path readiness and generation/session metadata. Static RAM is 83196
+bytes stationary / 83356 normal, and S1 message-buffer requests are zero.
+Additional packed cache/resource costs and limitations are in the current table.
+Current-image physical tests remain deferred. The original JSON-to-v2
+69-to-6-byte comparison remains historical, not a like-for-like v4 claim.
+
+
 6 November 2026. This stage follows the user's functional passes for the
 six-byte distance/IR image: target movement, stale readings, normal laptop
 restart and power-bank restart. See the [user bench record](logs/2026-11-06-cr1-user-bench-observation.md).

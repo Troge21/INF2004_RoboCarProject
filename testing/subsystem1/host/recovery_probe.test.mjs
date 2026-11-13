@@ -8,8 +8,8 @@ import {fileURLToPath} from 'node:url';
 import {forwardSequence,baselineReady,assessTrial,keepaliveAction} from '../recovery_probe.mjs';
 function trial() {
   return {baseline:{at_ms:100,uptime_ms:100000,round_trip_ms:20},restore_marker_ms:20000,
-    telemetry:Array.from({length:5},(_,i)=>({at_ms:21000+i*500})),heartbeats:[{at_ms:22000},{at_ms:27000}],
-    status:{at_ms:22000,uptime_ms:121900,round_trip_ms:20,sample_age_ms:100,test_build:true}};
+    telemetry:Array.from({length:5},(_,i)=>({at_ms:21000+i*500,uptime_ms:120900+i*500,session_token:17})),heartbeats:[{at_ms:22000},{at_ms:27000}],
+    status:{at_ms:22000,uptime_ms:121900,round_trip_ms:20,sample_age_ms:100,test_build:true,session_token:17}};
 }
 test('recovery baseline requires fresh real telemetry, heartbeat and subscribed connection',()=>{
   assert.ok(baselineReady(10000,9000,5000,true));

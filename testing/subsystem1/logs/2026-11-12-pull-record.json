@@ -1,0 +1,52 @@
+{
+  "recorded_utc": "2026-11-12T01:53:00.323266+00:00",
+  "request": "Check failed VS Code pull and safely pull teammate updates",
+  "before": "b11c682808c3e82caae907fba0d1ef5c3c69311c",
+  "after": "f37055f567d46d4f2465725e1af46082b880ba29",
+  "origin_main": "f37055f567d46d4f2465725e1af46082b880ba29",
+  "branch": "main",
+  "ahead": 0,
+  "behind": 0,
+  "original_popup": "VS Code Git log: local changes to TEAM.md and app_program/app_main.c would be overwritten; abort before merge",
+  "backup": {
+    "directory": "C:\\Users\\wilso\\AppData\\Local\\Temp\\robocar-before-pull-2026-11-12-95ee5qvl",
+    "files": 59,
+    "binary_patches": true,
+    "ignored_secrets_excluded": true
+  },
+  "preserved_stash": "a21aafcf2b3db46280532c70ba768ab801bc1fd3",
+  "local_state": "Restored; original unstaged/untracked work retained; nothing committed or pushed; stash retained for recovery",
+  "conflicts": {
+    "TEAM.md": "Resolved by combining restored S1 row and upstream S2 row",
+    "app_program/app_main.c": "Automatically merged, retaining local controller and upstream standalone bench entry"
+  },
+  "exactly_preserved_nonoverlap_files": 57,
+  "upstream_paths": [
+    "TEAM.md",
+    "app_program/app_main.c",
+    "app_program/gpio_irq.c",
+    "app_program/gpio_irq.h",
+    "app_program/subsystem2/encoder_capture.c",
+    "app_program/subsystem2/encoder_capture.h",
+    "app_program/subsystem2/motion_control.c",
+    "app_program/subsystem2/motion_control.h",
+    "app_program/subsystem2/subsystem2.c",
+    "app_program/subsystem2/subsystem2.h",
+    "app_program/subsystem2/subsystem2_test.c",
+    "app_program/subsystem3/ir_adc_test.c",
+    "app_program/subsystem5/subsystem5.c",
+    "testing/subsystem2/LINE_FOLLOW.md",
+    "testing/subsystem2/MOTOR_FEEDBACK.md",
+    "testing/subsystem2/test_motor_commands.py"
+  ],
+  "checks": {
+    "unmerged_index_entries": 0,
+    "staged_paths": 0,
+    "teammate_files": "match origin/main, allowing CRLF conversion",
+    "dashboard_tests": 45,
+    "S1_codec_checks": 36,
+    "S1_queue_checks": 23
+  },
+  "followup": "Current upstream usermain enters ir_adc_test() (noreturn) before full S1/controller lifecycle. Normal mode is standalone analog IR/motor testing, not integrated dashboard startup. Review/integrate before firmware rebuild.",
+  "UF2": "Not rebuilt or flashed; existing local artifact predates this pull and new wiring. No live robot command was sent."
+}

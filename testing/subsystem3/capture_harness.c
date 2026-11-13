@@ -23,6 +23,7 @@ typedef struct { unsigned intatr; FP inthdr; } T_DINT;
 #define E_IO (-57)
 #define E_TMOUT (-50)
 #define TA_HLNG 1
+#include "subsystem3.h"
 enum { TIMER_TIMERAWL, TIMER_INTR, TIMER_ALARM2, TIMER_ARMED, TIMER_INTE };
 static UW registers[5];
 static UINT level, core = 1, irq_enabled;
@@ -34,7 +35,7 @@ static void out_w(UINT reg, UW value) {
     if (reg == TIMER_ALARM2) registers[TIMER_ARMED] |= 4U;
 }
 static void set_w(UINT reg, UW value) { registers[reg] |= value; }
-static UINT gpio_get_val(UINT pin) { assert(pin == 26); return level; }
+static UINT gpio_get_val(UINT pin) { assert(pin == S3_BARCODE_PIN); return level; }
 static void DisableInt(UINT irq) { assert(irq == 2); irq_enabled = 0; }
 static void EnableInt(UINT irq, int priority) {
     assert(irq == 2 && priority == 3); irq_enabled = 1;

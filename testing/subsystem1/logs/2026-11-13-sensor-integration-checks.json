@@ -1,0 +1,122 @@
+{
+  "date": "2026-11-13",
+  "all_17_groups_passed": true,
+  "checks": [
+    {
+      "name": "s5-scan-stationary",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T10-01-35/s5-scan-stationary.txt"
+    },
+    {
+      "name": "s5-scan-normal",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T10-01-35/s5-scan-normal.txt"
+    },
+    {
+      "name": "current-layout",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T10-01-35/current-layout.txt"
+    },
+    {
+      "name": "s1-codec-bridge",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T10-01-35/s1-codec-bridge.txt"
+    },
+    {
+      "name": "mqtt-port",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T10-01-35/mqtt-port.txt"
+    },
+    {
+      "name": "controller-normal",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T10-01-35/controller-normal.txt"
+    },
+    {
+      "name": "controller-stationary",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T10-01-35/controller-stationary.txt"
+    },
+    {
+      "name": "wire-vectors",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T10-01-35/wire-vectors.txt"
+    },
+    {
+      "name": "dashboard",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T10-01-35/dashboard.txt"
+    },
+    {
+      "name": "recovery-recorder",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T10-01-35/recovery-recorder.txt"
+    },
+    {
+      "name": "actual-motor-stop",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T10-01-35/actual-motor-stop.txt"
+    },
+    {
+      "name": "heap-snapshot",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T10-01-35/heap-snapshot.txt"
+    },
+    {
+      "name": "producer-linkage",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T10-03-04/producer-linkage.txt"
+    },
+    {
+      "name": "shared-gpio",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T10-01-35/shared-gpio.txt"
+    },
+    {
+      "name": "analog-policy",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T10-01-35/analog-policy.txt"
+    },
+    {
+      "name": "analog-and-barcode",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T10-01-35/analog-and-barcode.txt"
+    },
+    {
+      "name": "javascript-syntax",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T10-01-35/javascript-syntax.txt"
+    }
+  ],
+  "initial_run": "testing/subsystem1/logs/s1-batch-2026-11-13T10-01-35/summary.json",
+  "retry": "testing/subsystem1/logs/s1-batch-2026-11-13T10-03-04/summary.json",
+  "retry_reason": "Windows sandbox denied WSL access; producer-linkage passed with WSL access. Original failure preserved.",
+  "hardware_operated": false,
+  "new_image_flashed": false,
+  "additional_checks": [
+    "Four actual ARM build modes, controller frame <=768 bytes, no S5 motor-call imports.",
+    "Actual ARM static stack guards: collector 464/2048, S5 sensing 136/2048, S1 startup chain 312/1024, S5 startup chain 208/1024.",
+    "Both final ARM links warning-free; strong S5 telemetry_get_scan confirmed in linked normal/stationary ELF."
+  ],
+  "limits": [
+    "Deterministic GPIO/RTOS tests do not prove physical servo orientation, motor inhibition or avoidance trajectory.",
+    "No current-image hardware pass or runtime stack high-water claim."
+  ]
+}

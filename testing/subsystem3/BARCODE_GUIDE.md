@@ -1,3 +1,12 @@
+# Historical digital barcode guide
+
+**12 November 2026:** this GP26 digital-capture procedure is inactive for the
+current AO wiring. Right line IR now uses GP26 AO; GP28 is barcode-reserved
+AO. Integrated S3 never starts the old digital capture/timer. Do not apply
+the old pin/sampling instructions to the rewired car. Decoder/register-model
+tests below are software evidence only; analog barcode acquisition remains
+the owning subsystem work. See ../../dashboard/README.md for current pins.
+
 # Left IR barcode bench build
 
 Current firmware uses left GP26 for barcode capture, centre GP6 and right GP16

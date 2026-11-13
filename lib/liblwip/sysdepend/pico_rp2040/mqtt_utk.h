@@ -23,8 +23,17 @@ void mqtt_utk_poll(void);
 void mqtt_utk_set_link(unsigned int available);
 
 /* S1 queue bridge ABI; deliberately no kernel or SDK headers in this file. */
-int s1_network_poll(unsigned char *out, unsigned int capacity);
+int s1_network_poll(unsigned char *out, unsigned int capacity,uint32_t session);
+int s1_network_aux(unsigned char *out,unsigned capacity,uint32_t session,const uint32_t counters[3]);
+void s1_network_aux_result(unsigned marker,int accepted);
 int s1_network_status(const unsigned char *request, unsigned int length,
-                      unsigned char *out, unsigned int capacity);
+                      unsigned char *out, unsigned int capacity,uint32_t session);
+unsigned s1_network_controller_word(void);
+int s1_network_uptime(uint32_t *out);
+int s1_network_submit_stop(uint32_t id,uint32_t session,uint32_t deadline);
+int s1_network_stop_reply(uint8_t out[10]);
+/* Radio-owner implementation reads oscillator variation; no GPIO/clock writes.
+ * Session freshness, not authentication or a cryptographic security claim. */
+unsigned int mqtt_utk_session_entropy(void);
 
 #endif /* MQTT_UTK_H */

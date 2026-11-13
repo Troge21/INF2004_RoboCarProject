@@ -1,5 +1,29 @@
 # micro T-Kernel 3.0 project for Raspberry Pi Pico W
 
+## Current RoboCar integration ? 13 November 2026
+
+The current source integrates sensor branch c8a789b with S1 v4 and the
+existing controller. S5 publishes servo/range/scan snapshots; the shared
+controller arbitrates line following, obstacle turns and the STOP latch.
+S2/S3/S4 and the existing S1/decoder/latch sources are unchanged.
+Both integrated builds and 17 software check groups pass. Hardware checking
+of this sensor integration is recorded separately from earlier image passes.
+
+Use the single current stationary image:
+**build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2**,
+NET=lwip MQTT=1 TEST=1 APP_MODE=integrated. **Wheel motors are disabled;
+the servo centres and sweeps when front distance is <=250 mm.**
+See [the integration contract/evidence](testing/subsystem1/SENSOR_INTEGRATION.md).
+The car uses one USB/power-bank supply. Normal TEST=0 can move after three
+seconds; raise both wheels before flashing or connecting power in that mode.
+
+[Dashboard, wiring and startup](dashboard/README.md),
+[producer handoff](testing/subsystem1/PRODUCER_HANDOFF.md),
+[one final hardware session](testing/subsystem1/FINAL_ACCEPTANCE.md).
+APP_MODE=ir and TEST=1 APP_MODE=encoder explicitly select diagnostic benches.
+Keep USB CDC / CRASH_REPORT=0; GP0/GP1 belong to the right encoder.
+Older generic examples below do not override these hardware requirements.
+
 A starting point for your project: micro T-Kernel 3.0 running on **both cores**
 of the Pico W's RP2040, with a USB serial console and the WiFi driver built in.
 

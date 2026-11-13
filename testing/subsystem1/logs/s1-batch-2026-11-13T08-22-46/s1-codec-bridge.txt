@@ -1,0 +1,44 @@
+C:\Users\wilso\OneDrive\Desktop\INF2004 Embedded Systems Programming\INF2004_RoboCarProject\testing\subsystem1\host\test_telemetry.c: In function 'tk_wai_sem':
+C:\Users\wilso\OneDrive\Desktop\INF2004 Embedded Systems Programming\INF2004_RoboCarProject\testing\subsystem1\host\test_telemetry.c:44:5: error: this 'if' clause does not guard... [-Werror=misleading-indentation]
+   44 |     if(id!=1||n!=1||(timeout!=0&&timeout!=-1))abort();return blocked?E_TMOUT:0;
+      |     ^~
+C:\Users\wilso\OneDrive\Desktop\INF2004 Embedded Systems Programming\INF2004_RoboCarProject\testing\subsystem1\host\test_telemetry.c:44:55: note: ...this statement, but the latter is misleadingly indented as if it were guarded by the 'if'
+   44 |     if(id!=1||n!=1||(timeout!=0&&timeout!=-1))abort();return blocked?E_TMOUT:0;
+      |                                                       ^~~~~~
+C:\Users\wilso\OneDrive\Desktop\INF2004 Embedded Systems Programming\INF2004_RoboCarProject\testing\subsystem1\host\test_telemetry.c: In function 'tk_dly_tsk':
+C:\Users\wilso\OneDrive\Desktop\INF2004 Embedded Systems Programming\INF2004_RoboCarProject\testing\subsystem1\host\test_telemetry.c:50:5: error: this 'if' clause does not guard... [-Werror=misleading-indentation]
+   50 |     if(--ticks<=0)longjmp(stopped,1);calendar_ms+=(UW)delay;boot_ms+=(UW)delay;return 0;
+      |     ^~
+C:\Users\wilso\OneDrive\Desktop\INF2004 Embedded Systems Programming\INF2004_RoboCarProject\testing\subsystem1\host\test_telemetry.c:50:38: note: ...this statement, but the latter is misleadingly indented as if it were guarded by the 'if'
+   50 |     if(--ticks<=0)longjmp(stopped,1);calendar_ms+=(UW)delay;boot_ms+=(UW)delay;return 0;
+      |                                      ^~~~~~~~~~~
+In file included from C:\Users\wilso\OneDrive\Desktop\INF2004 Embedded Systems Programming\INF2004_RoboCarProject\testing\subsystem1\host\test_telemetry.c:80:
+C:/Users/wilso/OneDrive/Desktop/INF2004 Embedded Systems Programming/INF2004_RoboCarProject/app_program/subsystem1/s1_protocol.c: In function 's1_pack_heartbeat':
+C:/Users/wilso/OneDrive/Desktop/INF2004 Embedded Systems Programming/INF2004_RoboCarProject/app_program/subsystem1/s1_protocol.c:159:5: error: this 'if' clause does not guard... [-Werror=misleading-indentation]
+  159 |     if(!out||capacity<5)return -1;out[0]=0x80;s1_write_u32(out+1,counter);return 5;
+      |     ^~
+C:/Users/wilso/OneDrive/Desktop/INF2004 Embedded Systems Programming/INF2004_RoboCarProject/app_program/subsystem1/s1_protocol.c:159:35: note: ...this statement, but the latter is misleadingly indented as if it were guarded by the 'if'
+  159 |     if(!out||capacity<5)return -1;out[0]=0x80;s1_write_u32(out+1,counter);return 5;
+      |                                   ^~~
+In file included from C:\Users\wilso\OneDrive\Desktop\INF2004 Embedded Systems Programming\INF2004_RoboCarProject\testing\subsystem1\host\test_telemetry.c:88:
+C:/Users/wilso/OneDrive/Desktop/INF2004 Embedded Systems Programming/INF2004_RoboCarProject/app_program/subsystem1/subsystem1.c: In function 's1_network_uptime':
+C:/Users/wilso/OneDrive/Desktop/INF2004 Embedded Systems Programming/INF2004_RoboCarProject/app_program/subsystem1/subsystem1.c:42:5: error: this 'if' clause does not guard... [-Werror=misleading-indentation]
+   42 |     if(tk_get_otm(&t)!=E_OK)return E_OBJ;*out=t.lo;return E_OK;
+      |     ^~
+C:/Users/wilso/OneDrive/Desktop/INF2004 Embedded Systems Programming/INF2004_RoboCarProject/app_program/subsystem1/subsystem1.c:42:42: note: ...this statement, but the latter is misleadingly indented as if it were guarded by the 'if'
+   42 |     if(tk_get_otm(&t)!=E_OK)return E_OBJ;*out=t.lo;return E_OK;
+      |                                          ^
+C:/Users/wilso/OneDrive/Desktop/INF2004 Embedded Systems Programming/INF2004_RoboCarProject/app_program/subsystem1/subsystem1.c: In function 's1_network_aux':
+C:/Users/wilso/OneDrive/Desktop/INF2004 Embedded Systems Programming/INF2004_RoboCarProject/app_program/subsystem1/subsystem1.c:112:9: error: this 'for' clause does not guard... [-Werror=misleading-indentation]
+  112 |         for(i=0;i<3;++i)counts[i]=counters[i];counts[3]=network_busy;
+      |         ^~~
+C:/Users/wilso/OneDrive/Desktop/INF2004 Embedded Systems Programming/INF2004_RoboCarProject/app_program/subsystem1/subsystem1.c:112:47: note: ...this statement, but the latter is misleadingly indented as if it were guarded by the 'for'
+  112 |         for(i=0;i<3;++i)counts[i]=counters[i];counts[3]=network_busy;
+      |                                               ^~~~~~
+C:/Users/wilso/OneDrive/Desktop/INF2004 Embedded Systems Programming/INF2004_RoboCarProject/app_program/subsystem1/subsystem1.c:114:9: error: this 'if' clause does not guard... [-Werror=misleading-indentation]
+  114 |         if(n>0)last_aux=boot;return n;
+      |         ^~
+C:/Users/wilso/OneDrive/Desktop/INF2004 Embedded Systems Programming/INF2004_RoboCarProject/app_program/subsystem1/subsystem1.c:114:30: note: ...this statement, but the latter is misleadingly indented as if it were guarded by the 'if'
+  114 |         if(n>0)last_aux=boot;return n;
+      |                              ^~~~~~
+cc1.exe: all warnings being treated as errors

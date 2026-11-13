@@ -1,184 +1,83 @@
-/* Local parser/format tests; do not inject fake samples into live telemetry. */
+/* Pure codec checks in TEST=1; never publish synthetic telemetry or move motors. */
 #include "subsystem1.h"
-
 #if APP_TEST
 #include "../test_report.h"
 #ifdef PICO_RP2040
 #include <sys/sysdef.h>
 #include <tk/syslib.h>
 #endif
-
-static INT same_bytes(const UB *a, const UB *b, UINT count)
-{
-    UINT i;
-    for (i = 0; i < count; ++i) if (a[i] != b[i]) return 0;
-    return 1;
-}
-
 EXPORT void subsystem1_test(void)
 {
-    S1_TELEMETRY sample = {{0}}, bad;
-    S1_LINE_TELEMETRY line = {{0}};
-    UB payload[S1_PAYLOAD_CAPACITY];
-    UB small[4] = {0xa5, 0xa5, 0xa5, 0xa5};
-    const UB plain[6] = {1, 0, 0, 0, 0xc3, 0x81};
-    const UB missing[6] = {1, 0, 0, 0, 0, 0x80};
-    const UB maximum[6] = {255, 255, 255, 255, 0xa0, 0x8f};
-    const UB left[6] = {1, 0, 0, 0, 0xc3, 0xe1};
-    const UB white[6] = {1, 0, 0, 0, 0xc3, 0xc1};
-    const UB right[6] = {1, 0, 0, 0, 0xc3, 0xd1};
-    const UB hb_zero[5] = {0x80, 0, 0, 0, 0};
-    const UB hb_max[5] = {0x80, 255, 255, 255, 255};
-    INT len;
+    /* Startup calls this once from the 1 KiB initial task. Keep the large
+     * pure-code vectors out of that stack: the console formatter and
+     * kernel/interrupt calls also need space while each check prints. */
+    static S1_SNAPSHOT s;
+    static S1_MOTION_INPUT motion;
+    static UB frame[S1_TX_CAPACITY],reply[S1_STATUS_MAX_BYTES];
+    static UB scan[S1_SCAN_PACKED_BYTES];
+    UB tiny[2]={0xa5,0xa5};
+    UB request[13]={0xa2,42,0,0,0,17,0,0,0,255,255,255,255};
+    uint32_t id=0,session=0,deadline=0,values[6]={82596,4000,2000,3000,12288,UINT32_MAX};
+    uint32_t counters[4]={1,2,3,UINT32_MAX};unsigned i;
     TEST_INIT();
-
-    (void)s1_make_telemetry(&sample, 1, 451, 1);
-    len = s1_encode_telemetry(&sample, NULL, 0, payload, sizeof(payload));
-    TEST_CHECK("S1-U22", len == 6 && same_bytes(payload, plain, 6),
-               "distance has exact six-byte binary golden vector");
-    (void)s1_make_telemetry(&sample, 1, 451, 0);
-    TEST_CHECK("S1-U23", s1_encode_telemetry(&sample, NULL, 0, payload, sizeof(payload)) == 6 &&
-               same_bytes(payload, missing, 6),
-               "invalid distance uses zero sentinel, never clear-space distance");
-    TEST_CHECK("S1-U24", s1_encode_telemetry(&sample, NULL, 0, small, sizeof(small)) == E_PAR &&
-               small[0] == 0xa5 && small[3] == 0xa5,
-               "small binary buffer rejected without writing");
-    bad = sample; bad.bytes[4] = 0xa1; bad.bytes[5] = 0x8f;
-    TEST_CHECK("S1-U25", s1_make_telemetry(&sample, 1, 4001, 1) == S1_CODEC_INVALID &&
-               s1_submit_telemetry(&bad) == E_PAR && s1_submit_telemetry(NULL) == E_PAR,
-               "null and out-of-range samples rejected before queue access");
-    (void)s1_make_telemetry(&sample, 0xffffffffU, 4000, 1);
-    TEST_CHECK("S1-U26", s1_encode_telemetry(&sample, NULL, 0, payload, sizeof(payload)) == 6 &&
-               same_bytes(payload, maximum, 6), "maximum sequence and distance preserved");
-    TEST_CHECK("S1-U27", s1_make_telemetry(&sample, 1, 451, 2) == S1_CODEC_INVALID &&
-               s1_encode_telemetry(&sample, NULL, 0, NULL, 6) == E_PAR &&
-               s1_encode_telemetry(&sample, NULL, 0, payload, 0) == E_PAR,
-               "invalid validity and output arguments rejected");
-    (void)s1_make_telemetry(&sample, 1, 451, 1);
-    (void)s1_make_line(&line, 2, 1, 1000);
-    TEST_CHECK("S1-U28", s1_encode_telemetry(&sample, &line, 1100, payload, sizeof(payload)) == 6 &&
-               same_bytes(payload, left, 6), "left line black remains valid at age 100 ms");
-    (void)s1_make_line(&line, 0, 1, 1000);
-    TEST_CHECK("S1-U29", s1_encode_telemetry(&sample, &line, 1000, payload, sizeof(payload)) == 6 &&
-               same_bytes(payload, white, 6), "valid background differs from unavailable");
-    (void)s1_make_line(&line, 3, 1, 1000);
-    TEST_CHECK("S1-U30", s1_encode_telemetry(&sample, &line, 1101, payload, sizeof(payload)) == 6 &&
-               same_bytes(payload, plain, 6), "queued IR expires without losing distance");
-    (void)s1_make_line(&line, 1, 1, 0xfffffff0U);
-    TEST_CHECK("S1-U31", s1_encode_telemetry(&sample, &line, 16, payload, sizeof(payload)) == 6 &&
-               same_bytes(payload, right, 6), "freshness survives uptime wrap");
-    (void)s1_make_line(&line, 1, 1, 1001);
-    TEST_CHECK("S1-U32", s1_encode_telemetry(&sample, &line, 1000, payload, sizeof(payload)) == 6 &&
-               same_bytes(payload, plain, 6), "future timestamp cannot appear fresh");
-    payload[0] = 0xa5; line.bytes[4] = 3;
-    len = s1_encode_telemetry(&sample, &line, 1001, payload, sizeof(payload));
-    line.bytes[4] = 8;
-    TEST_CHECK("S1-U33", len == E_PAR &&
-               s1_encode_telemetry(&sample, &line, 1001, payload, sizeof(payload)) == E_PAR &&
-               payload[0] == 0xa5, "noncanonical line bits rejected without writing");
-    TEST_CHECK("S1-U44", sizeof(S1_TELEMETRY) == 6 && sizeof(S1_LINE_TELEMETRY) == 5,
-               "application snapshots use packed byte layouts");
-    len = s1_pack_heartbeat(0, payload, sizeof(payload));
-    TEST_CHECK("S1-U45", len == 5 && same_bytes(payload, hb_zero, 5) &&
-               s1_pack_heartbeat(0xffffffffU, payload, sizeof(payload)) == 5 &&
-               same_bytes(payload, hb_max, 5), "binary heartbeat preserves zero and full counter");
-    TEST_CHECK("S1-U46", s1_pack_heartbeat(1, small, sizeof(small)) == S1_CODEC_INVALID &&
-               small[0] == 0xa5 && small[3] == 0xa5 &&
-               s1_pack_heartbeat(1, NULL, 5) == S1_CODEC_INVALID,
-               "heartbeat output bounds preserved");
-    TEST_CHECK("S1-U47", s1_make_telemetry(&sample, 1, 4096U + 451U, 1) == S1_CODEC_INVALID &&
-               s1_make_line(&line, 4, 1, 1000) == S1_CODEC_INVALID,
-               "raw values rejected before masking could turn them into valid data");
-    {
-        S1_IMU_TELEMETRY imu;
-        const UB frame[11] = {1,0,0,0,0xc3,0xe1,0x1b,0x64,0x88,0x14,0};
-        (void)s1_make_telemetry(&sample, 1, 451, 1);
-        (void)s1_make_line(&line, 2, 1, 1000);
-        len = s1_make_imu(&imu, 150, 12, 34, 2, 0x11, 1000, 1000);
-        TEST_CHECK("S1-U48", len == 0 && sizeof(imu) == 13 &&
-            s1_pack_frame(&sample, &line, &imu, 1000, 100, payload, sizeof(payload)) == 11 &&
-            same_bytes(payload, frame, 11), "V3 matches independent 11-byte pitch/height golden vector");
-        (void)s1_make_imu(&imu, -900, 0, 0, 2, 0x11, 1000, 1000);
-        (void)s1_pack_frame(&sample, NULL, &imu, 1000, 100, payload, sizeof(payload));
-        len = payload[6] == 1 && (payload[7] & 7U) == 0;
-        (void)s1_make_imu(&imu, 900, 80, 80, 2, 0x31, 1000, 1000);
-        (void)s1_pack_frame(&sample, NULL, &imu, 1000, 100, payload, sizeof(payload));
-        TEST_CHECK("S1-U49", len && (s1_read_u32(payload + 6) & 2047U) == 1801U,
-            "full signed pitch range and maximum accepted height fit without truncation");
-        TEST_CHECK("S1-U50", s1_make_imu(&imu, 901, 0, 0, 2, 0x11, 0, 0) < 0 &&
-            s1_make_imu(&imu, -901, 0, 0, 2, 0x11, 0, 0) < 0 &&
-            s1_make_imu(&imu, 0, 81, 81, 2, 1, 0, 0) < 0 &&
-            s1_make_imu(&imu, 0, 0, 0, 8, 1, 0, 0) < 0,
-            "IMU raw range errors rejected before packing");
-        (void)s1_make_imu(&imu, 150, 12, 34, 2, 0x11, 1000, 1000);
-        (void)s1_pack_frame(&sample, NULL, &imu, 1100, 100, payload, sizeof(payload));
-        len = (s1_read_u32(payload + 6) & 2047U) == 1051U;
-        (void)s1_pack_frame(&sample, NULL, &imu, 1101, 100, payload, sizeof(payload));
-        len = len && (s1_read_u32(payload + 6) & 2047U) == 0U &&
-            ((s1_read_u32(payload + 6) >> 18) & 127U) == 34U;
-        (void)s1_pack_frame(&sample, NULL, &imu, 2001, 100, payload, sizeof(payload));
-        TEST_CHECK("S1-U51", len && s1_read_u32(payload + 6) == (7U << 25) && payload[10] == 0,
-            "queued pitch expires independently, then the whole stale IMU block expires");
-        (void)s1_make_imu(&imu, -150, 0, 0, 2, 0x11, 0xfffffff0U, 0xfffffff0U);
-        (void)s1_pack_frame(&sample, NULL, &imu, 16, 100, payload, sizeof(payload));
-        len = (s1_read_u32(payload + 6) & 2047U) == 751U;
-        (void)s1_make_imu(&imu, 0, 0, 0, 2, 0x11, 17, 17);
-        (void)s1_pack_frame(&sample, NULL, &imu, 16, 100, payload, sizeof(payload));
-        TEST_CHECK("S1-U52", len && s1_read_u32(payload + 6) == (7U << 25),
-            "IMU freshness handles uptime wrap and rejects future source time");
-        imu.bytes[4] |= 0x80U; payload[0] = 0xa5;
-        TEST_CHECK("S1-U53", s1_pack_frame(&sample, NULL, &imu, 17, 100, payload, sizeof(payload)) < 0 &&
-            payload[0] == 0xa5, "reserved IMU bits rejected without changing output");
-        TEST_CHECK("S1-U54", s1_pack_frame(&sample, NULL, NULL, 0, 100, small, sizeof(small)) < 0 &&
-            small[0] == 0xa5 && s1_pack_frame(&sample, NULL, NULL, 0, 100, NULL, 11) < 0,
-            "V3 buffer boundaries preserved");
-        TEST_CHECK("S1-U55", s1_make_imu(&imu, 0, 20, 12, 2, 1, 0, 0) < 0 &&
-            s1_make_imu(&imu, 0, 0, 0, 6, 0x91, 0, 0) < 0 &&
-            s1_make_imu(&imu, 0, 0, 0, 7, 1, 0, 0) < 0 &&
-            s1_make_imu(&imu, 0, 0, 0, 1, 0x11, 0, 0) < 0,
-            "contradictory validity, unavailable fields and height ordering rejected");
+    motion=(S1_MOTION_INPUT){0};
+    s1_snapshot_init(&s,UINT32_MAX);
+    TEST_CHECK("S1-V4-01",sizeof(s)==73&&s1_pack_frame(&s,0,100,17,APP_CTRL_STARTING,frame,sizeof(frame))==46,
+        "one packed frame and byte-packed shared snapshot");
+    TEST_CHECK("S1-V4-02",s1_read_u32(frame+1)==UINT32_MAX&&s1_validate_frame(frame,46)==0,
+        "full sequence and current framing preserved");
+    TEST_CHECK("S1-V4-03",s1_get_bits(frame+13,S1_B_LEFT,14)==16383&&
+        s1_get_bits(frame+13,S1_B_COUNT_L,32)==0x80000000U,
+        "missing motion is not measured stationary zero");
+    TEST_CHECK("S1-V4-04",s1_pack_frame(&s,0,100,17,APP_CTRL_STARTING,tiny,2)<0&&tiny[0]==0xa5&&tiny[1]==0xa5,
+        "short output rejected without writes");
+    TEST_CHECK("S1-V4-05",s1_set_range(&s,19,1,100)<0&&s1_set_range(&s,4001,1,100)<0&&
+        s1_set_range(&s,0,2,100)<0,"range and validity bounds");
+    (void)s1_set_range(&s,451,1,100);(void)s1_set_line(&s,3,1,0);
+    (void)s1_pack_frame(&s,101,101,17,APP_CTRL_STARTING,frame,sizeof(frame));
+    TEST_CHECK("S1-V4-06",s1_get_bits(frame+13,S1_B_RANGE,12)==451&&s1_get_bits(frame+13,S1_B_LINE,3)==0,
+        "IR can expire independently of range");
+    for(i=0;i<4;++i){
+        (void)s1_set_line(&s,i,1,100);
+        (void)s1_pack_frame(&s,100,100,17,APP_CTRL_STARTING,frame,sizeof(frame));
+        TEST_CHECK("S1-V4-07",s1_get_bits(frame+13,S1_B_LINE,3)==4+i,"all line combinations");
     }
-    {
-        const UB request[5] = {0xa0,12,0,0,0};
-        const UB empty_reply[11] = {0xa1,12,0,0,0,4,3,2,1,0xff,0x0f};
-        UB reply[S1_STATUS_MAX_BYTES], frame[S1_FRAME_BYTES], invalid[5] = {0xa0,0,0,0,0};
-        uint32_t id = 123;
-        TEST_CHECK("S1-U62", s1_parse_status_request(request,5,&id)==0 && id==12,
-            "binary STATUS request preserves its correlation ID");
-        TEST_CHECK("S1-U63", s1_parse_status_request(NULL,5,&id)<0 &&
-            s1_parse_status_request(request,0xffffffffU,&id)<0 &&
-            s1_parse_status_request((const UB *)"STATUS",6,&id)<0 &&
-            s1_parse_status_request((const UB *)"STOP",4,&id)<0,
-            "null, malformed, oversized and obsolete commands rejected");
-        id = 123;
-        TEST_CHECK("S1-U64", s1_parse_status_request(invalid,5,&id)<0 && id==123 &&
-            s1_parse_status_request(request,5,NULL)<0,
-            "zero request ID rejected without changing caller data");
-        TEST_CHECK("S1-U65", s1_pack_status_reply(12,0x01020304U,S1_STATUS_NO_SAMPLE,1,NULL,
-            reply,sizeof(reply))==11 && same_bytes(reply,empty_reply,11),
-            "no-sample STATUS reply matches independent binary golden vector");
-        (void)s1_make_telemetry(&sample,1,451,1);
-        (void)s1_pack_frame(&sample,NULL,NULL,1000,100,frame,sizeof(frame));
-        TEST_CHECK("S1-U66", s1_pack_status_reply(12,1000,100,1,frame,reply,sizeof(reply))==22 &&
-            reply[9]==100 && reply[10]==8 && same_bytes(reply+11,frame,11),
-            "STATUS includes current telemetry and original source age");
-        reply[0] = 0xa5;
-        TEST_CHECK("S1-U67", s1_pack_status_reply(12,0,0,1,frame,reply,21)<0 && reply[0]==0xa5 &&
-            s1_pack_status_reply(12,0,S1_STATUS_NO_SAMPLE,1,NULL,reply,10)<0 && reply[0]==0xa5,
-            "STATUS small-buffer failures leave output unchanged");
-        frame[10] |= 0x80U;
-        TEST_CHECK("S1-U68", s1_pack_status_reply(12,0,0,1,frame,reply,sizeof(reply))<0 &&
-            s1_pack_status_reply(0,0,S1_STATUS_NO_SAMPLE,1,NULL,reply,sizeof(reply))<0 &&
-            s1_pack_status_reply(12,0,2001,1,NULL,reply,sizeof(reply))<0 &&
-            s1_pack_status_reply(12,0,S1_STATUS_NO_SAMPLE,2,NULL,reply,sizeof(reply))<0 && reply[0]==0xa5,
-            "STATUS validates snapshot, IDs, age and one-bit build mode before writing");
-        (void)s1_pack_frame(&sample,NULL,NULL,1000,100,frame,sizeof(frame));
-        TEST_CHECK("S1-U69", s1_pack_status_reply(0xffffffffU,0xffffffffU,2000,0,frame,reply,sizeof(reply))==22 &&
-            s1_read_u32(reply+1)==0xffffffffU && s1_read_u32(reply+5)==0xffffffffU &&
-            s1_pack_status_reply(12,0,0,0,NULL,reply,sizeof(reply))<0 &&
-            s1_pack_status_reply(12,0,S1_STATUS_NO_SAMPLE,0,frame,reply,sizeof(reply))<0,
-            "STATUS preserves full counters and canonical presence/age boundaries");
-    }
+    TEST_CHECK("S1-V4-08",s1_set_imu(&s,150,12,34,2,17,200,200)==0,"real IMU view can be packed");
+    (void)s1_pack_frame(&s,301,301,17,APP_CTRL_STARTING,frame,sizeof(frame));
+    TEST_CHECK("S1-V4-09",s1_get_bits(frame+13,S1_B_IMU,11)==0&&s1_get_bits(frame+13,S1_B_IMU+11,7)==12,
+        "stale pitch clears independently of retained height/status");
+    motion.timestamp_ms=motion.speed_timestamp_ms=300;
+    motion.encoder_valid=motion.speed_valid=1;motion.mode=0;motion.stop_reason=0;
+    (void)s1_set_motion(&s,&motion);(void)s1_pack_frame(&s,301,301,17,APP_CTRL_STARTING,frame,sizeof(frame));
+    TEST_CHECK("S1-V4-10",s1_get_bits(frame+13,S1_B_LEFT,14)==5000&&s1_get_bits(frame+13,S1_B_COUNT_L,32)==0,
+        "measured zero motion stays valid");
+    motion.left_count=2147483648LL;motion.left_speed_x10=5001;
+    (void)s1_set_motion(&s,&motion);(void)s1_pack_frame(&s,301,301,17,APP_CTRL_STARTING,frame,sizeof(frame));
+    TEST_CHECK("S1-V4-11",s1_get_bits(frame+13,S1_B_LEFT,14)==16383&&
+        s1_get_bits(frame+13,S1_B_COUNT_L,32)==0x80000000U,"overflow becomes unavailable, never wraps/clamps");
+    TEST_CHECK("S1-V4-12",s1_set_barcode(&s,138,1,42,300)==0&&s1_set_barcode(&s,127,1,42,300)<0,
+        "Code39 validity is independent of navigation mapping");
+    (void)s1_pack_frame(&s,301,301,17,APP_CTRL_STARTING,frame,sizeof(frame));
+    TEST_CHECK("S1-V4-13",s1_get_bits(frame+13,S1_B_BARCODE,7)==11&&s1_get_bits(frame+13,S1_B_NAV,3)==1,
+        "barcode A and controller-supplied left intent preserved");
+    TEST_CHECK("S1-V4-14",s1_set_faults(&s,256,512,300)<0&&s1_set_faults(&s,256,256,300)==0,
+        "faults must be explicitly known before active");
+    (void)s1_pack_frame(&s,301,301,17,APP_CTRL_STARTING,frame,sizeof(frame));
+    TEST_CHECK("S1-V4-15",s1_pack_status_reply(42,301,0,APP_CTRL_STARTING,17,frame,reply,sizeof(reply))==62&&
+        s1_pack_status_reply(42,301,2047,APP_CTRL_STARTING,17,NULL,reply,sizeof(reply))==16,
+        "current STATUS has canonical snapshot presence");
+    TEST_CHECK("S1-V4-16",s1_parse_stop_request(request,13,&id,&session,&deadline)==0&&
+        id==42&&session==17&&deadline==UINT32_MAX,"full STOP lease clock preserved");
+    TEST_CHECK("S1-V4-17",s1_pack_stop_reply(42,17,0,APP_CTRL_STOP_LATCHED|APP_CTRL_LATCH,reply,sizeof(reply))==11&&
+        s1_pack_stop_reply(42,17,0,APP_CTRL_FAULT|APP_CTRL_LATCH,reply,sizeof(reply))<0,
+        "only applied nonfault controller stop can acknowledge success");
+    TEST_CHECK("S1-V4-18",s1_valid_control_word(APP_CTRL_SCANNING)&&
+        !s1_valid_control_word(APP_CTRL_READY|APP_CTRL_LATCH),"future controller vocabulary retains latch invariants");
+    for(i=0;i<181;++i){s1_set_bits(scan,20*i,8,i);s1_set_bits(scan,20*i+8,12,200);}
+    TEST_CHECK("S1-V4-19",s1_pack_scan(17,1,301,scan,181,176,reply,sizeof(reply))==29&&reply[15]==5,
+        "181 point profile is bounded into small exact chunks");
+    TEST_CHECK("S1-V4-20",s1_pack_diagnostics(17,301,values,counters,reply,sizeof(reply))==40&&
+        s1_get_bits(reply+9,95,19)==S1_RESOURCE_UNKNOWN,"unsupported high-water stays unavailable");
 #ifdef PICO_RP2040
     {
         UW raw_before, elapsed_us, tick;
@@ -202,6 +101,6 @@ EXPORT void subsystem1_test(void)
                    "microsecond TIMER configured and advancing at 1 MHz");
     }
 #endif
-    TEST_SUMMARY("subsystem1");
+    TEST_SUMMARY("subsystem1 v4 codec and startup clock");
 }
 #endif

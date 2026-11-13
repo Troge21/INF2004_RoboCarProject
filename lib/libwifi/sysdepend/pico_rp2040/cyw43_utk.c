@@ -19,6 +19,19 @@
 #include "wifi_recovery.h"
 #if TM_MQTT
 #include "mqtt_utk.h"
+#include "hardware/structs/rosc.h"
+unsigned int mqtt_utk_session_entropy(void)
+{
+    uint32_t bits=0;unsigned i;
+    /* A different radio session must not accept a retained old STOP. This
+     * is freshness variation on a trusted broker, not an auth credential. */
+    for(i=0;i<32U;++i) {
+        uint64_t edge=time_us_64();
+        bits=(bits<<1)|(rosc_hw->randombit&1U);
+        while(time_us_64()==edge) { }
+    }
+    return bits^(uint32_t)time_us_64();
+}
 #endif
 #endif
 

@@ -22,7 +22,7 @@
 #define MQTT_TOPIC       "mtk3smp-pico/heartbeat"
 /* Optional override; existing wifi_secrets.h files use this default too. */
 #define MQTT_TELEMETRY_TOPIC MQTT_CLIENT_ID "/telemetry"
-#define MQTT_COMMAND_TOPIC MQTT_CLIENT_ID "/command" /* read-only STATUS */
-#define MQTT_STATUS_TOPIC MQTT_CLIENT_ID "/status"   /* correlated replies */
+#define MQTT_COMMAND_TOPIC MQTT_CLIENT_ID "/command" /* STATUS / controller STOP */
+#define MQTT_STATUS_TOPIC MQTT_CLIENT_ID "/status"   /* replies / controller state */
 
 #endif /* WIFI_SECRETS_H */

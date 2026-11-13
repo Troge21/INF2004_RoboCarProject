@@ -1,0 +1,2 @@
+PASS: actual app_main.c compiles with APP_TEST=0; temporary object only, no driving image.
+PASS: actual controller.c compiles with APP_TEST=0; temporary object only, no driving image.

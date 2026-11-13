@@ -1,0 +1,12 @@
+C:/msys64/ucrt64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../x86_64-w64-mingw32/bin/ld.exe: C:\Users\wilso\AppData\Local\Temp\ccQRpdQ5.o:main.c:(.text+0x61): undefined reference to `telemetry_get_barcode'
+C:/msys64/ucrt64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../x86_64-w64-mingw32/bin/ld.exe: C:\Users\wilso\AppData\Local\Temp\ccQRpdQ5.o:main.c:(.text+0x9b): undefined reference to `telemetry_get_barcode'
+C:/msys64/ucrt64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../x86_64-w64-mingw32/bin/ld.exe: C:\Users\wilso\AppData\Local\Temp\ccQRpdQ5.o:main.c:(.text+0xcc): undefined reference to `telemetry_get_scan'
+C:/msys64/ucrt64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../x86_64-w64-mingw32/bin/ld.exe: C:\Users\wilso\AppData\Local\Temp\ccQRpdQ5.o:main.c:(.text+0xfd): undefined reference to `telemetry_get_resources'
+collect2.exe: error: ld returned 1 exit status
+Traceback (most recent call last):
+  File "C:\Users\wilso\OneDrive\Desktop\INF2004 Embedded Systems Programming\INF2004_RoboCarProject\testing\subsystem1\test_producer_hooks.py", line 53, in <module>
+    subprocess.run(args,check=True);subprocess.run([str(exe)],check=True)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\msys64\ucrt64\lib\python3.12\subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['gcc', '-std=c11', '-Wall', '-Wextra', '-Werror', '-include', 'C:\\Users\\wilso\\AppData\\Local\\Temp\\robocar-producer-hooks-drm3_n8i\\stub.h', '-I', 'C:\\Users\\wilso\\OneDrive\\Desktop\\INF2004 Embedded Systems Programming\\INF2004_RoboCarProject\\testing\\subsystem1\\host\\include', '-I', 'C:\\Users\\wilso\\OneDrive\\Desktop\\INF2004 Embedded Systems Programming\\INF2004_RoboCarProject\\app_program', 'C:\\Users\\wilso\\OneDrive\\Desktop\\INF2004 Embedded Systems Programming\\INF2004_RoboCarProject\\app_program\\subsystem1\\s1_sources.c', 'C:\\Users\\wilso\\AppData\\Local\\Temp\\robocar-producer-hooks-drm3_n8i\\main.c', '-o', 'C:\\Users\\wilso\\AppData\\Local\\Temp\\robocar-producer-hooks-drm3_n8i\\default.exe']' returned non-zero exit status 1.

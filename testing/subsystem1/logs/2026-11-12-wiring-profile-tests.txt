@@ -1,0 +1,5 @@
+PASS: integrated normal actual ARM compilation and startup/motor symbols
+PASS: integrated stationary actual ARM compilation and startup/motor symbols
+PASS: explicit IR bench actual ARM compilation and startup/motor symbols
+PASS: explicit encoder bench actual ARM compilation and startup/motor symbols
+PASS: stationary integrated TEST=1 contains no motor_task; hardware benches require explicit APP_MODE.

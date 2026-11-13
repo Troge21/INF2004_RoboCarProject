@@ -1,0 +1,89 @@
+{
+  "offline": true,
+  "checks": [
+    {
+      "name": "s1-codec-bridge",
+      "passed": false,
+      "exit_code": 1,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T08-22-46/s1-codec-bridge.txt"
+    },
+    {
+      "name": "mqtt-port",
+      "passed": false,
+      "exit_code": 1,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T08-22-46/mqtt-port.txt"
+    },
+    {
+      "name": "controller-normal",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T08-22-46/controller-normal.txt"
+    },
+    {
+      "name": "controller-stationary",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T08-22-46/controller-stationary.txt"
+    },
+    {
+      "name": "wire-vectors",
+      "passed": false,
+      "exit_code": 1,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T08-22-46/wire-vectors.txt"
+    },
+    {
+      "name": "dashboard",
+      "passed": false,
+      "exit_code": 1,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T08-22-46/dashboard.txt"
+    },
+    {
+      "name": "recovery-recorder",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T08-22-46/recovery-recorder.txt"
+    },
+    {
+      "name": "actual-motor-stop",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T08-22-46/actual-motor-stop.txt"
+    },
+    {
+      "name": "heap-snapshot",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T08-22-46/heap-snapshot.txt"
+    },
+    {
+      "name": "producer-linkage",
+      "passed": false,
+      "exit_code": 1,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T08-22-46/producer-linkage.txt"
+    },
+    {
+      "name": "shared-gpio",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T08-22-46/shared-gpio.txt"
+    },
+    {
+      "name": "analog-policy",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T08-22-46/analog-policy.txt"
+    },
+    {
+      "name": "analog-and-barcode",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T08-22-46/analog-and-barcode.txt"
+    },
+    {
+      "name": "javascript-syntax",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T08-22-46/javascript-syntax.txt"
+    }
+  ]
+}

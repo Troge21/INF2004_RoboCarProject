@@ -1,0 +1,11 @@
+{
+  "offline": true,
+  "checks": [
+    {
+      "name": "producer-linkage",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-13T10-03-04/producer-linkage.txt"
+    }
+  ]
+}

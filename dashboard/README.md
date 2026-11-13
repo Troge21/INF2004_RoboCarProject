@@ -1,367 +1,200 @@
 # RoboCar Mission Control
 
-A browser dashboard for the INF2004 RoboCar project. It has three views: Overview, Sensors & motion, and Communications. It runs without npm dependencies, a cloud account, or a build step.
+Local real-MQTT dashboard for Buddy/Subsystem 1: Overview, Sensors & motion,
+Communications, charts and exports. No cloud hosting, demo feed, npm packages
+or website build step.
 
-## Run on your laptop
+## Current batch — 13 November 2026
 
-Install Node.js if it is not already available. From the project root, run:
+One current **Packed v4** contract covers distance, IR, IMU, measured wheel
+velocity/counts/net travel, controller state, faults and future path/barcode
+data. Typed scan chunks and diagnostics share the telemetry topic. The old
+v3/JSON decoders and controller beacon path are removed.
 
-```powershell
+Current stationary image:
+**build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2**
+
+Profile: **NET=lwip MQTT=1 TEST=1 APP_MODE=integrated**.
+Bytes: **723456**; SHA-256: **3a8b79c37a01cfa92615db69e62d2817795ab53ec9decae5e33c4faa19f3aaf6**.
+
+This image integrates origin/sensor with the current S1/controller.
+The user reports flashing it and confirms the servo sweeps, the three-point
+profile appears, and existing readings update. An independent capture has
+220 valid distance/pitch frames, 26 scan packets, 22 heartbeats and matching
+STATUS, with zero decode errors. Normal physical line/avoidance/STOP and
+accuracy checks remain open. The preceding 390c5893 working image and
+original failure records are preserved. Only one current UF2 is kept.
+
+**The wheel motors are disabled in this test image, but the GP12 servo
+centres at startup and sweeps when the front is blocked.** Normal mode
+keeps line following and lets the shared controller arbitrate scan/turn
+intent; the STOP latch has priority over both.
+
+The whole car uses laptop USB or a power bank, with no separate battery
+switch. TEST=1 integrated disables motor control. Normal TEST=0 can request
+motion three seconds after startup; raise both wheels before flashing or
+connecting power in that mode. Unplugging USB turns off the whole car.
+Reconnecting starts a new run and clears the STOP latch.
+
+## Start the bench
+
+1. Join the configured hotspot. For iPhone, enable Maximize Compatibility.
+   The laptop WiFi IPv4 must match ignored config/wifi_secrets.h and the
+   custom Mosquitto configuration (currently 172.20.10.2).
+2. At the repository root, start the custom broker and leave it open:
+
+~~~powershell
+& "C:\Program Files\mosquitto\mosquitto.exe" -c ".\dashboard\mosquitto.local.conf" -v
+~~~
+
+3. In another terminal:
+
+~~~powershell
 cd dashboard
 npm start
-```
+~~~
 
-Open **http://127.0.0.1:4173**. The dashboard starts disconnected, with empty charts and unavailable measurements. It displays only data received from the configured RoboCar MQTT topics. All assets are local. Stop the server with Ctrl+C.
+Use **node server.mjs** if PowerShell blocks npm.ps1. Open
+**http://127.0.0.1:4173**. Refresh after website changes.
 
-`node server.mjs` is equivalent to `npm start` if PowerShell prevents running npm.ps1.
+4. Flash the current stationary UF2 through BOOTSEL. Let it restart and keep
+   USB connected. Click Connect robot using:
 
-## Restart the real-car bench on Windows
-
-The flashed firmware remains on the Pico after power-off. Rebuild/reflash only
-after changing firmware or its WiFi/broker settings.
-
-1. Connect the laptop to the car's configured WiFi. For the iPhone hotspot,
-   keep **Maximize Compatibility** enabled. Run `ipconfig`: the WiFi IPv4
-   must match `MQTT_BROKER_IP` in `config/wifi_secrets.h` and the car-facing
-   listener address in `dashboard/mosquitto.local.conf` (currently `172.20.10.2`).
-2. In a Windows PowerShell terminal at the **repository root**, run:
-
-   ```powershell
-   & "C:\Program Files\mosquitto\mosquitto.exe" -c ".\dashboard\mosquitto.local.conf" -v
-   ```
-
-   Leave it open. This broker listens on the WiFi address at port 1883 and on
-   `127.0.0.1:9001` for the browser. The separate default Windows service on
-   `127.0.0.1:1883` is not the bench broker.
-3. In a second terminal at the repository root, run `cd dashboard`, then
-   `npm start` (or `node server.mjs`). Skip this if the dashboard server is
-   already running. Leave it open.
-4. Power the Pico normally, **without BOOTSEL**. Open
-   **http://127.0.0.1:4173**, click **Connect robot**, and use the connection
-   settings below. For the local bench, use `ws://127.0.0.1:9001` and leave
-   broker username/password empty. Packed v3 is fixed automatically; there
-   is no decoder selector.
-
-An optional PowerShell diagnostic subscriber is:
-
-```powershell
-& "C:\Program Files\mosquitto\mosquitto_sub.exe" -h 172.20.10.2 -p 1883 -t "mtk3smp-pico/#" -v
-```
-
-It waits silently when no messages arrive. It is not needed by the dashboard.
-Use the same WiFi address as the car-facing listener, rather than the separate
-broker on `127.0.0.1:1883`. Stop each foreground server/subscriber with Ctrl+C.
-
-## Rebuild firmware after pulling changes
-
-From an Ubuntu/WSL terminal at the repository root (the SDK path below is
-this laptop's existing installation):
-
-```sh
-make -B -C build_make PICO_SDK_PATH=/opt/robocar/pico-sdk-2.2.0 NET=lwip MQTT=1 TEST=1 -j8
-```
-
-Flash only `build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2`.
-`-B` recompiles all objects, including newly pulled files, and avoids reusing
-objects from another build profile. `TEST=1` is the current stationary
-sensor/communication build: it deliberately disables automatic driving.
-Pulling Git source alone does not update the Pico or the existing UF2.
-
-## Features
-
-- Overview: latest readings, two wheel-speed traces, obstacle-distance history, robot status, digital IR indicators, faults and activity feed.
-- Sensors & motion: wheel speed, ultrasonic distance, live IMU pitch/status, hump estimates and their speed assumption, run maximum, cumulative distance, IR readings and a servo scan profile.
-- Communications: delivery intervals, heartbeat age, subscriptions, payload sizes, sequence gaps, rejected messages, decoded/raw packet inspector and recent messages.
-- Last 30 / 60 / 120 seconds, chart hover values, pause display while continuing collection, and CSV export of received telemetry with `source=mqtt`.
-- **Request status** sends a read-only binary request to the Pico and confirms its matching reply. **Stop stays disabled** pending controller integration. STATUS does not control motors or change sensor algorithms.
-- Missing fields show unavailable. Invalid ultrasonic readings produce gaps, rather than zero or clear space. Live current values become unavailable after 2 seconds without telemetry; historical charts remain visible.
-- Memory is bounded to 600 telemetry samples, 30 packets and 80 events. Nothing is saved to browser storage. Exports contain telemetry, not broker credentials.
-
-## Connect to the current firmware
-
-The Pico firmware uses MQTT over TCP. A browser uses MQTT over **WebSockets**, so the broker needs an additional WebSocket listener. Both listeners belong to the same broker; the Pico continues using its existing TCP port.
-
-For an isolated local bench broker, a Mosquitto configuration can contain the following. Adapt binding addresses and your existing authentication configuration to your setup; do not replace a working broker configuration blindly.
-
-```conf
-# Existing Pico-facing listener; use your laptop's actual LAN address.
-listener 1883 <LAPTOP_LAN_IP>
-protocol mqtt
-
-# Browser on this same laptop only.
-listener 9001 127.0.0.1
-protocol websockets
-
-# Local development only. Keep this bench broker on a trusted network.
-allow_anonymous true
-```
-
-Use the locally served dashboard, click **Connect robot**, and enter:
-
-| Setting | Default |
+| Setting | Value |
 | --- | --- |
-| Broker URL | `ws://localhost:9001` |
-| Telemetry topic | `mtk3smp-pico/telemetry` |
-| Heartbeat topic | `mtk3smp-pico/heartbeat` |
-| STATUS command topic | `mtk3smp-pico/command` |
-| STATUS reply topic | `mtk3smp-pico/status` |
-| Telemetry format | Packed v3, fixed automatically (11 bytes) |
+| Broker | ws://127.0.0.1:9001 |
+| Telemetry | mtk3smp-pico/telemetry |
+| Heartbeat | mtk3smp-pico/heartbeat |
+| Commands | mtk3smp-pico/command |
+| Status replies | mtk3smp-pico/status |
+| Credentials | Empty for the local bench |
 
-These topics match `config/wifi_secrets.example.h`. Change them if your firmware overrides the client ID/topics. The dashboard does not read your secrets file. Username/password, if supplied, are held only in tab memory for reconnects; input fields are cleared when the settings close. Disconnect using **Disconnect** in the connection settings.
+Both listeners belong to the same custom broker: car TCP on WiFi:1883 and
+browser WebSocket on 127.0.0.1:9001. The default Windows service on
+localhost:1883 is separate. All four topic names must be distinct; the
+browser waits for all three subscription acknowledgements.
 
-Build/flash the WiFi/MQTT firmware (`NET=lwip MQTT=1 TEST=1` for stationary
-bench testing; normal driving is disabled). The new IMU build publishes
-**11-byte packed v3 telemetry** and **five-byte binary heartbeats** on the
-same topics. Flash `build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2`.
-This is the single current UF2; the identical `_imu` alias and obsolete
-firmware variants were removed on 6 November at the user's request.
-The dashboard now accepts only the current 11-byte telemetry and five-byte
-binary heartbeats. There is no decoder selector. Reflash the current UF2
-before using this dashboard if the car still runs older six-byte/JSON firmware.
-After pulling website changes, refresh the browser so it loads the new scripts.
+STATUS clock synchronization is automatic and read-only. Measurements wait
+for a matching Pico clock/session reply; stale buffered frames are rejected.
+User STATUS and STOP requests retain correlation IDs, bounded waits and no
+automatic actuator retry. Credentials stay in tab memory and are not exported.
 
-V3 adds live pitch, IMU state, last accepted hump and run maximum to the
-unchanged distance/IR prefix. The dashboard shows a Vehicle pitch graph and
-IMU & height status under Sensors & motion. Heights use nominal 150 mm/s
-until encoder speed is supplied; their accuracy remains unverified. Zero
-height codes mean no accepted hump yet, not a measured zero. Missing/faulted
-or stale pitch is unavailable. See the [IMU integration and test guide](../testing/subsystem1/IMU_TELEMETRY.md).
+## Measurements and missing producers
 
-For sequence 1, 451 mm, left black/right background, pitch +15.0 degrees,
-last accepted height 12 mm, maximum 34 mm and monitoring at nominal speed:
-
-```text
-01 00 00 00 c3 e1 1b 64 88 14 00
-```
-
-Distance code zero still means unavailable, not a measured 0 mm. IR validity
-is independent. Wheel speed and other future measurements remain unavailable.
-Obsolete v1/v2/JSON telemetry and text heartbeats are rejected with a clear
-current-firmware message; no compatibility decoder remains.
-
-Only a successful MQTT connection **and all three accepted subscriptions** count
-as broker connected. Robot presence is inferred separately from fresh
-messages. Retained packets are rejected. Duplicate/backward sequences are
-rejected, wraparound is supported, and a decreasing heartbeat counter resets
-the sequence baseline after a possible robot reboot. The decoded inspector
-shows readable measurements/counters; **Raw bytes** shows hexadecimal.
-
-The user reported functional v2 passes for distance/IR, stale readings,
-normal laptop restart and power-bank restart. See the [bench observation](../testing/subsystem1/logs/2026-11-06-cr1-user-bench-observation.md).
-On 10 November the user confirmed the apparent failure was a setup issue
-and the system works as intended. The UF2 was then rebuilt from the pulled
-barcode/line updates plus the current IMU code. The new rebuild has not been
-flashed by the agent. Hardware accuracy and the exact running revision were
-not independently captured.
-Packet timing, outage recovery and height accuracy remain unmeasured.
-
-### Left/right line sensor labels and field
-
-The dashboard names the inputs by their current roles:
-
-| Dashboard name | Pico GPIO | Existing firmware name |
-| --- | --- | --- |
-| Barcode IR | GP26 | Left/barcode input |
-| Left IR | GP6 | Centre line input (`S3_IR_CENTRE_PIN`) |
-| Right IR | GP16 | Right line input (`S3_IR_RIGHT_PIN`) |
-
-This is a display-name mapping. GPIO assignments, steering behavior and
-MQTT bits are unchanged. Existing firmware/test references to centre/right
-still refer to the GP6/GP16 pair, displayed as left/right on the dashboard.
-
-`line_bits` packs three logical bits: bit 2 = snapshot valid, bit 1 = left
-line IR (GP6) detects black, bit 0 = right line IR (GP16) detects black.
-It occupies bits 12..14 of the distance/IR word. In the decoded message
-inspector it appears as the following readable integer:
-
-| Value | Left IR (GP6) | Right IR (GP16) | Meaning |
-| --- | --- | --- | --- |
-| `0` | Unavailable | Unavailable | Missing, busy, invalid or stale snapshot |
-| `4` | Background | Background | Valid all-background reading |
-| `5` | Background | Black line | Right detects black |
-| `6` | Black line | Background | Left line IR detects black |
-| `7` | Black line | Black line | Both detect black |
-
-Other values are rejected. S1 reads `subsystem3_get_line()` without waiting;
-S3 retains ownership of the GPIO pins and its snapshot semaphore. S1 checks
-the source timestamp against `APP_IR_MAX_AGE_MS` (100 ms) when gathering and
-again when serializing for MQTT. Queued IR can expire without discarding a
-still-fresh ultrasonic reading. IR timestamps are local freshness metadata,
-not synchronized laptop timestamps. The dashboard displays sampled IR states
-at the telemetry rate, approximately twice a second, rather than every 20 ms
-sensor update. All current readings become unavailable on disconnect or after
-2 seconds without fresh telemetry; received history remains available.
-
-The **GP26 input is reserved for barcode capture**, not included in line
-bits. Overview shows L/R only; Sensors & motion labels the inputs Barcode IR,
-Left IR and Right IR. Unknown readings display `?`, distinct from measured
-background. CSV exports include `ir_left` (GP6, formerly named `ir_centre`)
-and `ir_right` (GP16); unavailable values are blank. Snapshot validity does
-not independently detect a disconnected or miswired digital sensor.
-
-For the physical bench check, flash the updated UF2 and test all four
-left/right line IR black/background combinations against values 4, 5, 6, 7 above.
-Then disconnect the car and verify both live indicators become unavailable.
-Do not mark this test passed until the real hardware behavior is observed.
-
-## Current measurement fields
-
-| Decoded field | Meaning |
+| Data | Current source / readiness |
 | --- | --- |
-| `sequence` | 32-bit sample counter |
-| `obstacle_mm`, `obstacle_valid` | 20..4000 mm; unavailable is null/false |
-| `line_bits`, `ir` | Left GP6/right GP16 line states; GP26 remains barcode-only |
-| `pitch_deg` | Fresh calibrated IMU angle, degrees; null if unavailable |
-| `imu_state`, `imu_flags` | Sensor/calibration/hump status, separate from vehicle state |
-| `imu_speed_source` | Nominal 150 mm/s or externally supplied speed |
-| `hump_mm`, `max_hump_mm` | Last accepted estimate and run maximum; 6..80 mm or null |
+| Distance, left/right IR, pitch and hump estimates | Existing protected S5/S3/S4 snapshots |
+| Wheel speeds, encoder counts, net travel, motor mode/reason | Existing measured S2 feedback; available in normal mode |
+| Controller state / STOP latch | Actual protected controller publication |
+| Faults | Fresh known/active reports; incomplete coverage is not global all-clear |
+| Barcode / navigation intent | Transport/display ready; S3 passive snapshot getter pending |
+| Total distance travelled | Transport/display ready; S2 actual path getter pending |
+| Completed servo scan | S5 protected three-angle profile; 30/right, 90/centre, 150/left degrees |
+| Heap / resources | Read-only allocator snapshot, sampled minimum, requested app stacks |
+| Stack high-water | Unavailable until actual platform instrumentation supplies it |
 
-Wheel speed, travelled distance, vehicle state, barcode navigation and servo
-scan panels remain unavailable until real data is integrated. The latest
-barcode improvements are included in the firmware, but barcode results are
-still reported through the existing S3/controller interface and console;
-S1 does not consume another task's result queue to fill a graph.
+In stationary mode the S2 motor/encoder task is disabled, so its measurements
+remain unavailable. PWM duty and nominal speed are never shown as measured
+wheel velocity. Signed net travel can decrease in reverse and is displayed
+separately from total travelled path length.
 
-Add future fields by agreeing their ranges and updating this one binary
-contract in firmware and JavaScript together. There is no JSON fallback.
+S4 still uses its nominal 150 mm/s input unless its owner supplies measured
+speed. One-wheel/curb detection and height accuracy remain Buddy 4 work.
+Missing measurements are null, not fabricated zeroes. A valid accepted
+packet can contain unavailable measurements. Validity does not prove wiring
+or sensor calibration.
 
-## Current compact telemetry contract
+The owner-facing plug-in contract is [Producer handoff](../testing/subsystem1/PRODUCER_HANDOFF.md).
+An owner's strong nonblocking getter replaces an unavailable weak default;
+S1 and the browser need no further edits within the documented ranges.
+No barcode event queue is consumed by S1.
 
-The implemented v3 frame preserves the six-byte v2 prefix: sequence:32,
-distance:12 (zero unavailable), line:3 and marker:1. It appends five bytes
-with pitch:11, last height:7, maximum:7, S4 state:3, flags:6 and six reserved
-zero bits. Total: **11 bytes**. Explicit little-endian operations define the
-layout. See [the current bit table, storage comparison and test evidence](../testing/subsystem1/IMU_TELEMETRY.md).
+## Wiring and IR checks
 
-The heartbeat remains `80` followed by a four-byte little-endian counter.
-Its marker distinguishes binary from old ASCII `hb N`. The dashboard accepts only this current contract. Earlier decoder functions
-and format-selection controls have been removed.
-
-The [original Change Requirement 1 report](../testing/subsystem1/CHANGE_REQUIREMENT_1.md)
-records the earlier like-for-like JSON-to-v2 conversion (example 69 to 6
-bytes, queue storage 192 to 144 bytes). The added IMU fields/source timestamps
-bring the current queue request to 192 bytes and linked static RAM to 82764
-bytes. These are feature costs; peak heap/stack use is still unmeasured.
-
-Other subsystem/controller data, actuator commands and physical timing evidence
-remain group work. S4 retains sensor ownership; the new snapshot handoff and
-API changes need S4 owner review before team merge.
-
-## Request STATUS
-
-After flashing the current UF2, refresh this page, reconnect and click
-**Request status** in Overview or Communications. The note should say
-**Pico STATUS reply confirmed** with a measured request/reply time. Below it,
-the last reply shows Pico boot uptime, normal/stationary-test build mode and
-sensor sample age. It remains a last-response record, not a live controller state.
-
-The Pico subscribes to `/command`; the browser subscribes to telemetry,
-heartbeat and `/status`. All four configured topic names must be distinct.
-A broker connection alone does not prove that the Pico accepted a request;
-only its matching reply confirms that path.
-
-| Packet | Binary contract |
+| Role | GPIO |
 | --- | --- |
-| STATUS request, 5 bytes | `a0` + nonzero uint32 request ID, little endian |
-| Reply header, 11 bytes | `a1` + echoed ID:32 + boot uptime milliseconds:32 + source age:11 / test-build:1 / reserved-zero:4 |
-| Optional reply snapshot, 11 bytes | Current telemetry frame appended when source age is 0..2000 ms; total reply length 22 bytes |
-| No recent telemetry | Age code 2047 and header only (11 bytes); measurements unavailable |
+| Barcode AO, reserved | GP28 / ADC2 |
+| Left IR (firmware centre) | GP27 / ADC1 |
+| Right IR | GP26 / ADC0 |
+| Left encoder A/B | GP16 / GP17 |
+| Right encoder A/B | GP0 / GP1 |
+| Left / right motors | GP8/9 / GP10/11 |
+| Ultrasonic TRIG/ECHO | GP4/GP5 |
+| IMU SDA/SCL | GP2/GP3 |
+| Servo scan | GP12, PWM slice 6 |
 
-IDs and uptime retain their full 32-bit ranges. Source age plus unavailable
-has 2002 possible states and uses 11 bits; build mode uses one bit. Snapshot
-presence is derived from age without an extra boolean. Fixed framing markers
-are metadata; no ASCII command names or JSON are transmitted.
+Line bits: 4 white/white, 5 white/black, 6 black/white, 7 black/black,
+0 unavailable. IR/pitch expire independently at 100 ms on the Pico.
+Both white and both black request forward motion in normal mode; white
+is not a motor-stop condition. The old digital barcode sampler is inactive.
 
-The network task alone receives/dispatches STATUS and publishes its reply.
-It holds one five-byte request slot, rate limits accepted requests to one per
-250 ms and retries command subscriptions after failure. It queries the existing
-network-owned sensor cache, rechecking all source freshness. No driver reads,
-new task, kernel queue or actuator interface is introduced. Cache presence is
-derived from its existing frame marker. Receive length/flags share one byte.
-Boot uptime uses `tk_get_otm`; existing sensor timestamps remain in their
-shared `tk_get_tim` time domain for valid age differences.
+## Servo scan and obstacle integration
 
-The browser permits one pending request, uses a fresh correlation ID and
-waits three seconds. Unmatched, late or retained replies are ignored; a
-connection change cancels the request and does not resend it. A STATUS
-snapshot never replaces the live stream or resets its sequence/history.
-The browser's measured round trip is not a WiFi-recovery measurement.
+Bring a target to **250 mm or closer in front** to trigger a scan. S5 samples
+left/right, returns the head to centre and publishes a completed three-point
+profile. Under Sensors & motion, the scan plot should update at angles
+30/90/150 and its CSV export should contain those points. Invalid echoes
+remain gaps. Angles are servo commands; physical orientation/calibration
+still needs the bench check. A clear centre alone does not trigger a profile.
 
-Publish requests with QoS 0 and retain off. STATUS is intentionally read-only
-and repeatable: the stock Pico lwIP incoming callback does not expose the
-retained flag, so firmware does not claim retained-command rejection. An old
-request can only produce an unmatched read-only reply. Actuator commands
-require a separate controller-owned design before enabling STOP.
+In normal mode, a clear front uses the existing IR line targets. Scanning
+requests zero wheels; a clear side permits a brief controller-owned turn.
+Blocked/invalid range, missing/busy/stale navigation and STOP inhibit motion.
+S5 never calls the motor API. The front-distance tile uses centre samples,
+not the left/right echoes. Servo sensing can continue while STOP is latched.
 
-The user confirmed the website button works. The final real-Pico check
-returned its matching reply in 29 ms while five telemetry samples and a
-heartbeat arrived. This is one functional check, not a worst-case timing or
-recovery guarantee. See the [S1 test log](../testing/subsystem1/TEST_LOG.md).
+See [the integration and evidence](../testing/subsystem1/SENSOR_INTEGRATION.md)
+and [the physical checklist](../testing/subsystem1/FINAL_ACCEPTANCE.md).
+This uses the existing v4 decoder, topics and scan fields.
 
-## Validation
+## Binary messages
 
-### WiFi and broker recovery bench
+| Message | Bytes |
+| --- | ---: |
+| Main telemetry, b4 | 46 |
+| Completed scan chunk, b5 | 19..56 |
+| Diagnostics, b6 | 40 |
+| Heartbeat, 80 | 5 |
+| STATUS request / reply | 5 / 16 or 62 |
+| STOP request / result | 13 / 11 |
 
-The earlier recovery UF2 included WiFi DOWN/failure retries and MQTT
-backoff/session cleanup. On 10 November the user reported flashing it; five actual broker
-restarts then restored telemetry, heartbeat and STATUS without a detected
-Pico reboot. Recovery bounds were 3.318..5.811 s, measured from a marker
-before broker restart. Some post-recovery delivery intervals exceeded the
-earlier 2 s/5 s targets. Five later hotspot trials did not meet the 15 s
-design target: three correlated recoveries at 15.572, 18.015 and 20.484 s;
-two incomplete within 30 s. See the S1 test log for exact results.
+Generation uptime, session, independent source freshness and unknown
+sentinels are part of the current contract. Heartbeat is nominally every
+4 seconds; main telemetry every 400 ms. These schedules do not establish
+received timing guarantees. See [the bit table](../testing/subsystem1/S1_COMPLETION_BATCH.md).
 
-The current replacement UF2 adds a five-second MQTT keepalive (previously
-60 s) and a five-second pending connection deadline using the existing
-retry timer. **The user reports flashing it; a one-minute normal baseline is
-observed. Later hotspot captures included four recoveries in a complete
-five-trial run, but the user then clarified that the intended UF2 had not
-been flashed. Their earlier running-image identity is unconfirmed.**
-SHA-256: `9c5ac8f0876055939f2cc4049a22e3ca9285b38ccccd889096bd801dafc2a7a0`.
-The five-second application heartbeat and all packet formats are unchanged.
-The baseline received 118 telemetry messages, 13 heartbeats and three matching
-STATUS replies without a Pico MQTT restart. It still observed maximum intervals
-of 2.007 s telemetry and 6.362 s heartbeat, so the earlier strict interval
-targets remain open. No new flash is needed before the next hotspot retest.
-The user has now explicitly confirmed flashing the current file. A new
-20-second check received 37 telemetry messages, three heartbeats and STATUS
-in 81 ms; USB communication also returned. No source change/new image was
-needed in that review. A clean hotspot series after this confirmed flash
-remains required; earlier local-file hashes are not flash readback.
-Current linked static RAM is 82612 bytes, versus 82604 for STATUS alone;
-S1 queue requests remain 192 bytes. Runtime heap/stack peaks are unmeasured.
+Charts retain received history. Current measurements expire after two
+seconds without sufficiently fresh telemetry. Completed scans are explicitly
+historical profiles. Telemetry CSV, scan CSV and evidence JSON contain actual
+received data, no credentials. Histories are bounded to 600 telemetry rows,
+120 resource rows, 30 inspector packets, 80 events and one 181-point profile.
+Sampled heap minimum is not an exact allocation peak; stack reservations
+exclude kernel/radio stacks and are not stack high-water.
 
-Follow [the recovery test guide](../testing/subsystem1/RECOVERY_TESTS.md)
-when the car is available. It covers five broker trials and five separate
-hotspot trials, a real-data baseline, JSON evidence and timing limitations.
-The recorder uses direct TCP independently of browser WebSocket recovery;
-it sends only read-only STATUS requests and never changes services itself.
+## Build and final validation
 
-From the repository root, after flashing and starting the real bench:
+~~~sh
+make -B -C build_make PICO_SDK_PATH=/opt/robocar/pico-sdk-2.2.0 NET=lwip MQTT=1 TEST=1 APP_MODE=integrated -j8
+~~~
 
-```powershell
-node testing/subsystem1/recovery_probe.mjs --kind broker
-# Run separately after the broker series:
-node testing/subsystem1/recovery_probe.mjs --kind wifi
-```
+For a raised-wheel normal motor phase use TEST=0 instead. Standalone IR and
+powered encoder diagnostics require explicit APP_MODE=ir or
+TEST=1 APP_MODE=encoder. TEST=1 alone never enables that powered bench.
+Keep USB CDC / CRASH_REPORT=0 because GP0/GP1 belong to the encoder.
 
-Read the guide before using `loss` / `restore`. No live test starts without
-fresh telemetry, heartbeat and a matching Pico STATUS reply. The restoration
-marker must be entered before restoring the service; its timing is a
-conservative end-to-end bound, not isolated Pico association time.
+Run the offline consolidated checks from the root:
 
-Firmware checks source freshness before serialization. Browser current-value
-expiry is based on receipt time; v3 carries no sample-generation timestamp.
-It cannot independently detect delay already spent inside TCP/radio buffers.
-Post-outage bursts of old queued packets do not demonstrate normal sensor
-cadence; use a new matching STATUS and sustained delivery when checking recovery.
+~~~powershell
+& "C:\msys64\ucrt64\bin\python.exe" testing/subsystem1/run_batch_checks.py
+~~~
 
-### Software checks
+After building, run the ARM stack-budget guard from WSL at the root:
 
-```powershell
-npm test
-```
+~~~sh
+python3 testing/subsystem1/test_s1_stack_frames.py
+~~~
 
-The Node tests cover the current binary contract, no-echo handling, malformed/obsolete formats, independent golden vectors, IMU fault isolation, sequence wrap/replay/reboot handling, bounded buffers, MQTT fragmentation, retained packets and subscription readiness. See [the 10 November update record](../testing/subsystem1/TEST_LOG.md).
-
-Bench checks still required for packed v3: live pitch and sensor-state behavior, repeat distance/IR and unavailable-state checks, normal cold boot/power-bank restart, broker outage/recovery, timing trials, full-team sensor integration, and the final binary firmware schema. Reconnection figures in the browser measure browser socket/subscription recovery, not the Pico's WiFi restoration requirement. Runtime heap/stack RAM remains unmeasured; linked static RAM and queue-buffer comparisons are in the implementation report.
+Remaining hardware checks are in [one combined final session](../testing/subsystem1/FINAL_ACCEPTANCE.md).
+No offline test establishes current-image physical accuracy, recovery,
+stopping time or runtime peaks. Earlier observations and failures remain in
+[the test log](../testing/subsystem1/TEST_LOG.md).

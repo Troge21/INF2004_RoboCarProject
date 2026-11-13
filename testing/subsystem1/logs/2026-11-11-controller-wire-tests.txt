@@ -1,0 +1,4 @@
+PASS: 19914 distance/IR and 4083 IMU current-format C telemetry frames decoded and MQTT-framed byte-for-byte; 3 C heartbeats decoded.
+C constructor also rejected all 114 reserved distance codes. This is offline contract evidence, not a hardware timing trial.
+PASS: 3 C STATUS requests match JS encoding; 24 C STATUS replies decode and preserve MQTT bytes.
+PASS: 147 C controller/session/STOP boundary vectors match JavaScript and MQTT framing; fault states never encode successful STOP.

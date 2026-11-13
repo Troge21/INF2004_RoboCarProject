@@ -1,0 +1,271 @@
+{
+  "date_local": "2026-11-11",
+  "timezone": "Asia/Kuala_Lumpur",
+  "source_capture": "2026-11-11T06-09-18-051Z-wifi-recovery.json",
+  "source_sha256": "38e8486a8414a8d783f6b7bf28bf102faba362a65845a6f1f5f1f1d0b2c489c3",
+  "git_head_at_review": "b11c682808c3e82caae907fba0d1ef5c3c69311c",
+  "local_uf2_sha256": "9c5ac8f0876055939f2cc4049a22e3ca9285b38ccccd889096bd801dafc2a7a0",
+  "probe_sha256": "0ba128ad62de87c65b5dc100f6f065f6371c07bf4acd49e3e5fd0aaedfb194ff",
+  "image_note": "Series follows explicit user flash confirmation. Recorder fingerprints local files; no independent flash readback.",
+  "recorded_trials": 5,
+  "functional_recoveries": 5,
+  "within_15s": 5,
+  "criterion": "Earlier design/test target: restoration within 15 s in at least four of five trials, not a numeric requirement stated in Project Write-up.pdf.",
+  "recovery_target_met": true,
+  "bounds_ms": [
+    8511,
+    7922,
+    8913,
+    9242,
+    8688
+  ],
+  "series_uptime_continuity": {
+    "compatible": true,
+    "delta_ms": 245660,
+    "elapsed_between_received_status_ms": 245691
+  },
+  "strict_telemetry_interval_windows_met": 4,
+  "strict_heartbeat_interval_windows_met": 3,
+  "maximum_observed_telemetry_interval_ms": 2080,
+  "maximum_observed_heartbeat_interval_ms": 5086,
+  "limitation": "Operator restore marker precedes AP restoration; timings include human, laptop association, observer and Pico recovery. First new telemetry receipt is not independently source-timestamped. Fresh matched STATUS confirms recent communication. Short post-recovery windows do not establish long-run cadence.",
+  "pretrial_rejected_baselines": [
+    {
+      "at_ms": 183896,
+      "message": "Baseline rejected: need fresh real data and stationary TEST=1 firmware."
+    }
+  ],
+  "scope": "This series passes its recovery design criterion; earlier failed/unconfirmed captures, delivery-interval targets, controller commands and peak runtime RAM remain separate.",
+  "trials": [
+    {
+      "number": 1,
+      "baseline": {
+        "at_ms": 50658,
+        "round_trip_ms": 74,
+        "uptime_ms": 162670,
+        "sample_age_ms": 380,
+        "test_build": true
+      },
+      "status": {
+        "at_ms": 79067,
+        "round_trip_ms": 131,
+        "uptime_ms": 191050,
+        "sample_age_ms": 200,
+        "test_build": true
+      },
+      "telemetry_count": 20,
+      "heartbeat_count": 2,
+      "outage_observed_ms": 58009,
+      "restore_marker_ms": 70387,
+      "end_ms": 88793,
+      "result": {
+        "functional_recovery": true,
+        "uptime_continuous": true,
+        "uptime_delta_ms": 28380,
+        "expected_uptime_delta_ms": {
+          "min": 26278,
+          "max": 30483
+        },
+        "recovery_upper_bound_ms": 8511,
+        "telemetry_intervals": {
+          "count": 19,
+          "min_ms": 0,
+          "max_ms": 2080
+        },
+        "heartbeat_intervals": {
+          "count": 1,
+          "min_ms": 4997,
+          "max_ms": 4997
+        },
+        "within_conservative_15s_target": true,
+        "timing_anchor": "Operator marker BEFORE restoring service; includes human, service-start and observer delays. Not isolated Pico WiFi time."
+      },
+      "telemetry_interval_target_met": false,
+      "heartbeat_interval_target_met": true
+    },
+    {
+      "number": 2,
+      "baseline": {
+        "at_ms": 97397,
+        "round_trip_ms": 63,
+        "uptime_ms": 209390,
+        "sample_age_ms": 180,
+        "test_build": true
+      },
+      "status": {
+        "at_ms": 124882,
+        "round_trip_ms": 23,
+        "uptime_ms": 236890,
+        "sample_age_ms": 140,
+        "test_build": true
+      },
+      "telemetry_count": 20,
+      "heartbeat_count": 2,
+      "outage_observed_ms": 104037,
+      "restore_marker_ms": 116841,
+      "end_ms": 134615,
+      "result": {
+        "functional_recovery": true,
+        "uptime_continuous": true,
+        "uptime_delta_ms": 27500,
+        "expected_uptime_delta_ms": {
+          "min": 25462,
+          "max": 29548
+        },
+        "recovery_upper_bound_ms": 7922,
+        "telemetry_intervals": {
+          "count": 19,
+          "min_ms": 484,
+          "max_ms": 539
+        },
+        "heartbeat_intervals": {
+          "count": 1,
+          "min_ms": 4987,
+          "max_ms": 4987
+        },
+        "within_conservative_15s_target": true,
+        "timing_anchor": "Operator marker BEFORE restoring service; includes human, service-start and observer delays. Not isolated Pico WiFi time."
+      },
+      "telemetry_interval_target_met": true,
+      "heartbeat_interval_target_met": true
+    },
+    {
+      "number": 3,
+      "baseline": {
+        "at_ms": 140253,
+        "round_trip_ms": 110,
+        "uptime_ms": 252170,
+        "sample_age_ms": 120,
+        "test_build": true
+      },
+      "status": {
+        "at_ms": 168177,
+        "round_trip_ms": 20,
+        "uptime_ms": 280190,
+        "sample_age_ms": 90,
+        "test_build": true
+      },
+      "telemetry_count": 19,
+      "heartbeat_count": 2,
+      "outage_observed_ms": 143638,
+      "restore_marker_ms": 159184,
+      "end_ms": 177744,
+      "result": {
+        "functional_recovery": true,
+        "uptime_continuous": true,
+        "uptime_delta_ms": 28020,
+        "expected_uptime_delta_ms": {
+          "min": 25904,
+          "max": 30034
+        },
+        "recovery_upper_bound_ms": 8913,
+        "telemetry_intervals": {
+          "count": 18,
+          "min_ms": 473,
+          "max_ms": 546
+        },
+        "heartbeat_intervals": {
+          "count": 1,
+          "min_ms": 5020,
+          "max_ms": 5020
+        },
+        "within_conservative_15s_target": true,
+        "timing_anchor": "Operator marker BEFORE restoring service; includes human, service-start and observer delays. Not isolated Pico WiFi time."
+      },
+      "telemetry_interval_target_met": true,
+      "heartbeat_interval_target_met": false
+    },
+    {
+      "number": 4,
+      "baseline": {
+        "at_ms": 226779,
+        "round_trip_ms": 19,
+        "uptime_ms": 338790,
+        "sample_age_ms": 40,
+        "test_build": true
+      },
+      "status": {
+        "at_ms": 253835,
+        "round_trip_ms": 18,
+        "uptime_ms": 365850,
+        "sample_age_ms": 70,
+        "test_build": true
+      },
+      "telemetry_count": 20,
+      "heartbeat_count": 2,
+      "outage_observed_ms": 233964,
+      "restore_marker_ms": 244534,
+      "end_ms": 263638,
+      "result": {
+        "functional_recovery": true,
+        "uptime_continuous": true,
+        "uptime_delta_ms": 27060,
+        "expected_uptime_delta_ms": {
+          "min": 25038,
+          "max": 29075
+        },
+        "recovery_upper_bound_ms": 9242,
+        "telemetry_intervals": {
+          "count": 19,
+          "min_ms": 425,
+          "max_ms": 599
+        },
+        "heartbeat_intervals": {
+          "count": 1,
+          "min_ms": 5086,
+          "max_ms": 5086
+        },
+        "within_conservative_15s_target": true,
+        "timing_anchor": "Operator marker BEFORE restoring service; includes human, service-start and observer delays. Not isolated Pico WiFi time."
+      },
+      "telemetry_interval_target_met": true,
+      "heartbeat_interval_target_met": false
+    },
+    {
+      "number": 5,
+      "baseline": {
+        "at_ms": 268675,
+        "round_trip_ms": 270,
+        "uptime_ms": 380550,
+        "sample_age_ms": 490,
+        "test_build": true
+      },
+      "status": {
+        "at_ms": 296349,
+        "round_trip_ms": 159,
+        "uptime_ms": 408330,
+        "sample_age_ms": 220,
+        "test_build": true
+      },
+      "telemetry_count": 20,
+      "heartbeat_count": 2,
+      "outage_observed_ms": 274777,
+      "restore_marker_ms": 287435,
+      "end_ms": 305838,
+      "result": {
+        "functional_recovery": true,
+        "uptime_continuous": true,
+        "uptime_delta_ms": 27780,
+        "expected_uptime_delta_ms": {
+          "min": 25515,
+          "max": 29944
+        },
+        "recovery_upper_bound_ms": 8688,
+        "telemetry_intervals": {
+          "count": 19,
+          "min_ms": 426,
+          "max_ms": 592
+        },
+        "heartbeat_intervals": {
+          "count": 1,
+          "min_ms": 4992,
+          "max_ms": 4992
+        },
+        "within_conservative_15s_target": true,
+        "timing_anchor": "Operator marker BEFORE restoring service; includes human, service-start and observer delays. Not isolated Pico WiFi time."
+      },
+      "telemetry_interval_target_met": true,
+      "heartbeat_interval_target_met": true
+    }
+  ]
+}

@@ -93,7 +93,10 @@ EXPORT void knl_hard_fault_report(void)
 	}
 	/* Report the processor too: a faulting core halts below while the other
 	   keeps running, so without it the log reads as if nothing happened. */
-	tm_printf((UB*)"*** Hard fault ***  prc:%d ctxtsk:%d\n",
+	/* Print the captured location before optional scheduler diagnostics:
+	 * another damaged structure or stack may prevent later lines. */
+	tm_printf((UB*)"*** Hard fault *** pc=%08x lr=%08x prc:%d ctxtsk:%d\n",
+		  f == NULL ? 0U : f[6], f == NULL ? 0U : f[5],
 		  (INT)knl_current_core() + 1, ctskid);
 #if TK_SUPPORT_SMP
 	/*

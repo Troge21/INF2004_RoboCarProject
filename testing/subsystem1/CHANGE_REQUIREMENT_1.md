@@ -1,11 +1,24 @@
 # Change Requirement 1 for WiFi communication and telemetry
 
+**Historical stage report. Current contract: 13 November Packed v4.**
+Use [the current field/resource table](S1_COMPLETION_BATCH.md),
+[producer handoff](PRODUCER_HANDOFF.md) and [controller contract](CONTROLLER_COMMANDS.md).
+Descriptions of v2/v3, earlier queue sizes and earlier firmware below belong
+to those recorded stages; they are not current flash instructions.
+The new main packet is 46 bytes; it adds measured motion, fault coverage,
+barcode/path readiness and generation/session metadata. Static RAM is 83196
+bytes stationary / 83356 normal, and S1 message-buffer requests are zero.
+Additional packed cache/resource costs and limitations are in the current table.
+Current-image physical tests remain deferred. The original JSON-to-v2
+69-to-6-byte comparison remains historical, not a like-for-like v4 claim.
+
+
 **Stage record:** this report describes the original JSON-to-v2 conversion.
 The subsequent v3 extension and current build are documented in
 [IMU telemetry](IMU_TELEMETRY.md); its new fields, RAM costs and pending
 hardware tests are separate from the before/after figures below.
 The current read-only STATUS contract is documented in the
-[dashboard README](../../dashboard/README.md#request-status) and latest S1
+[dashboard README](CONTROLLER_COMMANDS.md) and latest S1
 test log. The later table at the end of this report covers its packed fields.
 
 Recorded 6 November 2026. Source: the professor-provided **Change Requirement
@@ -287,7 +300,7 @@ final submission.
 
 The telemetry frame remains 11 bytes; STATUS uses separate request/reply
 messages on the command/status topics. Current implementation/evidence is
-in the [S1 test log](TEST_LOG.md) and [dashboard protocol documentation](../../dashboard/README.md#request-status).
+in the [S1 test log](TEST_LOG.md) and [dashboard protocol documentation](CONTROLLER_COMMANDS.md).
 
 | Field | Range / information | Logical bits | Representation |
 | --- | --- | ---: | --- |
@@ -346,3 +359,68 @@ Those raw runs remain preserved with unconfirmed running-image identity.
 Normal telemetry/heartbeat/STATUS/USB were observed after the confirmed flash;
 a clean recovery series for that image is still required. No representation
 or firmware source change was made in that review.
+
+**11 November update:** the clean hotspot series after explicit flash
+confirmation passed **5/5 within 15 s**, with bounds 7.922..9.242 s and fresh
+matched STATUS/compatible uptime throughout. The capture and source hashes
+are pinned in [the verified recovery summary](logs/2026-11-11-hotspot-confirmed-recovery-summary.json).
+This closes that recovery design milestone, not strict interval targets
+(latest maxima: 2.080 s telemetry, 5.086 s heartbeat), peak runtime RAM or
+other subsystem/controller conversions. Representation/linked sizes are
+unchanged; no new source or image was produced for this review.
+
+
+## Controller command/status extension — 11 November 2026
+
+The current local implementation adds compact controller state and latched
+STOP without changing the 11-byte sensor frame or five-byte heartbeat.
+STATUS now uses a 15-byte header (26 with sensor snapshot); a six-byte
+controller beacon and ten-byte STOP result share the existing status topic.
+The 13-byte STOP request retains full-width ID/session/boot deadline. No
+old STATUS decoder or ASCII command path remains.
+
+Controller state has eight values (three bits); latch and TEST each use one
+bit. Six result codes use three bits, filling the result/control byte. The
+private request slot is 12 bytes, result slot nine, publication five and
+owner state one. Slot presence derives from nonzero IDs. MQTT receive length
+uses four bits (including offline sentinel 15), alongside four one-bit
+flags in the same byte; its bounded request buffer is 13 bytes. All kernel
+handoffs are protected and nonblocking. See the exact layouts and validity
+rules in [Controller commands](CONTROLLER_COMMANDS.md).
+
+Linked stationary sizes: text 357108, data 104, bss 82576, **82680 static RAM**
+(+68 versus the prior recovery image). S1 queue requests remain 192 bytes.
+The stationary controller task now adds a 2048-byte dynamic stack plus kernel
+bookkeeping and one semaphore; normal driving already had that task. This
+feature extension does not establish a whole-device RAM saving. Runtime
+heap/stack peaks and performance evidence remain open.
+
+The tests/build passed (see [current test log](TEST_LOG.md)), including actual
+controller code in both modes, expiry/session/wrap checks, packed C/JS vectors
+and fault-isolated results. The image is **not yet flashed/physically tested**.
+Earlier recovery passes apply to their original captured image. Other group
+application-state conversions and final correctness/resource evidence remain.
+
+## AO wiring / startup integration — 12 November 2026
+
+Current S1 wire formats are unchanged. S3 now shares a nine-byte explicit
+record: three ADC readings ×12 bits, source time ×32 and valid ×1, with
+three reserved bits for byte alignment. Line pattern is derived from raw
+thresholds rather than duplicated in shared state. The old native line
+record was 12 bytes; this local record comparison does not establish a
+whole-device saving. The obsolete barcode-result queue is not allocated;
+the inactive decoder sources remain for their owner.
+
+ADC conversion UW variables are transient working buffers required by the
+kernel device API. Snapshot sharing is protected/nonblocking, includes source
+time, and rejects failed/out-of-range/slow acquisition. The public line view
+is a transient decoded API result; S1 still packs its existing three line
+bits into the same v3 frame. Current ADC raw values are not extra network
+fields. Native motion/IMU owner state and runtime peak RAM remain separate
+group work; no broader completion claim is made.
+
+Linked stationary RAM is 82596 bytes (104 data +82492 bss); checked normal
+mode is 82756. The feature and mode changes are not a like-for-like savings
+comparison. S1 queue requests remain 192 bytes. Tests/builds and the pending
+physical verification are in [the test log](TEST_LOG.md) and
+[current fingerprint](logs/2026-11-12-wiring-fingerprint.json).

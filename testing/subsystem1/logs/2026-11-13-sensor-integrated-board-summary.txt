@@ -1,0 +1,9 @@
+[CLOCK] tick=24076 timer_us=1028 cpu_wait_us=1000
+[TEST] subsystem1 v4 codec and startup clock SUMMARY 24 passed, 0 failed
+[TEST] subsystem3 software (sensor not tested) SUMMARY 5 passed, 0 failed
+[TEST] subsystem4 SUMMARY 10 passed, 0 failed
+[TEST] subsystem5 conversion (hardware not checked) SUMMARY 6 passed, 0 failed
+[S4] IMU Hump Task started (priority=18, period=20 ms, I2C1 GP2/GP3)
+[S4] GY-511 sensor detected. Entering stationary calibration...
+[S4] Calibration complete. Baseline pitch: 5.3 deg
+[S4] HUMP DETECTED! Ascent pitch: 5.4 deg (starmqtt: TX [mtk3smp-pico/heartbeat] 5 binary bytes

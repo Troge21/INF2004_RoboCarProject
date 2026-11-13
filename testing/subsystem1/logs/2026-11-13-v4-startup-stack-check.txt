@@ -1,0 +1,8 @@
+ARM -fstack-usage, actual current sources and stationary build flags:
+Collector static chain 464 / 2048 bytes.
+usermain 24; subsystem1_test 144; tm_printf 32; tm_vsprintf 96; out_cons 16.
+Known startup-test/console chain 312 / 1024 bytes. Regression passed.
+Previous subsystem1_test was 872 bytes: same known chain 1040 > 1024
+before initial-task/kernel/driver/interrupt frames. This is a definite overflow.
+Current limits: collector <=768; test function <=256; startup chain <=512.
+Actual runtime high-water remains unmeasured.
