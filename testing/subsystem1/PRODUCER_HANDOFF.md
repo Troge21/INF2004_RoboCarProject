@@ -21,7 +21,7 @@ S1 rechecks them at serialization.
 | S4 (already connected) | subsystem4_get_telemetry | Actual pitch/state/retained hump estimates; existing API |
 | S5 (already connected) | subsystem5_get_range | Protected distance/invalid echo snapshot; added in this batch |
 | S3 barcode owner | telemetry_get_barcode | Valid S3 Code39 byte, uint16 event sequence, publication timestamp; optional navigation enum |
-| S2 odometer owner | telemetry_get_travel | Actual nonnegative path length in integer mm, publication timestamp |
+| S2 (now connected) | telemetry_get_travel | Protected encoder-estimated centre path in integer mm and publication timestamp |
 | S5 (now connected) | telemetry_get_scan | Protected completed three-point profile (30/90/150), stable ID/completion time; generic capacity remains 181 |
 | Controller / fault aggregator | telemetry_get_faults | Known/active external source flags and publication timestamp |
 | Platform / resource instrumentation | telemetry_get_resources | Allocator/stack values that can actually be measured; unknown values UINT32_MAX |
@@ -42,9 +42,14 @@ actuator behavior from a character. The controller executes navigation.
 ## Distance and wheel speed
 
 S2's signed centre distance is exported as net_distance_m. It can decrease
-in reverse and is not an odometer. Until telemetry_get_travel supplies a real
-path measurement, distance_m remains unavailable. Never substitute PWM duty,
-nominal speed or abs(net distance) for measured speed/path distance.
+in reverse and is not an odometer. S2 now supplies telemetry_get_travel from
+its own protected path accumulator: sum of absolute mean signed wheel
+increments, using calibrated per-wheel geometry. Reverse adds path; equal
+opposite wheel movement has no centre translation. Zero is valid; encoder
+failure/overflow is unavailable until restart. See [motion telemetry](MOTION_TELEMETRY.md).
+Integrated TEST=1 collects passive feedback without wheel PWM, so hand-turn
+measurements are available. Never substitute PWM duty, nominal speed or
+abs(net distance) for measured speed/path distance.
 
 S1 converts the existing measured RPM using S2's own tyre diameter and
 355/113 circumference convention. Wire resolution is 0.1 mm/s, supported
@@ -94,5 +99,6 @@ unless a platform owner replaces the getter with actual instrumentation.
 Do not add stack capacities to heap usage: stacks are allocations in that heap.
 
 All source algorithms, GPIO assignments and motor/servo ownership stay with
-their respective owners. This handoff prepares transport, not their missing
-missing barcode/odometry algorithms or the deferred one-wheel IMU accuracy case.
+their respective owners. This handoff prepares transport; barcode acquisition/navigation, the external
+fault aggregate and the deferred one-wheel IMU accuracy case remain owner work.
+S2 odometry and S5 scan producers are already connected.

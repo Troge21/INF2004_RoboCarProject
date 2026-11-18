@@ -1,0 +1,113 @@
+{
+  "offline": true,
+  "checks": [
+    {
+      "name": "odometer",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-17T07-08-51/odometer.txt"
+    },
+    {
+      "name": "s5-scan-stationary",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-17T07-08-51/s5-scan-stationary.txt"
+    },
+    {
+      "name": "s5-scan-normal",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-17T07-08-51/s5-scan-normal.txt"
+    },
+    {
+      "name": "current-layout",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-17T07-08-51/current-layout.txt"
+    },
+    {
+      "name": "s1-codec-bridge",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-17T07-08-51/s1-codec-bridge.txt"
+    },
+    {
+      "name": "mqtt-port",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-17T07-08-51/mqtt-port.txt"
+    },
+    {
+      "name": "controller-normal",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-17T07-08-51/controller-normal.txt"
+    },
+    {
+      "name": "controller-stationary",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-17T07-08-51/controller-stationary.txt"
+    },
+    {
+      "name": "wire-vectors",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-17T07-08-51/wire-vectors.txt"
+    },
+    {
+      "name": "dashboard",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-17T07-08-51/dashboard.txt"
+    },
+    {
+      "name": "recovery-recorder",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-17T07-08-51/recovery-recorder.txt"
+    },
+    {
+      "name": "passive-feedback",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-17T07-08-51/passive-feedback.txt"
+    },
+    {
+      "name": "actual-motor-stop",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-17T07-08-51/actual-motor-stop.txt"
+    },
+    {
+      "name": "heap-snapshot",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-17T07-08-51/heap-snapshot.txt"
+    },
+    {
+      "name": "shared-gpio",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-17T07-08-51/shared-gpio.txt"
+    },
+    {
+      "name": "analog-policy",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-17T07-08-51/analog-policy.txt"
+    },
+    {
+      "name": "analog-and-barcode",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-17T07-08-51/analog-and-barcode.txt"
+    },
+    {
+      "name": "javascript-syntax",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-17T07-08-51/javascript-syntax.txt"
+    }
+  ]
+}

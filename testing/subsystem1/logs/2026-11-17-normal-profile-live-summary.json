@@ -1,0 +1,63 @@
+{
+  "window_seconds": 45,
+  "main_packets": 111,
+  "heartbeats": 12,
+  "scan_packets": 0,
+  "decode_errors": 0,
+  "status_round_trip_ms": [
+    527
+  ],
+  "test_build_values": [
+    false
+  ],
+  "controller_states": {
+    "Stopped": 95,
+    "Following line": 16
+  },
+  "main_intervals_ms": {
+    "count": 110,
+    "min": 151,
+    "median": 400.0,
+    "max": 688
+  },
+  "heartbeat_intervals_ms": {
+    "count": 11,
+    "min": 2857,
+    "median": 3999,
+    "max": 4225
+  },
+  "missing_main_sequences": 0,
+  "nonzero_left_speed_samples": 14,
+  "nonzero_right_speed_samples": 14,
+  "valid_range_samples": 16,
+  "controller_fault_samples": 0,
+  "first_diagnostics": {
+    "session_token": 1141228266,
+    "uptime_ms": 30350,
+    "static_ram_bytes": 84124,
+    "heap_free_bytes": 148744,
+    "largest_free_block_bytes": 148744,
+    "sampled_min_heap_free_bytes": 148744,
+    "task_stack_capacity_bytes": 12288,
+    "stack_high_water_bytes": null,
+    "publish_errors": 0,
+    "rejected_commands": 0,
+    "mqtt_connections": 1,
+    "snapshot_contention": 0
+  },
+  "last_diagnostics": {
+    "session_token": 1141228266,
+    "uptime_ms": 70350,
+    "static_ram_bytes": 84124,
+    "heap_free_bytes": 148744,
+    "largest_free_block_bytes": 148744,
+    "sampled_min_heap_free_bytes": 148744,
+    "task_stack_capacity_bytes": 12288,
+    "stack_high_water_bytes": null,
+    "publish_errors": 0,
+    "rejected_commands": 0,
+    "mqtt_connections": 1,
+    "snapshot_contention": 0
+  },
+  "limits": "Read-only transport/controller observation. Both-wheel physical rotation and stopping require user observation; no actuator command or service interruption by observer. Intermittent unavailable ultrasonic data leads controller to Stopped and is not interpreted as a transport fault."
+}

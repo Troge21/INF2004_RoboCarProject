@@ -1,0 +1,71 @@
+{
+  "offline": true,
+  "checks": [
+    {
+      "name": "current-layout",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-18T12-51-47/current-layout.txt"
+    },
+    {
+      "name": "s1-codec-bridge",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-18T12-51-47/s1-codec-bridge.txt"
+    },
+    {
+      "name": "s1-bridge-normal",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-18T12-51-47/s1-bridge-normal.txt"
+    },
+    {
+      "name": "mqtt-port",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-18T12-51-47/mqtt-port.txt"
+    },
+    {
+      "name": "controller-normal",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-18T12-51-47/controller-normal.txt"
+    },
+    {
+      "name": "controller-stationary",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-18T12-51-47/controller-stationary.txt"
+    },
+    {
+      "name": "wire-vectors",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-18T12-51-47/wire-vectors.txt"
+    },
+    {
+      "name": "dashboard",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-18T12-51-47/dashboard.txt"
+    },
+    {
+      "name": "actual-motor-stop",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-18T12-51-47/actual-motor-stop.txt"
+    },
+    {
+      "name": "heap-snapshot",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-18T12-51-47/heap-snapshot.txt"
+    },
+    {
+      "name": "javascript-syntax",
+      "passed": true,
+      "exit_code": 0,
+      "log": "testing/subsystem1/logs/s1-batch-2026-11-18T12-51-47/javascript-syntax.txt"
+    }
+  ]
+}

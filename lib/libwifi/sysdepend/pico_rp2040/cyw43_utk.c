@@ -246,6 +246,14 @@ void cyw43_utk_task(int32_t stacd, void *exinf)
                   "firmware load to the CYW43439 did not succeed)\n");
         result = -CYW43_EIO;
     } else {
+#if TM_NET_LWIP
+        /* Live supervisory telemetry prefers latency over radio sleep savings.
+         * Apply after interface setup (which restores the SDK default PM2),
+         * on the existing owner task while holding the driver lock. */
+        int pm_result = cyw43_wifi_pm(&cyw43_state, CYW43_NONE_PM);
+        if(pm_result != 0)
+            tm_printf((UB*)"wifi: low-latency power mode failed, err=%d\n", pm_result);
+#endif
         (void)cyw43_wifi_get_mac(&cyw43_state, CYW43_ITF_STA,
                                  radio_status.mac);
 #if TM_NET_LWIP

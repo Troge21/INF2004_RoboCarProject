@@ -1,0 +1,1 @@
+PASS: actual AO policy in RPM/duty modes; both-white/both-black forward, corrections, invalid zero

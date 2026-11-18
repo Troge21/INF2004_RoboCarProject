@@ -25,10 +25,12 @@ def c_case(name,source,extra=(),wire=False):
             return code,text+output
     return name,run
 cases=[
+    c_case('odometer','testing/subsystem2/test_odometry.c',[root/'app_program/subsystem2/odometry.c','-I',root/'app_program/subsystem2']),
     c_case('s5-scan-stationary','testing/subsystem1/host/test_s5_scan.c',['-DAPP_TEST=1']),
     c_case('s5-scan-normal','testing/subsystem1/host/test_s5_scan.c',['-DAPP_TEST=0']),
     c_case('current-layout','testing/subsystem1/host/measure_layout.c'),
     c_case('s1-codec-bridge','testing/subsystem1/host/test_telemetry.c'),
+    c_case('s1-bridge-normal','testing/subsystem1/host/test_telemetry.c',['-DAPP_TEST=0']),
     c_case('mqtt-port','testing/subsystem1/host/test_status_mqtt.c'),
     c_case('controller-normal','testing/subsystem1/host/test_controller.c',['-DAPP_TEST=0']),
     c_case('controller-stationary','testing/subsystem1/host/test_controller.c',['-DAPP_TEST=1']),
@@ -37,6 +39,8 @@ cases=[
 cases += [('dashboard',lambda:command([node,'--test',*sorted((root/'dashboard/tests').glob('*.test.mjs'))])),
           ('recovery-recorder',lambda:command([node,'--test',root/'testing/subsystem1/host/recovery_probe.test.mjs']))]
 for name,path in [
+    ('wifi-latency','testing/subsystem1/test_wifi_latency.py'),
+    ('passive-feedback','testing/subsystem2/test_passive_feedback.py'),
     ('actual-motor-stop','testing/subsystem1/test_motor_stop_path.py'),
     ('heap-snapshot','testing/subsystem1/test_memory_stats.py'),
     ('producer-linkage','testing/subsystem1/test_producer_hooks.py'),

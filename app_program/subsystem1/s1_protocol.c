@@ -167,6 +167,12 @@ int s1_parse_stop_request(const uint8_t *b,unsigned n,uint32_t *id,uint32_t *ses
     if(!b||!id||!session||!deadline||n!=13||b[0]!=0xa2||!s1_read_u32(b+1)||!s1_read_u32(b+5))return -1;
     *id=s1_read_u32(b+1);*session=s1_read_u32(b+5);*deadline=s1_read_u32(b+9);return 0;
 }
+int s1_parse_resume_request(const uint8_t *b,unsigned n,uint8_t marker,
+                          uint32_t *id,uint32_t *session,uint32_t *deadline) {
+    if(!b||!id||!session||!deadline||n!=13||(marker!=0xa5&&marker!=0xa7)||
+       b[0]!=marker||!s1_read_u32(b+1)||!s1_read_u32(b+5))return -1;
+    *id=s1_read_u32(b+1);*session=s1_read_u32(b+5);*deadline=s1_read_u32(b+9);return 0;
+}
 int s1_pack_status_reply(uint32_t id,uint32_t uptime,unsigned age,unsigned control,
                           uint32_t session,const uint8_t *frame,uint8_t *out,unsigned capacity) {
     uint8_t b[S1_STATUS_MAX_BYTES]={0};unsigned n=S1_STATUS_HEADER_BYTES,word=age|(control<<11);
@@ -187,6 +193,24 @@ int s1_pack_stop_reply(uint32_t id,uint32_t session,unsigned result,unsigned con
     if(!id||!session||result>5||!out||capacity<11||!s1_valid_control_word(control)||
        (!result&&(!(control&APP_CTRL_LATCH)||(control&APP_CTRL_STATE_MASK)==APP_CTRL_FAULT)))return -1;
     out[0]=0xa4;s1_write_u32(out+1,id);s1_write_u32(out+5,session);out[9]=word;out[10]=word>>8;return 11;
+}
+int s1_pack_resume_arm_reply(uint32_t id,uint32_t boot,unsigned age,unsigned control,
+                           uint32_t session,uint32_t ticket,const uint8_t *frame,uint8_t *out,unsigned capacity) {
+    uint8_t status[S1_STATUS_MAX_BYTES];int n;
+    if(!ticket||!out||!(control&APP_CTRL_LATCH)||(control&APP_CTRL_TEST)||
+       (control&APP_CTRL_STATE_MASK)!=APP_CTRL_STOP_LATCHED)return -1;
+    n=s1_pack_status_reply(id,boot,age,control,session,frame,status,sizeof(status));
+    if(n<0||capacity<(unsigned)n+4)return -1;
+    memcpy(out,status,16);out[0]=0xa6;s1_write_u32(out+16,ticket);
+    if(n>16)memcpy(out+20,status+16,(unsigned)n-16);
+    return n+4;
+}
+int s1_pack_resume_reply(uint32_t id,uint32_t session,unsigned result,unsigned control,uint8_t *out,unsigned capacity) {
+    unsigned word=control|(result<<6),state=control&APP_CTRL_STATE_MASK;
+    if(!id||!session||result>7||!out||capacity<11||!s1_valid_control_word(control)||
+       (!result&&((control&(APP_CTRL_LATCH|APP_CTRL_TEST))||state==APP_CTRL_UNAVAILABLE||
+                  state==APP_CTRL_DISABLED||state==APP_CTRL_FAULT)))return -1;
+    out[0]=0xa8;s1_write_u32(out+1,id);s1_write_u32(out+5,session);out[9]=word;out[10]=word>>8;return 11;
 }
 int s1_pack_scan(uint32_t session,uint32_t sequence,uint32_t boot,const uint8_t *scan,
                   unsigned total,unsigned start,uint8_t *out,unsigned capacity) {

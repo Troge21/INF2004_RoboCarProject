@@ -1,0 +1,7 @@
+{
+  "source_commit": "a14220a49c8fa8a17be09fbd06c9bf0375895aac",
+  "backup": "C:\\Users\\wilso\\AppData\\Local\\Temp\\robocar-before-motion-feedback-zt9l31gp\\previous-firmware.zip",
+  "sha256": "e1d542afdf329d874e949b619606df68dac6c2997ebd3ae68e6455b9379d857d",
+  "old_uf2_sha256": "3a8b79c37a01cfa92615db69e62d2817795ab53ec9decae5e33c4faa19f3aaf6",
+  "note": "Committed source remains recoverable in Git; local firmware preserved separately. No private settings copied."
+}

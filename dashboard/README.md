@@ -4,37 +4,60 @@ Local real-MQTT dashboard for Buddy/Subsystem 1: Overview, Sensors & motion,
 Communications, charts and exports. No cloud hosting, demo feed, npm packages
 or website build step.
 
-## Current batch — 13 November 2026
+## Current batch - 17 November 2026
 
 One current **Packed v4** contract covers distance, IR, IMU, measured wheel
-velocity/counts/net travel, controller state, faults and future path/barcode
+velocity/counts/net travel, controller state, faults, encoder path and future barcode
 data. Typed scan chunks and diagnostics share the telemetry topic. The old
 v3/JSON decoders and controller beacon path are removed.
 
-Current stationary image:
-**build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2**
+Current normal operating image (motor control enabled):
+**build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt.uf2** (NO _test suffix)
 
-Profile: **NET=lwip MQTT=1 TEST=1 APP_MODE=integrated**.
-Bytes: **723456**; SHA-256: **3a8b79c37a01cfa92615db69e62d2817795ab53ec9decae5e33c4faa19f3aaf6**.
+Profile: **NET=lwip MQTT=1 TEST=0 APP_MODE=integrated CONSOLE=usb_cdc CRASH_REPORT=0**.
+Bytes: **721920**; SHA-256: **2c5a4652c7c434fb1d27743a3579b6a9ff0dcf2f2f9a4ee79a813840ecd1bcbe**.
 
-This image integrates origin/sensor with the current S1/controller.
-The user reports flashing it and confirms the servo sweeps, the three-point
-profile appears, and existing readings update. An independent capture has
-220 valid distance/pitch frames, 26 scan packets, 22 heartbeats and matching
-STATUS, with zero decode errors. Normal physical line/avoidance/STOP and
-accuracy checks remain open. The preceding 390c5893 working image and
-original failure records are preserved. Only one current UF2 is kept.
+This normal image adds **Resume** in Overview and Communications. After Latch
+stop, Resume explicitly releases the inhibit without rebooting or resetting
+run distance. It requires fresh stopped-wheel feedback, valid line data, a
+clear front and no motor fault. STOP takes priority; reconnect never resumes
+movement automatically. Existing sensor, PID, line and obstacle algorithms
+are unchanged. Barcode/navigation and external faults still await producers.
 
-**The wheel motors are disabled in this test image, but the GP12 servo
-centres at startup and sweeps when the front is blocked.** Normal mode
-keeps line following and lets the shared controller arbitrate scan/turn
-intent; the STOP latch has priority over both.
+On **18 November**, the user reported that the Resume test works after the
+requested Stop -> Resume -> Stop procedure. This is a user-reported basic
+functional pass; no new timing/packet capture or flash readback was collected.
+Detailed blocked/fault/expiry/path-retention checks remain separate.
+[Resume bench record](../testing/subsystem1/logs/2026-11-18-resume-user-bench-observation.md).
+The preceding normal image 9c0dbfd5 also passed physical STOP and persistence.
 
-The whole car uses laptop USB or a power bank, with no separate battery
-switch. TEST=1 integrated disables motor control. Normal TEST=0 can request
-motion three seconds after startup; raise both wheels before flashing or
-connecting power in that mode. Unplugging USB turns off the whole car.
-Reconnecting starts a new run and clears the STOP latch.
+**Delivery timing remains open:** the initial 45-second normal window had a
+688 ms main maximum, but a later 180-second window reached 5499 ms main and
+9304 ms heartbeat. No publish errors or missing sequence numbers were
+recorded; gaps also occurred while STOP was latched. The earlier stationary
+one-minute pass remains valid only for that captured window. See
+[normal observations](../testing/subsystem1/logs/2026-11-17-normal-stop-summary.json).
+
+**Raise BOTH drive wheels securely before flashing or connecting power.**
+Normal control may request movement three seconds after startup, before WiFi
+connects. Keep the GP12 servo and its leads free. The whole car uses USB or a
+power bank, with no separate battery switch. Disconnecting the supply ends
+the run; reconnecting clears STOP and can start movement again. Dashboard
+reconnect preserves STOP. Explicit Resume may release it in normal mode. See [normal mode and STOP/Resume check](../testing/subsystem1/MOTOR_STOP_TEST.md).
+
+The preceding stationary image 62e5bd63 passed a full-minute delivery capture:
+149 main packets, 15 heartbeats and six scans; median 402 ms/max 600 ms main,
+max 4057 ms heartbeat; zero missing sequences/publish/decoding errors.
+Those are measured stationary results, not a physical normal-mode pass.
+That delivery policy remains in the Resume image. Its WiFi no-sleep mode
+trades power saving for latency; current draw remains unmeasured.
+[Delivery evidence](../testing/subsystem1/TELEMETRY_DELIVERY.md),
+[current build identity](../testing/subsystem1/logs/2026-11-17-resume-fingerprint.json).
+
+Only this normal UF2 is kept in build_make. The preceding verified normal
+image and public source are preserved in [the rollback archive record](../testing/subsystem1/logs/2026-11-17-before-resume-backup.json).
+To build an explicit stationary hand-turn image later, use TEST=1; it is a
+separate profile, with wheel PWM disabled and existing servo scanning active.
 
 ## Start the bench
 
@@ -57,8 +80,9 @@ npm start
 Use **node server.mjs** if PowerShell blocks npm.ps1. Open
 **http://127.0.0.1:4173**. Refresh after website changes.
 
-4. Flash the current stationary UF2 through BOOTSEL. Let it restart and keep
-   USB connected. Click Connect robot using:
+4. With both drive wheels securely raised and the servo free, flash the
+   current normal UF2 through BOOTSEL. Wheels may move after auto-restart.
+   Keep them raised and click Connect robot using:
 
 | Setting | Value |
 | --- | --- |
@@ -76,7 +100,7 @@ browser waits for all three subscription acknowledgements.
 
 STATUS clock synchronization is automatic and read-only. Measurements wait
 for a matching Pico clock/session reply; stale buffered frames are rejected.
-User STATUS and STOP requests retain correlation IDs, bounded waits and no
+User STATUS, STOP and Resume retain correlation IDs, bounded waits and no
 automatic actuator retry. Credentials stay in tab memory and are not exported.
 
 ## Measurements and missing producers
@@ -84,19 +108,26 @@ automatic actuator retry. Credentials stay in tab memory and are not exported.
 | Data | Current source / readiness |
 | --- | --- |
 | Distance, left/right IR, pitch and hump estimates | Existing protected S5/S3/S4 snapshots |
-| Wheel speeds, encoder counts, net travel, motor mode/reason | Existing measured S2 feedback; available in normal mode |
+| Wheel speeds, encoder counts, net travel, motor mode/reason | Measured S2 feedback in normal and passive stationary modes |
 | Controller state / STOP latch | Actual protected controller publication |
 | Faults | Fresh known/active reports; incomplete coverage is not global all-clear |
 | Barcode / navigation intent | Transport/display ready; S3 passive snapshot getter pending |
-| Total distance travelled | Transport/display ready; S2 actual path getter pending |
+| Total distance travelled | S2 protected encoder odometer; reverse adds path, reset on Pico restart |
 | Completed servo scan | S5 protected three-angle profile; 30/right, 90/centre, 150/left degrees |
 | Heap / resources | Read-only allocator snapshot, sampled minimum, requested app stacks |
 | Stack high-water | Unavailable until actual platform instrumentation supplies it |
 
-In stationary mode the S2 motor/encoder task is disabled, so its measurements
-remain unavailable. PWM duty and nominal speed are never shown as measured
-wheel velocity. Signed net travel can decrease in reverse and is displayed
-separately from total travelled path length.
+In stationary integrated mode, S2 collects encoders with wheel PWM disabled.
+After about 200 ms, resting wheels should show real zero speeds; turn them
+by hand to change velocity/counts and total distance. The existing servo is
+active, so leave it free to move. Commands cannot enable wheel PWM in this
+profile. Normal line following/PID and STOP ownership are retained.
+
+Average wheel speed is the instantaneous mean of left/right speed magnitudes;
+the card sparkline and CSV use the same value. Wheel velocity is signed.
+Net travel can decrease in reverse; total centre path accumulates absolute
+mean wheel increments. Both rely on encoder calibration and wheel traction.
+Metres and m/s show three decimal places.
 
 S4 still uses its nominal 150 mm/s input unless its owner supplies measured
 speed. One-wheel/curb detection and height accuracy remain Buddy 4 work.
@@ -147,6 +178,22 @@ See [the integration and evidence](../testing/subsystem1/SENSOR_INTEGRATION.md)
 and [the physical checklist](../testing/subsystem1/FINAL_ACCEPTANCE.md).
 This uses the existing v4 decoder, topics and scan fields.
 
+## Resume after STOP
+
+With BOTH wheels raised, leave power connected and click Stop. Once
+both wheels stop and Stop latched is confirmed, present a valid clear-front
+target above 250 mm, keep the line sensors valid and click **Resume**. Expect
+**STOP latch released; autonomous control may move the car.** The button is
+disabled in stationary TEST=1 and until a fresh normal latch is received.
+
+Resume obtains a server-issued one-use ticket before sending its commit.
+Expired, replayed or unready requests leave STOP latched. A missing completion
+has an unknown outcome; inspect live state and use STOP if needed. No retry
+or reconnect automatically releases the latch. Run data is retained. Finish
+the raised-wheel check with another Stop and unplug the supply.
+See [the controller contract](../testing/subsystem1/CONTROLLER_COMMANDS.md) and
+[physical procedure](../testing/subsystem1/MOTOR_STOP_TEST.md).
+
 ## Binary messages
 
 | Message | Bytes |
@@ -157,11 +204,13 @@ This uses the existing v4 decoder, topics and scan fields.
 | Heartbeat, 80 | 5 |
 | STATUS request / reply | 5 / 16 or 62 |
 | STOP request / result | 13 / 11 |
+| Resume arm request / authorization | 13 / 20 or 66 |
+| Resume commit / result | 13 / 11 |
 
 Generation uptime, session, independent source freshness and unknown
 sentinels are part of the current contract. Heartbeat is nominally every
 4 seconds; main telemetry every 400 ms. These schedules do not establish
-received timing guarantees. See [the bit table](../testing/subsystem1/S1_COMPLETION_BATCH.md).
+received timing guarantees. The [Change Requirement 1 report](../testing/subsystem1/CHANGE_REQUIREMENT_1.md) records the current bit layouts, measured sizes and bench evidence.
 
 Charts retain received history. Current measurements expire after two
 seconds without sufficiently fresh telemetry. Completed scans are explicitly
@@ -174,10 +223,11 @@ exclude kernel/radio stacks and are not stack high-water.
 ## Build and final validation
 
 ~~~sh
-make -B -C build_make PICO_SDK_PATH=/opt/robocar/pico-sdk-2.2.0 NET=lwip MQTT=1 TEST=1 APP_MODE=integrated -j8
+make -B -C build_make PICO_SDK_PATH=/opt/robocar/pico-sdk-2.2.0 NET=lwip MQTT=1 TEST=0 APP_MODE=integrated CONSOLE=usb_cdc CRASH_REPORT=0 -j8
 ~~~
 
-For a raised-wheel normal motor phase use TEST=0 instead. Standalone IR and
+The current image is already normal TEST=0. Use TEST=1 only for an explicit
+stationary hand-turn/sensor profile. Standalone IR and
 powered encoder diagnostics require explicit APP_MODE=ir or
 TEST=1 APP_MODE=encoder. TEST=1 alone never enables that powered bench.
 Keep USB CDC / CRASH_REPORT=0 because GP0/GP1 belong to the encoder.

@@ -1,0 +1,1 @@
+PASS: 10 actual passive S2 checks; forward/reverse/wrap, path, faults, contention; no PWM linked.

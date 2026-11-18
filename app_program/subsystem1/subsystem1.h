@@ -22,5 +22,8 @@ int s1_network_status(const unsigned char *request,unsigned length,
 unsigned s1_network_controller_word(void);
 int s1_network_uptime(uint32_t *out);
 int s1_network_submit_stop(uint32_t id,uint32_t session,uint32_t deadline);
-int s1_network_stop_reply(uint8_t out[10]);
+int s1_network_command_reply(uint8_t out[10]);
+int s1_network_arm_resume(const unsigned char *request,unsigned length,unsigned char *out,
+                          unsigned capacity,uint32_t session);
+int s1_network_submit_resume(uint32_t ticket,uint32_t session,uint32_t deadline);
 #endif

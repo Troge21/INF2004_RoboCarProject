@@ -1,0 +1,1 @@
+PASS: actual WiFi setup applies no-sleep mode under owner lock before join; mode failure is reported and bus failure skips it.

@@ -5,7 +5,7 @@ Outputs are temporary objects only; no hardware or firmware flashing.
 from pathlib import Path
 import shlex,subprocess,tempfile,sys
 root=Path(__file__).resolve().parents[2]
-build_log=Path(sys.argv[1]) if len(sys.argv)>1 else root/'testing/subsystem1/logs/2026-11-12-wiring-stationary-build.txt'
+build_log=Path(sys.argv[1]) if len(sys.argv)>1 else root/'testing/subsystem1/logs/2026-11-17-resume-stationary-build.txt'
 b=build_log.read_bytes()
 log=b.decode('utf-16') if b.startswith((b'\xff\xfe',b'\xfe\xff')) else b.decode('utf-8-sig')
 line=next(s for s in log.splitlines() if s.startswith('arm-none-eabi-gcc ') and '../app_program/app_main.c' in s)
@@ -39,9 +39,14 @@ with tempfile.TemporaryDirectory(prefix='robocar-profile-') as tmp:
         assert any(s.split()[-2:]==['T','telemetry_get_scan'] for s in ultra_symbols.splitlines())
         motor_present=any(s.split()[-1:] == ['motor_task'] for s in motor_symbols.splitlines())
         assert motor_present == (not test or mode==2),name
+        passive=any(s.split()[-1:] == ['encoder_feedback_task'] for s in motor_symbols.splitlines())
+        assert passive == (test==1 and mode==0),name
+        if test and mode==0:
+            assert not any('pwm_set_' in s for s in motor_symbols.splitlines()),'Passive encoder task must have no PWM calls'
+        assert any(s.split()[-2:]==['T','telemetry_get_travel'] for s in motor_symbols.splitlines())
         s1_present=any(s.split()[-1:] == ['subsystem1_init'] for s in app_symbols.splitlines())
         assert s1_present == (mode==0),name
         if mode==1:assert any(s.split()[-1:] == ['ir_adc_test'] for s in app_symbols.splitlines())
         if mode==2:assert any(s.split()[-1:] == ['subsystem2_test'] for s in app_symbols.splitlines())
         print('PASS: '+name+' actual ARM compilation and startup/motor symbols')
-print('PASS: stationary integrated TEST=1 contains no motor_task; hardware benches require explicit APP_MODE.')
+print('PASS: stationary integrated TEST=1 collects encoders without PWM; hardware benches require explicit APP_MODE.')

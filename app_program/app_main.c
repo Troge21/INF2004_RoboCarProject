@@ -64,6 +64,15 @@ static void app_controller_step(UW started_ms)
             (UW)(now.lo - motion.timestamp_ms) <= S2_FEEDBACK_MAX_AGE_MS;
         navigation_fresh = navigation_er == E_OK &&
             (UW)(now.lo - navigation.timestamp_ms) <= S5_NAV_MAX_AGE_MS;
+        /* Explicit Resume only releases STOP with current, stopped feedback
+         * and a clear front. Normal steering/PID policy remains below. */
+        inhibit = app_controller_poll_ready(
+            (UW)(operating.lo-started_ms)>=APP_START_DELAY_MS && fresh &&
+            motion_fresh && motion.encoder_valid && motion.speed_valid && !motion.faults &&
+            motion.mode==S2_MODE_STOP && !motion.command_active &&
+            motion.duty_left_x100==0 && motion.duty_right_x100==0 &&
+            motion.actual_left_rpm_x10==0 && motion.actual_right_rpm_x10==0 &&
+            navigation_fresh && navigation.phase==S5_NAV_CLEAR);
         if (inhibit & APP_CTRL_LATCH) state = APP_CTRL_STOP_LATCHED;
         else if (inhibit & APP_CTRL_POLL_BUSY) state = APP_CTRL_WAITING_LINE;
         else if ((UW)(operating.lo - started_ms) >= APP_START_DELAY_MS) {
@@ -106,6 +115,13 @@ static void app_controller_step(UW started_ms)
         }
         if (motion_fresh && motion.faults != 0U) {
             left = right = 0; state = APP_CTRL_FAULT;
+        }
+        /* A STOP arriving during source reads or Resume admission wins. */
+        inhibit = app_controller_poll();
+        if(inhibit) {
+            left=right=0;
+            if(state!=APP_CTRL_FAULT)
+                state=(inhibit&APP_CTRL_LATCH)?APP_CTRL_STOP_LATCHED:APP_CTRL_WAITING_LINE;
         }
         er = app_motor_request(left, right);
         if (er != E_OK) (void)app_motor_request(0, 0);

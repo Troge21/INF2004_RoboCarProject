@@ -98,9 +98,30 @@ EXPORT int s1_network_submit_stop(uint32_t id,uint32_t session,uint32_t deadline
     if(!(s1_network_controller_word()&APP_CTRL_STATE_MASK))return E_OBJ;
     return app_controller_submit_stop(id,session,deadline);
 }
-EXPORT int s1_network_stop_reply(uint8_t out[10])
+EXPORT int s1_network_command_reply(uint8_t out[10])
 {
     int er=app_controller_take_reply(out);return er==E_OK?10:er;
+}
+EXPORT int s1_network_submit_resume(uint32_t ticket,uint32_t session,uint32_t deadline)
+{
+    return app_controller_submit_resume(ticket,session,deadline);
+}
+EXPORT int s1_network_arm_resume(const unsigned char *request,unsigned length,
+                                 unsigned char *out,unsigned capacity,uint32_t session)
+{
+    S1_SNAPSHOT s;UB frame[S1_FRAME_BYTES];uint32_t id,token,deadline,ticket=0,boot,published;
+    unsigned control=s1_network_controller_word(),age=S1_STATUS_NO_SAMPLE;const UB *ptr=NULL;int result;
+    if(s1_parse_resume_request(request,length,0xa5,&id,&token,&deadline))return E_PAR;
+    result=token==session?app_controller_arm_resume(deadline,&ticket):(int)APP_RESUME_SESSION;
+    if(result!=0)return s1_pack_resume_reply(id,session,result<0?APP_RESUME_FAULT:(unsigned)result,control,out,capacity);
+    if(s1_network_uptime(&boot)!=E_OK)return E_OBJ;
+    control=s1_network_controller_word();
+    if(copy_publication(&s,&published)==E_OK) {
+        age=(UW)(source_now()-published);s1_write_u32(s.sequence,next_sequence-1U);
+        if(age<=2000&&s1_pack_frame(&s,source_now(),boot,session,control,frame,sizeof(frame))>0)ptr=frame;
+    }
+    if(!ptr)age=S1_STATUS_NO_SAMPLE;
+    return s1_pack_resume_arm_reply(id,boot,age,control,session,ticket,ptr,out,capacity);
 }
 /* Optional traffic shares the telemetry topic, but is independently typed and
  * never advances the sensor sequence. At most one bounded packet per poll. */

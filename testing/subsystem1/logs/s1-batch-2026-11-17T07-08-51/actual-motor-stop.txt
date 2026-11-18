@@ -1,0 +1,23 @@
+PASS: actual analog policy: white/white and black/black forward; individual corrections
+PASS: normal controller requests RPM and actual PID/motor loop produces nonzero output after startup
+PASS: expired STOP cannot inhibit the running controller
+PASS: controller contention submits zero through actual RPM motor channel
+PASS: busy motor channel cannot acknowledge a STOP before accepting zero
+PASS: normal STOP result follows accepted request and zero output in the actual PID/motor loop
+PASS: latched STOP persists through all line and S5 scan/turn phases, stale and busy snapshots
+PASS: STOP is serviced during startup
+PASS: startup STOP prevents later white/white forward motion
+PASS: S2 encoder fault propagates to controller and never becomes a fabricated successful STOP
+PASS: stale ADC snapshot stops actual motor output
+PASS: invalid ADC snapshot stops actual motor output
+PASS: unsupported line pattern cannot drive motors
+PASS: controller stops the actual motor loop during S5 scans
+PASS: left avoidance intent reaches S2 only through controller RPM arbitration
+PASS: right avoidance intent reaches the shared controller
+PASS: stale S5 navigation cannot continue an avoidance turn
+PASS: busy S5 snapshot cannot permit motion
+PASS: blocked or invalid range intent keeps the motor loop stopped
+PASS: clear front returns to the unchanged line-following targets
+PASS: STOP during avoidance is acknowledged only after controller-owned zero request
+PASS: STOP cannot be overwritten by later scans, turn intents or line readings
+SUMMARY: 22 actual controller/PID/motor checks passed; no hardware or sockets.

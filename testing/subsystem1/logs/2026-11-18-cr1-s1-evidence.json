@@ -1,0 +1,281 @@
+{
+  "date_local": "2026-11-18",
+  "matched_json_to_v2": {
+    "layout_before": {
+      "sample_bytes": 12,
+      "line_snapshot_bytes": 8,
+      "input_record_bytes": 16,
+      "output_record_bytes": 24,
+      "input_buffer_bytes": 80,
+      "output_buffer_bytes": 112,
+      "example_telemetry_bytes": 69
+    },
+    "layout_after": {
+      "sample_bytes": 6,
+      "line_snapshot_bytes": 5,
+      "input_record_bytes": 10,
+      "output_record_bytes": 14,
+      "input_buffer_bytes": 64,
+      "output_buffer_bytes": 80,
+      "example_telemetry_bytes": 6
+    },
+    "static_ram_before_bytes": 82740,
+    "static_ram_after_bytes": 82740,
+    "requested_s1_queue_before_bytes": 192,
+    "requested_s1_queue_after_bytes": 144,
+    "linker_log": "2026-11-06-cr1-link-size-comparison.txt"
+  },
+  "current_resume_build": {
+    "normal_uf2_sha256": "2c5a4652c7c434fb1d27743a3579b6a9ff0dcf2f2f9a4ee79a813840ecd1bcbe",
+    "normal_static_ram_bytes": 84148,
+    "stationary_static_ram_bytes": 84884,
+    "verified_public_source_hashes": 102,
+    "verified_linked_elf_hashes": [
+      "normal",
+      "stationary"
+    ],
+    "layout": {
+      "snapshot_bytes": 73,
+      "publication_time_bytes": 4,
+      "scan_cache_and_metadata_bytes": 462,
+      "resources_bytes": 19,
+      "input_output_message_buffer_bytes": 0,
+      "main_packet_bytes": 46
+    },
+    "controller_records_bytes": {
+      "publication": 5,
+      "request": 13,
+      "completion": 10,
+      "authorization": 8,
+      "ticket_counter": 4,
+      "owner_word": 1
+    },
+    "fingerprint": "2026-11-17-resume-fingerprint.json",
+    "fresh_offline_groups_passed": 11,
+    "fresh_offline_summary": "s1-batch-2026-11-18T12-51-47/summary.json",
+    "functional_user_observation": "2026-11-18-resume-user-bench-observation.md"
+  },
+  "historical_bench_captures": [
+    {
+      "source": "2026-11-17-delivery-final-observation.json",
+      "source_sha256": "dc14c895a6a7f4260368e50302b90104bdd3d5df5a9c09fad1e2707d093c0309",
+      "reported_image_hash_prefix": "62e5bd63",
+      "capture_seconds": 60,
+      "payload_types": [
+        {
+          "marker": "80",
+          "bytes": 5,
+          "packets": 15
+        },
+        {
+          "marker": "a1",
+          "bytes": 62,
+          "packets": 7
+        },
+        {
+          "marker": "b4",
+          "bytes": 46,
+          "packets": 149
+        },
+        {
+          "marker": "b5",
+          "bytes": 24,
+          "packets": 6
+        },
+        {
+          "marker": "b6",
+          "bytes": 40,
+          "packets": 12
+        }
+      ],
+      "observed_payload_bytes": 7987,
+      "main_receive_gap": {
+        "samples": 148,
+        "median_ms": 402.0,
+        "max_ms": 600
+      },
+      "heartbeat_receive_gap": {
+        "samples": 14,
+        "median_ms": 3999.5,
+        "max_ms": 4057
+      },
+      "pico_main_frame_timestamp_gap": {
+        "samples": 148,
+        "median_ms": 400.0,
+        "max_ms": 400
+      },
+      "skipped_main_sequence_numbers": 0,
+      "largest_main_receive_gap_detail": {
+        "sequence_before": 245,
+        "sequence_after": 246,
+        "pico_frame_timestamp_gap_ms": 400
+      }
+    },
+    {
+      "source": "2026-11-17-normal-profile-live.json",
+      "source_sha256": "19fc33d634f4e29e918bf0c0524e33c53ce69e39534f317f8c40098a7823c5f1",
+      "reported_image_hash_prefix": "9c0dbfd5",
+      "capture_seconds": 45,
+      "payload_types": [
+        {
+          "marker": "80",
+          "bytes": 5,
+          "packets": 12
+        },
+        {
+          "marker": "a1",
+          "bytes": 62,
+          "packets": 6
+        },
+        {
+          "marker": "b4",
+          "bytes": 46,
+          "packets": 111
+        },
+        {
+          "marker": "b6",
+          "bytes": 40,
+          "packets": 9
+        }
+      ],
+      "observed_payload_bytes": 5898,
+      "main_receive_gap": {
+        "samples": 110,
+        "median_ms": 400.0,
+        "max_ms": 688
+      },
+      "heartbeat_receive_gap": {
+        "samples": 11,
+        "median_ms": 3999,
+        "max_ms": 4225
+      },
+      "pico_main_frame_timestamp_gap": {
+        "samples": 110,
+        "median_ms": 400.0,
+        "max_ms": 1580
+      },
+      "skipped_main_sequence_numbers": 0,
+      "largest_main_receive_gap_detail": {
+        "sequence_before": 162,
+        "sequence_after": 163,
+        "pico_frame_timestamp_gap_ms": 400
+      }
+    },
+    {
+      "source": "2026-11-17-normal-stop-live.json",
+      "source_sha256": "9b997d9f322e65a783663bed01e0ff7c2d53623b3e94a0784556e97e22c393f2",
+      "reported_image_hash_prefix": "9c0dbfd5",
+      "capture_seconds": 180,
+      "payload_types": [
+        {
+          "marker": "80",
+          "bytes": 5,
+          "packets": 42
+        },
+        {
+          "marker": "a1",
+          "bytes": 16,
+          "packets": 1
+        },
+        {
+          "marker": "a1",
+          "bytes": 62,
+          "packets": 18
+        },
+        {
+          "marker": "a4",
+          "bytes": 11,
+          "packets": 1
+        },
+        {
+          "marker": "b4",
+          "bytes": 46,
+          "packets": 373
+        },
+        {
+          "marker": "b5",
+          "bytes": 24,
+          "packets": 9
+        },
+        {
+          "marker": "b6",
+          "bytes": 40,
+          "packets": 35
+        }
+      ],
+      "observed_payload_bytes": 20127,
+      "main_receive_gap": {
+        "samples": 372,
+        "median_ms": 400.0,
+        "max_ms": 5499
+      },
+      "heartbeat_receive_gap": {
+        "samples": 41,
+        "median_ms": 4016,
+        "max_ms": 9304
+      },
+      "pico_main_frame_timestamp_gap": {
+        "samples": 372,
+        "median_ms": 400.0,
+        "max_ms": 5140
+      },
+      "skipped_main_sequence_numbers": 0,
+      "largest_main_receive_gap_detail": {
+        "sequence_before": 434,
+        "sequence_after": 435,
+        "pico_frame_timestamp_gap_ms": 400
+      }
+    },
+    {
+      "source": "2026-11-17-normal-latch-persistence-live.json",
+      "source_sha256": "089885aadfb8e9845347d37fb4556ea3e145c48335b91b6528399df6177a8c48",
+      "reported_image_hash_prefix": "9c0dbfd5",
+      "capture_seconds": 60,
+      "payload_types": [
+        {
+          "marker": "80",
+          "bytes": 5,
+          "packets": 13
+        },
+        {
+          "marker": "a1",
+          "bytes": 62,
+          "packets": 7
+        },
+        {
+          "marker": "b4",
+          "bytes": 46,
+          "packets": 106
+        },
+        {
+          "marker": "b6",
+          "bytes": 40,
+          "packets": 11
+        }
+      ],
+      "observed_payload_bytes": 5815,
+      "main_receive_gap": {
+        "samples": 105,
+        "median_ms": 399,
+        "max_ms": 4568
+      },
+      "heartbeat_receive_gap": {
+        "samples": 12,
+        "median_ms": 4551.0,
+        "max_ms": 6697
+      },
+      "pico_main_frame_timestamp_gap": {
+        "samples": 105,
+        "median_ms": 400,
+        "max_ms": 4240
+      },
+      "skipped_main_sequence_numbers": 0,
+      "largest_main_receive_gap_detail": {
+        "sequence_before": 649,
+        "sequence_after": 650,
+        "pico_frame_timestamp_gap_ms": 400
+      }
+    }
+  ],
+  "limitations": "Receive and firmware frame timestamps come from prior bench captures. There was no new target capture or matched target CPU benchmark. Peak runtime RAM and final demo timing are unmeasured."
+}

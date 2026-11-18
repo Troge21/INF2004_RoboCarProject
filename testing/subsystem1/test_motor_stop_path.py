@@ -8,9 +8,8 @@ root = Path(__file__).resolve().parents[2]
 app = (root/'app_program/app_main.c').read_text(encoding='utf-8')
 motor = (root/'app_program/subsystem2/subsystem2.c').read_text(encoding='utf-8')
 controller = app[app.index('static void app_line_targets'):app.index('static void vehicle_controller_task')]
-api = motor[motor.index('static ID s_command_sem'):motor.index('#if S2_DRIVE_ENABLED')]
-loop_start = motor.index('static void motor_duty')
-loop = motor[loop_start:motor.index('#endif',loop_start)]
+api = motor[motor.index('static ID s_command_sem'):motor.index('#if S2_FEEDBACK_ENABLED')]
+loop = motor[motor.index('#if S2_FEEDBACK_ENABLED'):motor.index('EXPORT ER subsystem2_init')]
 assert 'app_controller_step(started.lo);' in app
 prefix = r'''
 #include <assert.h>
@@ -39,6 +38,8 @@ prefix = r'''
 #define APP_FORWARD_DUTY 20
 #define APP_INNER_DUTY 15
 #define S2_PWM_TOP 6249U
+#define S2_DRIVE_ENABLED 1
+#define S2_FEEDBACK_ENABLED 1
 typedef int ID,INT,BOOL,ER;
 typedef unsigned UINT;
 typedef uint32_t UW;
@@ -48,6 +49,8 @@ typedef struct {unsigned sematr,isemcnt,maxsem;} T_CSEM;
 typedef struct {UINT pattern;UW timestamp_ms;BOOL valid;} S3_LINE_DATA;
 #include "subsystem2.h"
 #include "motion_control.h"
+#include "odometry.h"
+#include "telemetry_sources.h"
 #include "subsystem5/subsystem5.h"
 static UW operating_ms;
 static unsigned scenario,phase,ticks,checks,pattern,stale,invalid,compare[4];
@@ -91,6 +94,7 @@ static void stopped(void){for(unsigned i=0;i<4;++i)assert(compare[i]==0);}
 static BOOL moving(void){return compare[0]>0&&compare[2]>0;}
 static ER tk_dly_tsk(INT ms){
     uint8_t reply[10],snapshot[5];
+    static uint32_t resume_ticket_id;
     assert(ms==20);++ticks;
     if(scenario==0){
         if(operating_ms<APP_START_DELAY_MS)stopped();
@@ -171,6 +175,43 @@ static ER tk_dly_tsk(INT ms){
             stopped();nav_phase=ticks%6U;pattern=ticks%4U;
             if(ticks>230U){pass("STOP cannot be overwritten by later scans, turn intents or line readings");longjmp(done,1);}
         }
+    }else if(scenario==5){
+        if(phase==0&&moving()){
+            assert(app_controller_submit_stop(301,99,operating_ms+1000U)==E_OK);phase=1;
+        }else if(phase==1){
+            stopped();assert(app_controller_take_reply(reply)==E_OK);
+            assert(app_controller_arm_resume(operating_ms+1000U,&resume_ticket_id)==0);
+            assert(app_controller_submit_resume(resume_ticket_id,99,operating_ms+1000U)==0);
+            stale=1;phase=2;
+        }else if(phase==2){
+            stopped();assert(app_controller_take_reply(reply)==E_OK&&(reply[9]&2U)&&
+                (((reply[8]|((unsigned)reply[9]<<8))>>6)&7U)==APP_RESUME_NOT_READY);
+            assert(app_controller_poll()&APP_CTRL_LATCH);
+            pass("actual controller refuses Resume with stale line input and keeps motor outputs zero");
+            stale=0;phase=3;
+        }else if(phase==3&&s_feedback.actual_left_rpm_x10==0&&s_feedback.actual_right_rpm_x10==0){
+            assert(app_controller_arm_resume(operating_ms+1000U,&resume_ticket_id)==0);
+            assert(app_controller_submit_resume(resume_ticket_id,99,operating_ms+1000U)==0);phase=4;
+        }else if(phase==4){
+            assert(app_controller_take_reply(reply)==E_OK&&(reply[9]&2U)&&
+                (((reply[8]|((unsigned)reply[9]<<8))>>6)&7U)==0&&!(reply[8]&APP_CTRL_LATCH));
+            pass("actual normal controller releases the latch only after fresh stopped feedback and accepted motor handoff");phase=5;
+        }else if(phase==5&&moving()){
+            assert(s_command.left==350&&s_command.right==350);
+            pass("explicit Resume returns to the existing line targets and actual PID wheel outputs without a reboot");
+            assert(app_controller_submit_stop(302,99,operating_ms+1000U)==0);phase=6;
+        }else if(phase==6){
+            stopped();assert(app_controller_take_reply(reply)==E_OK);
+            assert(app_controller_arm_resume(operating_ms+1000U,&resume_ticket_id)==0);
+            assert(app_controller_submit_resume(resume_ticket_id,99,operating_ms+1000U)==0);
+            assert(app_controller_submit_stop(303,99,operating_ms+1000U)==0);phase=7;
+        }else if(phase==7){
+            stopped();assert(app_controller_take_reply(reply)==E_OK&&read32(reply)==303&&!(reply[9]&2U));
+            pass("STOP supersedes queued Resume before it can reach actual PWM");phase=8;
+        }else if(phase==8){
+            stopped();nav_phase=ticks%6U;pattern=ticks%4U;
+            if(ticks>360U){pass("second STOP remains latched through later line and scan intents after a Resume cycle");longjmp(done,1);}
+        }
     }else{
         if(phase==0&&moving()){stale=1;phase=1;}
         else if(phase==1){
@@ -204,13 +245,13 @@ int main(void){
         assert(l==(p==2?260:350)&&r==(p==1?260:350));
     }
     pass("actual analog policy: white/white and black/black forward; individual corrections");
-    run(0);run(1);run(2);run(3);run(4);
+    run(0);run(1);run(2);run(3);run(4);run(5);
     printf("SUMMARY: %u actual controller/PID/motor checks passed; no hardware or sockets.\n",checks);return 0;
 }
 '''
 with tempfile.TemporaryDirectory(prefix='robocar-ao-stop-') as directory:
     c=Path(directory)/'stop_path.c';exe=Path(directory)/'stop_path.exe'
-    c.write_text(prefix+'\n#include "motion_control.c"\n'+api+loop+controller+tests,encoding='utf-8')
+    c.write_text(prefix+'\n#include "motion_control.c"\n#include "odometry.c"\n'+api+loop+controller+tests,encoding='utf-8')
     subprocess.run(['gcc','-std=c11','-Wall','-Wextra','-Werror',
                     '-I',str(root/'app_program'),'-I',str(root/'app_program/subsystem2'),
                     str(c),'-o',str(exe)],check=True)

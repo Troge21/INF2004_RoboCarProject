@@ -1,0 +1,381 @@
+{
+  "date": "2026-11-17",
+  "source_base": "a14220a49c8fa8a17be09fbd06c9bf0375895aac",
+  "profile": "NET=lwip MQTT=1 APP_MODE=integrated; TEST=1 stationary, TEST=0 normal compile only",
+  "hardware_accessed": false,
+  "user_requested": "Prepare the image; test later",
+  "artifacts": {
+    "stationary": {
+      "path": "build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2",
+      "bytes": 731136,
+      "sha256": "5cc04c0ab0da1dcafb0b61b49f719f8391359048916876ac8af39314e88f311c",
+      "elf_sha256": "ce64d4168f1d86b6616e146c51907d6c7a5dfbfb60f73dc6e2fd597b7d6c0dd5",
+      "text": 365428,
+      "data": 108,
+      "bss": 84752,
+      "linked_static_ram": 84860,
+      "flashed": false,
+      "uf2_kept": true
+    },
+    "normal": {
+      "path": "build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt.uf2",
+      "bytes": 716288,
+      "sha256": "b8c45ab21c12b8b9a9edf1adfb03fb15c0b7bac69c4502fddf21257e0560b60d",
+      "elf_sha256": "b8768f8534b384a745c4ad0fe191e19011f890b55999a2a11fb269b9a2e67c61",
+      "text": 358004,
+      "data": 108,
+      "bss": 84016,
+      "linked_static_ram": 84124,
+      "flashed": false,
+      "uf2_kept": false
+    }
+  },
+  "source_files": [
+    {
+      "path": "app_program/app.h",
+      "sha256": "0367390628fbf164124b868276bd4d12639974f6c0497bf0f48eef430361ce47"
+    },
+    {
+      "path": "app_program/app_main.c",
+      "sha256": "e8cd807529ee5002f25e8f4f794b6a87b7ad669d5910bb1d37a14b4023693ef9"
+    },
+    {
+      "path": "app_program/controller.c",
+      "sha256": "d028e1b598b92c58d76b80ada8475ebed6d63b74bf5f800f68e3bd90e67717b5"
+    },
+    {
+      "path": "app_program/controller.h",
+      "sha256": "9bf798a790be0690b55746852abac32869c327d8d10a2d3de805a1b13ca27ba3"
+    },
+    {
+      "path": "app_program/gpio_irq.c",
+      "sha256": "54747912a0fbaefda676916db1f8674f5b5098200eac455d83d625af0cb6195c"
+    },
+    {
+      "path": "app_program/gpio_irq.h",
+      "sha256": "42411f0bf769ab81fde9b2ad7cfc1f456b88942b81bf6ba171466618957925c5"
+    },
+    {
+      "path": "app_program/subsystem1/s1_protocol.c",
+      "sha256": "ea29d9921c337a60aeb6b4db52662c2f9cee40b51d2e500234d7c649f08c7164"
+    },
+    {
+      "path": "app_program/subsystem1/s1_protocol.h",
+      "sha256": "7e9f9c05b9026a668faef12b280a4921a6af9a682c36a29fa2d7a7fc4664f2a1"
+    },
+    {
+      "path": "app_program/subsystem1/s1_sources.c",
+      "sha256": "31ed7a7f9f2750dd0f985bb915d7c26e9a01c1eaa45838089563ab2a76c38371"
+    },
+    {
+      "path": "app_program/subsystem1/subsystem1.c",
+      "sha256": "f425b876ef07954474614bde03d4e2e7865fdb5e1a35a7cf8ae952315ad11b1b"
+    },
+    {
+      "path": "app_program/subsystem1/subsystem1.h",
+      "sha256": "c9d0eb9754ed297b228bc7e83c31e0150c1e705e710051620aca56d3bee2a0ab"
+    },
+    {
+      "path": "app_program/subsystem1/subsystem1_test.c",
+      "sha256": "96aa6156dcb3fe52c2d9635817f558d0ea02c94b632cd251bab604bc8dd1bf29"
+    },
+    {
+      "path": "app_program/subsystem2/encoder_capture.c",
+      "sha256": "1e806dd7f75100fff477e5e8e0c26b278d2bfa7904df2f4666147015aa3b02f3"
+    },
+    {
+      "path": "app_program/subsystem2/encoder_capture.h",
+      "sha256": "c27303eea1b18e1ef990c1bf4bb50b5375209ca837fb50caea1e770b089d2ce1"
+    },
+    {
+      "path": "app_program/subsystem2/motion_control.c",
+      "sha256": "268be5d3c4b217543aa569d79b4b177330ff0aab128f6da7249ea8ac0df0b50b"
+    },
+    {
+      "path": "app_program/subsystem2/motion_control.h",
+      "sha256": "5f96e918c68792c4cb6d194dab37befcbe7e2bc9e3c22a4427aa5b0362bb92ec"
+    },
+    {
+      "path": "app_program/subsystem2/odometry.c",
+      "sha256": "182e8564ec5884c6e113039ccfe4ff493d4b7ed6db71e1a8105a52dcab0c1dd6"
+    },
+    {
+      "path": "app_program/subsystem2/odometry.h",
+      "sha256": "8d5c99f6f776b801521e86f395abe7f8bd1d21239e9433671f460cd590ad90d1"
+    },
+    {
+      "path": "app_program/subsystem2/subsystem2.c",
+      "sha256": "93308f86ee4e2ec544ce589a7b2cd12a05f79b3d3e3b84f31ed0429afb580ec9"
+    },
+    {
+      "path": "app_program/subsystem2/subsystem2.h",
+      "sha256": "d69abe00a32f0b0291fa421d4b5a0f45bb35af050c2903ea03dbef81898b1f7c"
+    },
+    {
+      "path": "app_program/subsystem2/subsystem2_test.c",
+      "sha256": "3acf712c07e3a77c121b85242b04ee97001bfa5c03efdc4cfd7e595a228d13a7"
+    },
+    {
+      "path": "app_program/subsystem3/barcode_capture.c",
+      "sha256": "37abf55d95115ed713f1de6e1a7e3b425fd771382ef33ac83e7d3973427d9016"
+    },
+    {
+      "path": "app_program/subsystem3/barcode_capture.h",
+      "sha256": "0181ba05cf6c36facf011e357f3c617166211aeda41ded728b745b4e30e8b799"
+    },
+    {
+      "path": "app_program/subsystem3/barcode_decoder.c",
+      "sha256": "93f0a674284b10b8743654066d00017cd1556b47b22d40541bf84aa126f8dc0d"
+    },
+    {
+      "path": "app_program/subsystem3/barcode_decoder.h",
+      "sha256": "b9c16866941476ccf8ec293a0da962f0f40aec82bc1d66733ef28989ad60766a"
+    },
+    {
+      "path": "app_program/subsystem3/ir_adc_test.c",
+      "sha256": "7e011125f2dca9cc618d5b0c663e8159b5812e19a5afd642be38684a77de3f79"
+    },
+    {
+      "path": "app_program/subsystem3/line_detection.c",
+      "sha256": "5a5c85f67bd0e5b679dfda1eb046b002ded23e32d8ca8a5343e43befe9b1cfb7"
+    },
+    {
+      "path": "app_program/subsystem3/line_detection.h",
+      "sha256": "62731eab10ac21e707c064ad34835cf7430457acd61271ee36d23ba099a109ba"
+    },
+    {
+      "path": "app_program/subsystem3/subsystem3.c",
+      "sha256": "e7bcc191f1eccd117b09fe7f6e5615c186ebc33f93f57b6149ac7f1c16727021"
+    },
+    {
+      "path": "app_program/subsystem3/subsystem3.h",
+      "sha256": "3a932adbe1b7d8f9fa6fd046f933ea0f92133a89e6b9ac88685e6b8db8f1f4c0"
+    },
+    {
+      "path": "app_program/subsystem3/subsystem3_test.c",
+      "sha256": "36366885c3ea1d3e1eff4839b780f5a8528bebfdcd61081daf602af95172c858"
+    },
+    {
+      "path": "app_program/subsystem4/drv_gy511.c",
+      "sha256": "36aa2a51100798ac404b2b7f53beda78d2b8dc8d907362976092028cf9fa1bea"
+    },
+    {
+      "path": "app_program/subsystem4/drv_gy511.h",
+      "sha256": "2879b2eb4baca3b16bf4e19de900639934aa698d833fe7604ad393748d36e3d0"
+    },
+    {
+      "path": "app_program/subsystem4/subsystem4.c",
+      "sha256": "8daffb73aa163ae4b2c6e74d186de78d7348e768dac39de84fec29cf1e68de69"
+    },
+    {
+      "path": "app_program/subsystem4/subsystem4.h",
+      "sha256": "c90d9144efa1a05783ae25aeebb87ca0fe43c671d0d58da0d914a59b718624c2"
+    },
+    {
+      "path": "app_program/subsystem4/subsystem4_test.c",
+      "sha256": "03207a225ec7e833bf785c3c960e7e37210ac738b777427173ccf7a54dc7d393"
+    },
+    {
+      "path": "app_program/subsystem5/subsystem5.c",
+      "sha256": "633b915a5a9336cbbdf5b9a036e461c26d295ad57b9a0e89ed08ca22c2209b15"
+    },
+    {
+      "path": "app_program/subsystem5/subsystem5.h",
+      "sha256": "d6b0555899a48031a47be61f4d5a28aaee33497b6b855b430e13369bae9abef3"
+    },
+    {
+      "path": "app_program/subsystem5/subsystem5_test.c",
+      "sha256": "812aa2fde70c00470136215674db2aea83268f4e436c652806cec27931774fd3"
+    },
+    {
+      "path": "app_program/telemetry_sources.h",
+      "sha256": "ea8f30400afcf47a29113b8ac01fc5127925e779ab03a4b8db8c49a2afb47a26"
+    },
+    {
+      "path": "app_program/test_report.h",
+      "sha256": "68858801abeef5aeb8d8588995392d78b2b550ba905ee1352cf4d4c31baa379b"
+    },
+    {
+      "path": "dashboard/dist/app.js",
+      "sha256": "cb24a94cb8692b1bfb5fbe660a43e0167bcce055793a151598a710afe0cd528c"
+    },
+    {
+      "path": "dashboard/dist/charts.js",
+      "sha256": "ce6b62b6452b817f6445b63d3bff8618f3736c9aa9c34233b221e4ed1aeabdec"
+    },
+    {
+      "path": "dashboard/dist/mqtt.js",
+      "sha256": "4fe0ce715a26aabd2b3e7628413b0e7597eeac7bd62b76fc84ffa8e5042f51bb"
+    },
+    {
+      "path": "dashboard/dist/protocol.js",
+      "sha256": "05f3d560ec70cdfcbbd7a679c1c1fdd0aa1711844ec149ee2e8b647c36909af8"
+    },
+    {
+      "path": "dashboard/server.mjs",
+      "sha256": "0d8c49f61fe2b5b66043b5909c6aaec4657a269b22326394cbef3ee91cdad428"
+    },
+    {
+      "path": "dashboard/tests/controller.test.mjs",
+      "sha256": "e3f5e2b803046fd50306dfb63cccb45b0d2bd29a0fed1f6126c5be26b5e381c0"
+    },
+    {
+      "path": "dashboard/tests/fixtures.mjs",
+      "sha256": "56495383e45eabaeefc598d4164d372bdc43339aeceb2d6f16ca54cef00846b8"
+    },
+    {
+      "path": "dashboard/tests/mqtt.test.mjs",
+      "sha256": "fa1270bc6c97937470223d2ee1283370e1bd32ce850337940cf587d598559d0d"
+    },
+    {
+      "path": "dashboard/tests/protocol.test.mjs",
+      "sha256": "56a6028d6e10572ca8b189437d2a603029cec321ce412bef8d16091088bd8de9"
+    },
+    {
+      "path": "testing/subsystem1/host/check_wire.mjs",
+      "sha256": "4eeb908575aac18b79798b0b3b05b0f616dfedc587ecba4b45c7cab9d1b6144e"
+    },
+    {
+      "path": "testing/subsystem1/host/emit_frames.c",
+      "sha256": "b38f3aea255cfcc5665a2194dca4261a9d5068e7d5a3365b369b25898c16bd34"
+    },
+    {
+      "path": "testing/subsystem1/host/include/bsp/libbsp.h",
+      "sha256": "5e833eadedd9f1f840ddf67d4b0b0187886e78a18a108b21dfe6a3f512528563"
+    },
+    {
+      "path": "testing/subsystem1/host/include/lwip/apps/mqtt.h",
+      "sha256": "b90cf90cde2d222fbaecd840c6eca036919e57acce32553f79f1ef69d4d39bdb"
+    },
+    {
+      "path": "testing/subsystem1/host/include/lwip/ip_addr.h",
+      "sha256": "ad4b4e6e65a4a03eecd88e34b5b352247781c71d4c0dd8dfb88551a5308f929c"
+    },
+    {
+      "path": "testing/subsystem1/host/include/lwip/sys.h",
+      "sha256": "deff1a80565817f806c13df954856b40fec279618020851beee72feb70e6d1b5"
+    },
+    {
+      "path": "testing/subsystem1/host/include/lwip/timeouts.h",
+      "sha256": "238cfa9bec0156ce5340b37eacda0dc65ba8555d9a232391dac091492dfb7e60"
+    },
+    {
+      "path": "testing/subsystem1/host/include/sys/sysdef.h",
+      "sha256": "33b5f8aca8695e02c499af000c432839523568f017a6a441a07269425142376e"
+    },
+    {
+      "path": "testing/subsystem1/host/include/tk/syslib.h",
+      "sha256": "0a99035b9522e1c7014fecf9c1de7225cd1ed19ab55e8d79edc648a16adad1ce"
+    },
+    {
+      "path": "testing/subsystem1/host/include/tk/tkernel.h",
+      "sha256": "524407a2e76adf9172ad5363e0bd15135ab937c6a4b3bd44e19c2e2e79d55449"
+    },
+    {
+      "path": "testing/subsystem1/host/include/tm/tmonitor.h",
+      "sha256": "7fe23b1a78a0d1f44b4c550abd7ff8ef1da162dba7f59af58746870a70712fa1"
+    },
+    {
+      "path": "testing/subsystem1/host/include/wifi_secrets.h",
+      "sha256": "561489e239a42fc39f05dcf9abc26e3bb93d6e72601f86e95dabf051e0b34a48"
+    },
+    {
+      "path": "testing/subsystem1/host/measure_layout.c",
+      "sha256": "92b6a07c5c30cc9c9e543bb28bf3617dc85ba8c88e9677fe967766766d7f0c35"
+    },
+    {
+      "path": "testing/subsystem1/host/recovery_probe.test.mjs",
+      "sha256": "33bf5bfd173acf5a8f1d3a4fc9bf6bd9e7b77630da4cbffdfd593b81c1721db6"
+    },
+    {
+      "path": "testing/subsystem1/host/test_controller.c",
+      "sha256": "e255b52d1aec3a8e8a0c6f9407177d44bbfaa12ed3344eef4ff6bfecc7f11657"
+    },
+    {
+      "path": "testing/subsystem1/host/test_imu_snapshot.c",
+      "sha256": "efa846eadf9606f9b3823e9dfe432196f4575dd2d56a81b176729cc805775a76"
+    },
+    {
+      "path": "testing/subsystem1/host/test_s5_scan.c",
+      "sha256": "fe4182763a12037340dfaf8ffa30a8fb0dc7bb011c645a3100a6a7dee3ac2bab"
+    },
+    {
+      "path": "testing/subsystem1/host/test_status_mqtt.c",
+      "sha256": "9266dfe48a92f7391ce149be3c49266dfe18db62e24737c7c53438a3926aa600"
+    },
+    {
+      "path": "testing/subsystem1/host/test_telemetry.c",
+      "sha256": "10cfdf1b1d00a04d5e94e693567717837653584562e51e24e8f4d5d837e29aeb"
+    },
+    {
+      "path": "testing/subsystem1/host/test_wifi_recovery.c",
+      "sha256": "41a3d3fc0384a715aa743b39c2b7628389304a921c6b73ed51762b32f4cd4c40"
+    },
+    {
+      "path": "testing/subsystem1/observe_controller.mjs",
+      "sha256": "a2400a9aaad1dfb1e3e6f8fd7a40b1b8ba15dbd9ab13eaf8c9ab979dc6822cbf"
+    },
+    {
+      "path": "testing/subsystem1/recovery_probe.mjs",
+      "sha256": "5bef666c350e02f94ad33d590bc2348ab1c60e99c9c3ce39c5a63a9c696d9edc"
+    },
+    {
+      "path": "testing/subsystem1/run_batch_checks.py",
+      "sha256": "219a98538996f5e59598db14a20697aefc3c72008987ced025706c13d7303d93"
+    },
+    {
+      "path": "testing/subsystem1/test_build_modes.py",
+      "sha256": "b1b8592a29b24bc8c5758fec5b011859200eb965280a9dc94db11abc61c268b5"
+    },
+    {
+      "path": "testing/subsystem1/test_gpio_sharing.py",
+      "sha256": "13479840de8a5f9e0b5b2d37a4f9024b9f970f8e8a60ac8dd730341f1892ea48"
+    },
+    {
+      "path": "testing/subsystem1/test_memory_stats.py",
+      "sha256": "5d05249f158e4f92b85223c37462cd379674fdc3451a6ef5d7cd735674534cf5"
+    },
+    {
+      "path": "testing/subsystem1/test_motor_stop_path.py",
+      "sha256": "9bc6a1b40ce06c757651b91f68a08d6f7a4527a2a2485cca90b090645df1ead5"
+    },
+    {
+      "path": "testing/subsystem1/test_producer_hooks.py",
+      "sha256": "ec30af9ae889d15ced3da2b15e47fb44c987c6bae51705ac213e7248253d9f47"
+    },
+    {
+      "path": "testing/subsystem1/test_s1_stack_frames.py",
+      "sha256": "3999d66d137ceb87e08d7c41c2020b8ace45b0bdabcaf1712913b5bded5e69c3"
+    },
+    {
+      "path": "testing/subsystem2/test_analog_policy.py",
+      "sha256": "770857cbb1e24f1a0d0500b1b990afb4d5b7998cc2410b1b4a8bf657d4d2c8a7"
+    },
+    {
+      "path": "testing/subsystem2/test_odometry.c",
+      "sha256": "0d22670e7e630228a9ae069c216579b11bc77b3ad17a640a65ac3a359d2fd794"
+    },
+    {
+      "path": "testing/subsystem2/test_passive_feedback.py",
+      "sha256": "336c48e449900a886b1d19500540097086fac30a81bcbb92eef868a8487174b6"
+    }
+  ],
+  "checks": {
+    "batch": "testing/subsystem1/logs/s1-batch-2026-11-17T07-08-51/summary.json",
+    "batch_groups_passed": 18,
+    "dashboard_tests": 43,
+    "wire_vectors": 20089,
+    "passive_loop_checks": 10,
+    "odometer_assertions": 17,
+    "normal_motor_checks": 22,
+    "arm_profiles": 4,
+    "s2_stack_estimate": 544,
+    "s1_stack_estimate": 464,
+    "s5_stack_estimate": 136,
+    "stack_capacity_per_task": 2048,
+    "runtime_high_water_measured": false,
+    "elf_producer_linkage": "passed"
+  },
+  "scope": "S2 passive encoder sampling and centre-path producer; dashboard derived average/precision/CSV. Existing controller/PID, S3, S4, S5 algorithms unchanged.",
+  "source_hash_scope": "Published source files as read in the local Windows working tree. Git checkout line endings may affect byte hashes."
+}

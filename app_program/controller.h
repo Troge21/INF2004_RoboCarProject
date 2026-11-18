@@ -30,13 +30,28 @@
 #define APP_STOP_REPLAY 3U
 #define APP_STOP_BUSY 4U
 #define APP_STOP_FAULT 5U
+#define APP_RESUME_RELEASED 0U
+#define APP_RESUME_EXPIRED 1U
+#define APP_RESUME_SESSION 2U
+#define APP_RESUME_REPLAY 3U
+#define APP_RESUME_BUSY 4U
+#define APP_RESUME_FAULT 5U
+#define APP_RESUME_NOT_READY 6U
+#define APP_RESUME_AUTH_CHANGED 7U
+/* Private owner reply bit; converted to a distinct MQTT marker, not sent here. */
+#define APP_REPLY_RESUME 0x200U
 /* Snapshot: operating-time:32 LE + state:4/latch:1/TEST:1/reserved:2.
  * Reply: ID:32 + session:32 + control:6/result:3/reserved:7. */
 int app_controller_init(void);
 int app_controller_submit_stop(uint32_t id,uint32_t session,uint32_t deadline_ms);
+/* A fresh arm creates a one-use server ticket, invalidated by STOP. */
+int app_controller_arm_resume(uint32_t deadline_ms,uint32_t *ticket);
+int app_controller_submit_resume(uint32_t ticket,uint32_t session,uint32_t deadline_ms);
+void app_controller_cancel_resume(void);
 int app_controller_snapshot(uint8_t out[5]);
 int app_controller_take_reply(uint8_t out[10]);
 /* Controller task only, once before and once after its motor submission. */
 unsigned app_controller_poll(void);
+unsigned app_controller_poll_ready(int resume_ready);
 void app_controller_publish(unsigned state,int motor_result);
 #endif

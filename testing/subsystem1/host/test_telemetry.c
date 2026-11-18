@@ -7,7 +7,9 @@
 #include <stdarg.h>
 #include <setjmp.h>
 #define APP_H
+#ifndef APP_TEST
 #define APP_TEST 1
+#endif
 #define APP_BENCH_MODE 0
 #define IMPORT extern
 #define EXPORT
@@ -51,11 +53,13 @@ static ER tk_dly_tsk(INT delay){
     if(--ticks<=0)longjmp(stopped,1);
     calendar_ms+=(UW)delay;boot_ms+=(UW)delay;return 0;
 }
+#if APP_TEST
 static INT tm_printf(UB *format,...){
     char text[1024];va_list args;int n;va_start(args,format);
     n=vsnprintf(text,sizeof(text),(const char *)format,args);va_end(args);
     fputs(text,stdout);if(strstr(text," FAIL "))++failures;return n;
 }
+#endif
 #include "../../../app_program/subsystem2/subsystem2.h"
 #include "../../../app_program/subsystem3/subsystem3.h"
 #include "../../../app_program/subsystem4/subsystem4.h"
@@ -66,27 +70,32 @@ static S3_LINE_DATA line;
 static S5_RANGE_DATA range;
 static HUMP_TELEMETRY_T imu;
 static TELEMETRY_SCAN scan_source;
-static int motion_ready,range_ready,line_ready,imu_ready,scan_ready;
+static TELEMETRY_TRAVEL travel_source;
+static int motion_ready,range_ready,line_ready,imu_ready,scan_ready,travel_ready;
 ER subsystem2_get_motion(S2_MOTION_DATA *s){++source_calls;*s=motion;return motion_ready?0:E_OBJ;}
 ER subsystem3_get_line(S3_LINE_DATA *s){++source_calls;*s=line;return line_ready?0:E_OBJ;}
 ER subsystem4_get_telemetry(HUMP_TELEMETRY_T *s){++source_calls;*s=imu;return imu_ready?0:E_OBJ;}
 ER subsystem5_get_range(S5_RANGE_DATA *s){++source_calls;*s=range;return range_ready?0:E_OBJ;}
 int telemetry_get_scan(TELEMETRY_SCAN *s){*s=scan_source;return scan_ready?0:E_NOSPT;}
 int telemetry_get_barcode(TELEMETRY_BARCODE *s){(void)s;return E_NOSPT;}
-int telemetry_get_travel(TELEMETRY_TRAVEL *s){(void)s;return E_NOSPT;}
+int telemetry_get_travel(TELEMETRY_TRAVEL *s){if(!travel_ready)return E_OBJ;*s=travel_source;return E_OK;}
 int telemetry_get_faults(TELEMETRY_FAULTS *s){(void)s;return E_NOSPT;}
 int telemetry_get_resources(TELEMETRY_RESOURCES *s){
     s->timestamp_ms=calendar_ms;s->free_heap=5000;s->largest_free_block=4000;
     s->allocated_stacks=2048;s->stack_high_water=UINT32_MAX;return 0;
 }
 #include "../../../app_program/subsystem1/s1_protocol.c"
+static unsigned mock_controller_word=(APP_TEST?APP_CTRL_TEST:0)|APP_CTRL_DISABLED;
+static int arm_result=APP_RESUME_NOT_READY;
 int app_controller_snapshot(uint8_t b[5]){
-    s1_write_u32(b,boot_ms);b[4]=APP_CTRL_TEST|APP_CTRL_DISABLED;return 0;
+    s1_write_u32(b,boot_ms);b[4]=mock_controller_word;return 0;
 }
 int app_controller_submit_stop(uint32_t id,uint32_t session,uint32_t deadline){
     (void)id;(void)session;(void)deadline;return 0;
 }
 int app_controller_take_reply(uint8_t b[10]){(void)b;return E_TMOUT;}
+int app_controller_arm_resume(uint32_t deadline,uint32_t *ticket){(void)deadline;if(!arm_result)*ticket=12345;return arm_result;}
+int app_controller_submit_resume(uint32_t ticket,uint32_t session,uint32_t deadline){(void)ticket;(void)session;(void)deadline;return APP_RESUME_NOT_READY;}
 #include "../../../app_program/subsystem1/subsystem1.c"
 #include "../../../app_program/subsystem1/subsystem1_test.c"
 static void expect(int value,const char *message){
@@ -96,17 +105,21 @@ static void collect(void){ticks=1;if(setjmp(stopped)==0)telemetry_task(0,NULL);}
 static void advance(UW ms){calendar_ms+=ms;boot_ms+=ms;}
 int main(void){
     UB b[S1_TX_CAPACITY],request[5]={0xa0,1,0,0,0};uint32_t counters[3]={0};int calls,n;
+#if APP_TEST
     subsystem1_test();
+#endif
     expect(subsystem1_init()==0&&subsystem1_start()==0,"collector starts with one protected publication and no input queue");
     motion_ready=1;motion.encoder_valid=motion.speed_valid=1;
     motion.timestamp_ms=motion.speed_timestamp_ms=calendar_ms;
     motion.actual_left_rpm_x10=motion.actual_right_rpm_x10=350;
     motion.count_left=100;motion.count_right=200;motion.distance_centre_mm_x10=333;
+    travel_ready=1;travel_source.timestamp_ms=calendar_ms;travel_source.distance_mm=0;
     collect();calls=source_calls;
     n=s1_network_poll(b,sizeof(b),17);
     expect(n==46&&s1_get_bits(b+13,S1_B_RANGE,12)==0&&s1_get_bits(b+13,S1_B_COUNT_L,32)==100,
         "motion publishes when ultrasonic source is absent");
     expect(s1_get_bits(b+13,S1_B_LEFT,14)==6191,"S2 RPM is converted to actual speed with its tyre geometry");
+    expect(s1_get_bits(b+13,S1_B_TRAVEL,32)==0,"real zero path is serialized independently of net travel");
     expect(s1_network_poll(b,sizeof(b),17)==E_TMOUT,"telemetry rate is bounded independently of producer rates");
     expect(s1_network_status(request,5,b,sizeof(b),17)==62&&source_calls==calls,
         "STATUS reserializes snapshots without calling a producer/driver");
@@ -136,6 +149,32 @@ int main(void){
     scan_count=0;scan_source.sequence=8;scan_source.count=2;
     scan_source.points[1].angle=scan_source.points[0].angle;gather_scan();
     expect(scan_count==0,"malformed future scan does not corrupt the published cache");
+    advance(400);travel_source.timestamp_ms=calendar_ms;travel_source.distance_mm=1234;
+    collect();n=s1_network_poll(b,sizeof(b),17);
+    expect(n==46&&s1_get_bits(b+13,S1_B_TRAVEL,32)==1234,"owner path snapshot reaches the existing 46-byte wire field");
+    advance(2001);n=s1_network_poll(b,sizeof(b),17);
+    expect(n==46&&s1_get_bits(b+13,S1_B_TRAVEL,32)==UINT32_MAX,"stale path expires instead of appearing current");
+
+    {
+        UB arm[13]={0xa5};
+        s1_write_u32(arm+1,99);s1_write_u32(arm+5,17);s1_write_u32(arm+9,boot_ms+1000U);
+        n=s1_network_arm_resume(arm,sizeof(arm),b,sizeof(b),17);
+        expect(n==11&&b[0]==0xa8&&(((b[9]|((unsigned)b[10]<<8))>>6)&7U)==APP_RESUME_NOT_READY,
+            "disabled/test controller returns an explicit Resume rejection");
+#if !APP_TEST
+        mock_controller_word=APP_CTRL_STOP_LATCHED|APP_CTRL_LATCH;arm_result=0;collect();
+        n=s1_network_arm_resume(arm,sizeof(arm),b,sizeof(b),17);
+        expect(n==66&&b[0]==0xa6&&s1_read_u32(b+16)==12345&&b[20]==0xb4&&
+               s1_get_bits(b+33,S1_B_CONTROL,6)==mock_controller_word,
+            "actual S1 packs server authorization with the current normal latched sensor snapshot");
+        advance(2001);n=s1_network_arm_resume(arm,sizeof(arm),b,sizeof(b),17);
+        expect(n==20&&b[0]==0xa6&&s1_read_u32(b+16)==12345,
+            "authorization with no recent publication is header-only, never invented sensor readings");
+#endif
+        s1_write_u32(arm+5,18);n=s1_network_arm_resume(arm,sizeof(arm),b,sizeof(b),17);
+        expect(n==11&&b[0]==0xa8&&(b[9]>>6)==APP_RESUME_SESSION,
+            "wrong MQTT session cannot obtain a Resume ticket through S1");
+    }
     printf("[S1 bridge] SUMMARY %d checks, %d failures\n",checks,failures);
     return failures?1:0;
 }

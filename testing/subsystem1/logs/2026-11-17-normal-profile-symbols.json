@@ -1,0 +1,14 @@
+{
+  "checks": {
+    "motor_task": true,
+    "vehicle_controller_task": true,
+    "telemetry_task": true,
+    "mqtt_utk_poll": true,
+    "telemetry_get_travel": true,
+    "telemetry_get_scan": true,
+    "encoder_feedback_task": false,
+    "subsystem1_test": false
+  },
+  "passed": true,
+  "meaning": "Normal motor task and S1/scan/path present; passive stationary task and on-board TEST fixtures absent."
+}

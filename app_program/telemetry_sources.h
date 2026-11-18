@@ -17,7 +17,7 @@ typedef struct {
 } TELEMETRY_BARCODE;
 typedef struct {
     uint32_t timestamp_ms;
-    uint64_t distance_mm; /* actual nonnegative path length, not signed net travel */
+    uint64_t distance_mm; /* encoder-estimated centre path length, not signed net travel */
 } TELEMETRY_TRAVEL;
 typedef struct {
     uint32_t timestamp_ms;

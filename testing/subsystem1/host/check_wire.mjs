@@ -1,7 +1,7 @@
 // Actual C output decoded by the current JavaScript and MQTT framing.
 import {spawnSync} from 'node:child_process';
 import assert from 'node:assert/strict';
-import {decodeTelemetry,decodeScan,decodeDiagnostics,decodeStatusReply,decodeStopReply,decodeHeartbeat} from '../../../dashboard/dist/protocol.js';
+import {decodeTelemetry,decodeScan,decodeDiagnostics,decodeStatusReply,decodeStopReply,decodeHeartbeat,decodeResumeArmReply,decodeResumeReply} from '../../../dashboard/dist/protocol.js';
 import {packet,concat,mqttString,parsePublish,PacketReader} from '../../../dashboard/dist/mqtt.js';
 assert.ok(process.argv[2],'Pass the compiled emit_frames executable');
 const result=spawnSync(process.argv[2],[],{encoding:'utf8',maxBuffer:16*1024*1024});
@@ -21,6 +21,8 @@ for(const line of result.stdout.trim().split(/\r?\n/)){
     if(e.kind==='barcode'){assert.equal(s.barcode,e.character);assert.equal(s.barcode_reversed,Boolean(e.reversed));assert.equal(s.barcode_event_sequence,65535);}
     if(e.kind==='imu')assert.equal(s.pitch_deg,e.pitch/10);
   }else if(e.kind==='status'){const s=decodeStatusReply(b);assert.equal(s.request_id,0xffffffff);assert.equal(s.snapshot===null,Boolean(e.missing));}
+  else if(e.kind==='resume_arm'){const r=decodeResumeArmReply(b);assert.equal(r.ticket,0xffffffff);assert.equal(r.snapshot===null,Boolean(e.missing));}
+  else if(e.kind==='resume')assert.equal(decodeResumeReply(b).result,e.result);
   else if(e.kind==='stop')assert.equal(decodeStopReply(b).result,e.result);
   else if(e.kind==='scan'){
     const s=decodeScan(b);assert.equal(s.start,e.start);assert.equal(s.total,181);

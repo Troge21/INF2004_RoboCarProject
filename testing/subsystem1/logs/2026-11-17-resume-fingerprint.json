@@ -1,0 +1,531 @@
+{
+  "date": "2026-11-17",
+  "source_base": "a14220a49c8fa8a17be09fbd06c9bf0375895aac plus motion/delivery/Resume local changes",
+  "profile": "NET=lwip MQTT=1 TEST=0 APP_MODE=integrated CONSOLE=usb_cdc CRASH_REPORT=0",
+  "images": {
+    "normal": {
+      "path": "build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt.uf2",
+      "bytes": 721920,
+      "sha256": "2c5a4652c7c434fb1d27743a3579b6a9ff0dcf2f2f9a4ee79a813840ecd1bcbe",
+      "elf_sha256": "6593cfdea68e871e167d3cdf14d88cd1a700d919986b5cad77fe381a6a3af08a",
+      "text": 360680,
+      "data": 108,
+      "bss": 84040,
+      "linked_static_ram": 84148,
+      "build_log": "testing/subsystem1/logs/2026-11-17-resume-normal-build.txt",
+      "flashed": false,
+      "hardware_tested": false
+    },
+    "stationary": {
+      "path": "build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2",
+      "bytes": 735744,
+      "sha256": "adfc4f27c4d338090c9599a1c55c78c2c7074ef30c9275c7d370b3a7f44cb796",
+      "elf_sha256": "b2acee76192de02201af2bada5a58a8f8903cd88a343dd13e39203b90312bd39",
+      "text": 367660,
+      "data": 108,
+      "bss": 84776,
+      "linked_static_ram": 84884,
+      "build_log": "testing/subsystem1/logs/2026-11-17-resume-stationary-build.txt",
+      "flashed": false,
+      "hardware_tested": false
+    }
+  },
+  "source_files": [
+    {
+      "path": "app_program/app.h",
+      "sha256": "0367390628fbf164124b868276bd4d12639974f6c0497bf0f48eef430361ce47"
+    },
+    {
+      "path": "app_program/app_main.c",
+      "sha256": "c418d854a6919787283058a8a46bec4ffec67b6d85929a5aa682f6f0d3d8dda8"
+    },
+    {
+      "path": "app_program/controller.c",
+      "sha256": "7afd7f850d334d168306222c6a29713b06fa22634ac19023ced2d78352e8f67a"
+    },
+    {
+      "path": "app_program/controller.h",
+      "sha256": "2f90e8eb358cd97dfdc3f4e5813ebe56214f03464331fecbf912d892fdc697cb"
+    },
+    {
+      "path": "app_program/gpio_irq.c",
+      "sha256": "54747912a0fbaefda676916db1f8674f5b5098200eac455d83d625af0cb6195c"
+    },
+    {
+      "path": "app_program/gpio_irq.h",
+      "sha256": "42411f0bf769ab81fde9b2ad7cfc1f456b88942b81bf6ba171466618957925c5"
+    },
+    {
+      "path": "app_program/subsystem1/s1_protocol.c",
+      "sha256": "b60407704322c2b62ec85081eb1fb2c501593f75cf1b671e5f94b88182095511"
+    },
+    {
+      "path": "app_program/subsystem1/s1_protocol.h",
+      "sha256": "92c3ddc39da0e6c9ace426c636602adb836ff9c408467130e1b9bdc501da150d"
+    },
+    {
+      "path": "app_program/subsystem1/s1_sources.c",
+      "sha256": "31ed7a7f9f2750dd0f985bb915d7c26e9a01c1eaa45838089563ab2a76c38371"
+    },
+    {
+      "path": "app_program/subsystem1/subsystem1.c",
+      "sha256": "6d886b50fe23d8596afd519cac9019c279fdb257ab52c06eb3ff0a5ef6038380"
+    },
+    {
+      "path": "app_program/subsystem1/subsystem1.h",
+      "sha256": "d5c73079318db1ca8d0496be69d822cd37f71eedfd7d594bd4ca3edadea5fd06"
+    },
+    {
+      "path": "app_program/subsystem1/subsystem1_test.c",
+      "sha256": "96aa6156dcb3fe52c2d9635817f558d0ea02c94b632cd251bab604bc8dd1bf29"
+    },
+    {
+      "path": "app_program/subsystem2/encoder_capture.c",
+      "sha256": "1e806dd7f75100fff477e5e8e0c26b278d2bfa7904df2f4666147015aa3b02f3"
+    },
+    {
+      "path": "app_program/subsystem2/encoder_capture.h",
+      "sha256": "c27303eea1b18e1ef990c1bf4bb50b5375209ca837fb50caea1e770b089d2ce1"
+    },
+    {
+      "path": "app_program/subsystem2/motion_control.c",
+      "sha256": "268be5d3c4b217543aa569d79b4b177330ff0aab128f6da7249ea8ac0df0b50b"
+    },
+    {
+      "path": "app_program/subsystem2/motion_control.h",
+      "sha256": "5f96e918c68792c4cb6d194dab37befcbe7e2bc9e3c22a4427aa5b0362bb92ec"
+    },
+    {
+      "path": "app_program/subsystem2/odometry.c",
+      "sha256": "182e8564ec5884c6e113039ccfe4ff493d4b7ed6db71e1a8105a52dcab0c1dd6"
+    },
+    {
+      "path": "app_program/subsystem2/odometry.h",
+      "sha256": "8d5c99f6f776b801521e86f395abe7f8bd1d21239e9433671f460cd590ad90d1"
+    },
+    {
+      "path": "app_program/subsystem2/subsystem2.c",
+      "sha256": "93308f86ee4e2ec544ce589a7b2cd12a05f79b3d3e3b84f31ed0429afb580ec9"
+    },
+    {
+      "path": "app_program/subsystem2/subsystem2.h",
+      "sha256": "d69abe00a32f0b0291fa421d4b5a0f45bb35af050c2903ea03dbef81898b1f7c"
+    },
+    {
+      "path": "app_program/subsystem2/subsystem2_test.c",
+      "sha256": "3acf712c07e3a77c121b85242b04ee97001bfa5c03efdc4cfd7e595a228d13a7"
+    },
+    {
+      "path": "app_program/subsystem3/barcode_capture.c",
+      "sha256": "37abf55d95115ed713f1de6e1a7e3b425fd771382ef33ac83e7d3973427d9016"
+    },
+    {
+      "path": "app_program/subsystem3/barcode_capture.h",
+      "sha256": "0181ba05cf6c36facf011e357f3c617166211aeda41ded728b745b4e30e8b799"
+    },
+    {
+      "path": "app_program/subsystem3/barcode_decoder.c",
+      "sha256": "93f0a674284b10b8743654066d00017cd1556b47b22d40541bf84aa126f8dc0d"
+    },
+    {
+      "path": "app_program/subsystem3/barcode_decoder.h",
+      "sha256": "b9c16866941476ccf8ec293a0da962f0f40aec82bc1d66733ef28989ad60766a"
+    },
+    {
+      "path": "app_program/subsystem3/ir_adc_test.c",
+      "sha256": "7e011125f2dca9cc618d5b0c663e8159b5812e19a5afd642be38684a77de3f79"
+    },
+    {
+      "path": "app_program/subsystem3/line_detection.c",
+      "sha256": "5a5c85f67bd0e5b679dfda1eb046b002ded23e32d8ca8a5343e43befe9b1cfb7"
+    },
+    {
+      "path": "app_program/subsystem3/line_detection.h",
+      "sha256": "62731eab10ac21e707c064ad34835cf7430457acd61271ee36d23ba099a109ba"
+    },
+    {
+      "path": "app_program/subsystem3/subsystem3.c",
+      "sha256": "e7bcc191f1eccd117b09fe7f6e5615c186ebc33f93f57b6149ac7f1c16727021"
+    },
+    {
+      "path": "app_program/subsystem3/subsystem3.h",
+      "sha256": "3a932adbe1b7d8f9fa6fd046f933ea0f92133a89e6b9ac88685e6b8db8f1f4c0"
+    },
+    {
+      "path": "app_program/subsystem3/subsystem3_test.c",
+      "sha256": "36366885c3ea1d3e1eff4839b780f5a8528bebfdcd61081daf602af95172c858"
+    },
+    {
+      "path": "app_program/subsystem4/drv_gy511.c",
+      "sha256": "36aa2a51100798ac404b2b7f53beda78d2b8dc8d907362976092028cf9fa1bea"
+    },
+    {
+      "path": "app_program/subsystem4/drv_gy511.h",
+      "sha256": "2879b2eb4baca3b16bf4e19de900639934aa698d833fe7604ad393748d36e3d0"
+    },
+    {
+      "path": "app_program/subsystem4/subsystem4.c",
+      "sha256": "8daffb73aa163ae4b2c6e74d186de78d7348e768dac39de84fec29cf1e68de69"
+    },
+    {
+      "path": "app_program/subsystem4/subsystem4.h",
+      "sha256": "c90d9144efa1a05783ae25aeebb87ca0fe43c671d0d58da0d914a59b718624c2"
+    },
+    {
+      "path": "app_program/subsystem4/subsystem4_test.c",
+      "sha256": "03207a225ec7e833bf785c3c960e7e37210ac738b777427173ccf7a54dc7d393"
+    },
+    {
+      "path": "app_program/subsystem5/subsystem5.c",
+      "sha256": "633b915a5a9336cbbdf5b9a036e461c26d295ad57b9a0e89ed08ca22c2209b15"
+    },
+    {
+      "path": "app_program/subsystem5/subsystem5.h",
+      "sha256": "d6b0555899a48031a47be61f4d5a28aaee33497b6b855b430e13369bae9abef3"
+    },
+    {
+      "path": "app_program/subsystem5/subsystem5_test.c",
+      "sha256": "812aa2fde70c00470136215674db2aea83268f4e436c652806cec27931774fd3"
+    },
+    {
+      "path": "app_program/telemetry_sources.h",
+      "sha256": "ea8f30400afcf47a29113b8ac01fc5127925e779ab03a4b8db8c49a2afb47a26"
+    },
+    {
+      "path": "app_program/test_report.h",
+      "sha256": "68858801abeef5aeb8d8588995392d78b2b550ba905ee1352cf4d4c31baa379b"
+    },
+    {
+      "path": "dashboard/dist/app.js",
+      "sha256": "97e98b160d270c0b311a4465f317374db0fdbc051822a725a811be873390b3b6"
+    },
+    {
+      "path": "dashboard/dist/charts.js",
+      "sha256": "ce6b62b6452b817f6445b63d3bff8618f3736c9aa9c34233b221e4ed1aeabdec"
+    },
+    {
+      "path": "dashboard/dist/mqtt.js",
+      "sha256": "4fe0ce715a26aabd2b3e7628413b0e7597eeac7bd62b76fc84ffa8e5042f51bb"
+    },
+    {
+      "path": "dashboard/dist/protocol.js",
+      "sha256": "48a61add74e93b610c7ccf5e35b003d38665b2e74f592a1a6c122895aec167ac"
+    },
+    {
+      "path": "dashboard/server.mjs",
+      "sha256": "0d8c49f61fe2b5b66043b5909c6aaec4657a269b22326394cbef3ee91cdad428"
+    },
+    {
+      "path": "dashboard/tests/controller.test.mjs",
+      "sha256": "e3f5e2b803046fd50306dfb63cccb45b0d2bd29a0fed1f6126c5be26b5e381c0"
+    },
+    {
+      "path": "dashboard/tests/fixtures.mjs",
+      "sha256": "108879f6d2ac75c5ea85722d6c597bf7b4727c91c9a164682cc447a77c631645"
+    },
+    {
+      "path": "dashboard/tests/mqtt.test.mjs",
+      "sha256": "fa1270bc6c97937470223d2ee1283370e1bd32ce850337940cf587d598559d0d"
+    },
+    {
+      "path": "dashboard/tests/protocol.test.mjs",
+      "sha256": "56a6028d6e10572ca8b189437d2a603029cec321ce412bef8d16091088bd8de9"
+    },
+    {
+      "path": "dashboard/tests/resume.test.mjs",
+      "sha256": "689ef3dae594abc906be67c2c5b981397916a7a99534e83d4ba34428f0d65df6"
+    },
+    {
+      "path": "lib/liblwip/sysdepend/pico_rp2040/include/arch/cc.h",
+      "sha256": "795c8b932fe6426f6849c57c550bd6ba14ce51e102c623c9b851404b0247235a"
+    },
+    {
+      "path": "lib/liblwip/sysdepend/pico_rp2040/include/arch/sys_arch.h",
+      "sha256": "8efcbc692de1130a9e8ad445f01651a04fa5dc81a3c5a79a281cb96b38927517"
+    },
+    {
+      "path": "lib/liblwip/sysdepend/pico_rp2040/lwipopts.h",
+      "sha256": "708afa92378248452894fec00cf00069c692bfaecf8aca7ff68420d30f51d1c4"
+    },
+    {
+      "path": "lib/liblwip/sysdepend/pico_rp2040/mqtt_utk.c",
+      "sha256": "875be2a9e8f09cce3996ca88ca7188abbdf0accf4507d5affe2ddb6717474440"
+    },
+    {
+      "path": "lib/liblwip/sysdepend/pico_rp2040/mqtt_utk.h",
+      "sha256": "02f30897ce378586a615d743bbe4ed933f96a34a72e74c3e95542015d19a2140"
+    },
+    {
+      "path": "lib/liblwip/sysdepend/pico_rp2040/sys_arch.c",
+      "sha256": "cd941b66abd9e68bc7b3e1acda0bc21224fe983150086b2bfcb10623d476c994"
+    },
+    {
+      "path": "lib/libwifi/sysdepend/pico_rp2040/cyw43_bus_pio_spi.pio.h",
+      "sha256": "e17984a59480a228b08521be89dcea9222a152fe29bb08fd866d5897c8fa1145"
+    },
+    {
+      "path": "lib/libwifi/sysdepend/pico_rp2040/cyw43_configport.h",
+      "sha256": "82956d38218c110569ed9a6f9e4a36a509f48b861b171b5e404743bb9f94c697"
+    },
+    {
+      "path": "lib/libwifi/sysdepend/pico_rp2040/cyw43_utk.c",
+      "sha256": "149894d883f45e24158b16797e96d6cea4f1230e11f2e0a8f767a6fc0c557f30"
+    },
+    {
+      "path": "lib/libwifi/sysdepend/pico_rp2040/cyw43_utk.h",
+      "sha256": "65e34a81a07f6c8f308934a97116d98fce39f276c5f5204201e010d00667bca4"
+    },
+    {
+      "path": "lib/libwifi/sysdepend/pico_rp2040/cyw43_utk_compat.c",
+      "sha256": "48ed37f7b69d5c152ce00ec1be82b23dcecdd0a5faeac2623a0554361cb1b93b"
+    },
+    {
+      "path": "lib/libwifi/sysdepend/pico_rp2040/cyw43_utk_kernel.c",
+      "sha256": "563e70835fbdf219f86349794bae85adf1c44b94c8236fa49e1111032f83c8a4"
+    },
+    {
+      "path": "lib/libwifi/sysdepend/pico_rp2040/wifi_recovery.h",
+      "sha256": "597dc8a7e9c6d43f7aa6d8b8c2fc002b54c4445c0e07d7051dcfa22f81dc60d9"
+    },
+    {
+      "path": "testing/subsystem1/host/check_wire.mjs",
+      "sha256": "0a411b2d6fcb310cb7157e352475a6729674a9061422591d255987ca1129727d"
+    },
+    {
+      "path": "testing/subsystem1/host/emit_frames.c",
+      "sha256": "db9fbf0210f2e6f1403300d805eb91dfb08cbe0840a3eb67bb8ed48fdd39980e"
+    },
+    {
+      "path": "testing/subsystem1/host/include/bsp/libbsp.h",
+      "sha256": "5e833eadedd9f1f840ddf67d4b0b0187886e78a18a108b21dfe6a3f512528563"
+    },
+    {
+      "path": "testing/subsystem1/host/include/lwip/altcp.h",
+      "sha256": "a7e9ccebe58c8da355132d803e670780e326699f8c4f3d637f84ef8b6f910012"
+    },
+    {
+      "path": "testing/subsystem1/host/include/lwip/apps/mqtt.h",
+      "sha256": "0c77568cdef4dee76af7012d7f25e2c7ce3f696ed46d4b2be97818e0890f4563"
+    },
+    {
+      "path": "testing/subsystem1/host/include/lwip/apps/mqtt_priv.h",
+      "sha256": "33ec9eb0a4b9b8ec1f8c11cc13d0a657a0d7a69b24022829e44f7b8e4b261812"
+    },
+    {
+      "path": "testing/subsystem1/host/include/lwip/ip_addr.h",
+      "sha256": "ad4b4e6e65a4a03eecd88e34b5b352247781c71d4c0dd8dfb88551a5308f929c"
+    },
+    {
+      "path": "testing/subsystem1/host/include/lwip/sys.h",
+      "sha256": "deff1a80565817f806c13df954856b40fec279618020851beee72feb70e6d1b5"
+    },
+    {
+      "path": "testing/subsystem1/host/include/lwip/timeouts.h",
+      "sha256": "238cfa9bec0156ce5340b37eacda0dc65ba8555d9a232391dac091492dfb7e60"
+    },
+    {
+      "path": "testing/subsystem1/host/include/sys/sysdef.h",
+      "sha256": "33b5f8aca8695e02c499af000c432839523568f017a6a441a07269425142376e"
+    },
+    {
+      "path": "testing/subsystem1/host/include/tk/syslib.h",
+      "sha256": "0a99035b9522e1c7014fecf9c1de7225cd1ed19ab55e8d79edc648a16adad1ce"
+    },
+    {
+      "path": "testing/subsystem1/host/include/tk/tkernel.h",
+      "sha256": "524407a2e76adf9172ad5363e0bd15135ab937c6a4b3bd44e19c2e2e79d55449"
+    },
+    {
+      "path": "testing/subsystem1/host/include/tm/tmonitor.h",
+      "sha256": "7fe23b1a78a0d1f44b4c550abd7ff8ef1da162dba7f59af58746870a70712fa1"
+    },
+    {
+      "path": "testing/subsystem1/host/include/wifi_secrets.h",
+      "sha256": "561489e239a42fc39f05dcf9abc26e3bb93d6e72601f86e95dabf051e0b34a48"
+    },
+    {
+      "path": "testing/subsystem1/host/measure_layout.c",
+      "sha256": "92b6a07c5c30cc9c9e543bb28bf3617dc85ba8c88e9677fe967766766d7f0c35"
+    },
+    {
+      "path": "testing/subsystem1/host/recovery_probe.test.mjs",
+      "sha256": "33bf5bfd173acf5a8f1d3a4fc9bf6bd9e7b77630da4cbffdfd593b81c1721db6"
+    },
+    {
+      "path": "testing/subsystem1/host/test_controller.c",
+      "sha256": "00ace0d07f860a01f22691ab20d6befeef3f8f5fac702c08282ccf887ce0de7a"
+    },
+    {
+      "path": "testing/subsystem1/host/test_imu_snapshot.c",
+      "sha256": "efa846eadf9606f9b3823e9dfe432196f4575dd2d56a81b176729cc805775a76"
+    },
+    {
+      "path": "testing/subsystem1/host/test_s5_scan.c",
+      "sha256": "fe4182763a12037340dfaf8ffa30a8fb0dc7bb011c645a3100a6a7dee3ac2bab"
+    },
+    {
+      "path": "testing/subsystem1/host/test_status_mqtt.c",
+      "sha256": "c952b9ca8a0c769312968aa393079c4a4554b88e9ebe17db9809127cc2f014f4"
+    },
+    {
+      "path": "testing/subsystem1/host/test_telemetry.c",
+      "sha256": "b8e5a0be21dcd6d951d594a7d6aba9cf943310719b321612b29676eae4855114"
+    },
+    {
+      "path": "testing/subsystem1/host/test_wifi_recovery.c",
+      "sha256": "41a3d3fc0384a715aa743b39c2b7628389304a921c6b73ed51762b32f4cd4c40"
+    },
+    {
+      "path": "testing/subsystem1/observe_controller.mjs",
+      "sha256": "6e1a018cd67733815438359561bc27a061d2dd88a7ec31db61d1b56e29473b8e"
+    },
+    {
+      "path": "testing/subsystem1/recovery_probe.mjs",
+      "sha256": "5bef666c350e02f94ad33d590bc2348ab1c60e99c9c3ce39c5a63a9c696d9edc"
+    },
+    {
+      "path": "testing/subsystem1/run_batch_checks.py",
+      "sha256": "9892d794001df7fbdcb68e3cfd3b0a767f3041c26a1267a7c481f02f29bf8255"
+    },
+    {
+      "path": "testing/subsystem1/test_build_modes.py",
+      "sha256": "c55b6569aa4f55b45ed8f0cf496fcfbde2328d55e2b42c9e3ed2c5f2e8a90f80"
+    },
+    {
+      "path": "testing/subsystem1/test_gpio_sharing.py",
+      "sha256": "13479840de8a5f9e0b5b2d37a4f9024b9f970f8e8a60ac8dd730341f1892ea48"
+    },
+    {
+      "path": "testing/subsystem1/test_memory_stats.py",
+      "sha256": "5d05249f158e4f92b85223c37462cd379674fdc3451a6ef5d7cd735674534cf5"
+    },
+    {
+      "path": "testing/subsystem1/test_motor_stop_path.py",
+      "sha256": "f044e233039ff5e6ee48378094a468af2603b4bdd59aaed940e60e394aae4692"
+    },
+    {
+      "path": "testing/subsystem1/test_producer_hooks.py",
+      "sha256": "ec30af9ae889d15ced3da2b15e47fb44c987c6bae51705ac213e7248253d9f47"
+    },
+    {
+      "path": "testing/subsystem1/test_s1_stack_frames.py",
+      "sha256": "d3db0122146df14c4a6eeebf95fb934c56b79a9910cbc8c44e0801d15a25d6b7"
+    },
+    {
+      "path": "testing/subsystem1/test_wifi_latency.py",
+      "sha256": "00a0e346566346a359b1f9834bef356b38e744fc21371908ec42a58b2cf0b9e5"
+    },
+    {
+      "path": "testing/subsystem2/test_analog_policy.py",
+      "sha256": "770857cbb1e24f1a0d0500b1b990afb4d5b7998cc2410b1b4a8bf657d4d2c8a7"
+    },
+    {
+      "path": "testing/subsystem2/test_odometry.c",
+      "sha256": "0d22670e7e630228a9ae069c216579b11bc77b3ad17a640a65ac3a359d2fd794"
+    },
+    {
+      "path": "testing/subsystem2/test_passive_feedback.py",
+      "sha256": "336c48e449900a886b1d19500540097086fac30a81bcbb92eef868a8487174b6"
+    },
+    {
+      "path": "testing/subsystem3/analog_input_harness.c",
+      "sha256": "ce3bca558347e41ac01cbe646651ecf5f2cd7f019983d46f1088d3cc51c59e44"
+    },
+    {
+      "path": "testing/subsystem3/capture_harness.c",
+      "sha256": "53d51f36debd0114cdbff9b788d4452756c2af136950f2c8990ae36016bcbea4"
+    },
+    {
+      "path": "testing/subsystem3/test_barcode.py",
+      "sha256": "ce058913d44b9d937e86ab9b0b2982e76302f174c8f3f518408b6af85126eaba"
+    }
+  ],
+  "changed_public_files_since_verified_normal": [
+    "app_program/app_main.c",
+    "app_program/controller.c",
+    "app_program/controller.h",
+    "app_program/subsystem1/s1_protocol.c",
+    "app_program/subsystem1/s1_protocol.h",
+    "app_program/subsystem1/subsystem1.c",
+    "app_program/subsystem1/subsystem1.h",
+    "dashboard/dist/app.js",
+    "dashboard/dist/protocol.js",
+    "dashboard/tests/fixtures.mjs",
+    "testing/subsystem1/host/check_wire.mjs",
+    "testing/subsystem1/host/emit_frames.c",
+    "testing/subsystem1/host/test_controller.c",
+    "testing/subsystem1/host/test_status_mqtt.c",
+    "testing/subsystem1/host/test_telemetry.c",
+    "testing/subsystem1/observe_controller.mjs",
+    "testing/subsystem1/run_batch_checks.py",
+    "testing/subsystem1/test_build_modes.py",
+    "testing/subsystem1/test_motor_stop_path.py",
+    "testing/subsystem1/test_s1_stack_frames.py",
+    "lib/liblwip/sysdepend/pico_rp2040/mqtt_utk.c",
+    "lib/liblwip/sysdepend/pico_rp2040/mqtt_utk.h"
+  ],
+  "unchanged_other_subsystem_files": [
+    "app_program/subsystem2/encoder_capture.c",
+    "app_program/subsystem2/encoder_capture.h",
+    "app_program/subsystem2/motion_control.c",
+    "app_program/subsystem2/motion_control.h",
+    "app_program/subsystem2/odometry.c",
+    "app_program/subsystem2/odometry.h",
+    "app_program/subsystem2/subsystem2.c",
+    "app_program/subsystem2/subsystem2.h",
+    "app_program/subsystem2/subsystem2_test.c",
+    "app_program/subsystem3/barcode_capture.c",
+    "app_program/subsystem3/barcode_capture.h",
+    "app_program/subsystem3/barcode_decoder.c",
+    "app_program/subsystem3/barcode_decoder.h",
+    "app_program/subsystem3/ir_adc_test.c",
+    "app_program/subsystem3/line_detection.c",
+    "app_program/subsystem3/line_detection.h",
+    "app_program/subsystem3/subsystem3.c",
+    "app_program/subsystem3/subsystem3.h",
+    "app_program/subsystem3/subsystem3_test.c",
+    "app_program/subsystem4/drv_gy511.c",
+    "app_program/subsystem4/drv_gy511.h",
+    "app_program/subsystem4/subsystem4.c",
+    "app_program/subsystem4/subsystem4.h",
+    "app_program/subsystem4/subsystem4_test.c",
+    "app_program/subsystem5/subsystem5.c",
+    "app_program/subsystem5/subsystem5.h",
+    "app_program/subsystem5/subsystem5_test.c"
+  ],
+  "source_archive": {
+    "path": "C:\\Users\\wilso\\AppData\\Local\\Temp\\robocar-resume-offline-titn2v3u\\resume-profiles-and-public-source.zip",
+    "sha256": "4777f477f1220d8d92cca03a64d4f631f323d997575905986ab2ef4acb3c05a8",
+    "private_settings_copied": true,
+    "publication": "Local only. The archive includes an ignored dashboard rollback and must stay private."
+  },
+  "previous_verified_image": "testing/subsystem1/logs/2026-11-17-before-resume-backup.json",
+  "normal_static_ram_delta_bytes": 24,
+  "new_tasks_queues_semaphores": 0,
+  "s1_queue_bytes": 0,
+  "controller_records_bytes": {
+    "publication": 5,
+    "request": 13,
+    "completion": 10,
+    "authorization": 8,
+    "ticket_counter": 4,
+    "owner_word": 1
+  },
+  "stack_static_chain_bytes": {
+    "collector": 464,
+    "s2": 544,
+    "s5": 136,
+    "startup_s1_console": 312,
+    "startup_s5_console": 208,
+    "radio_resume_bridge_codec": 552
+  },
+  "offline_checks": [
+    "testing/subsystem1/logs/s1-batch-2026-11-17T11-41-37/summary.json",
+    "testing/subsystem1/logs/s1-batch-2026-11-17T11-53-06/summary.json",
+    "testing/subsystem1/logs/2026-11-17-resume-build_modes.txt",
+    "testing/subsystem1/logs/2026-11-17-resume-s1_stack_frames.txt",
+    "testing/subsystem1/logs/2026-11-17-resume-producer_hooks.txt"
+  ],
+  "hardware_status": "Car remains unplugged by prior user report. No flash, actuator request or live test during this implementation. Stop/Resume/Stop hardware check pending. Longer-run delivery gaps remain open.",
+  "source_hash_scope": "Published source files as read in the local Windows working tree. Git checkout line endings may affect byte hashes."
+}

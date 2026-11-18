@@ -1,0 +1,52 @@
+{
+  "duration": "45 seconds",
+  "commands_sent": 0,
+  "streams": {
+    "tcp": {
+      "frames": 101,
+      "receive_max_ms": 3104,
+      "receive_median_ms": 388.0,
+      "generation_max_ms": 2000,
+      "gaps_over_1_second": 8
+    },
+    "websocket": {
+      "frames": 101,
+      "receive_max_ms": 3104,
+      "receive_median_ms": 388.0,
+      "generation_max_ms": 2000,
+      "gaps_over_1_second": 8
+    }
+  },
+  "matched_transport_arrival_difference_ms": {
+    "count": 101,
+    "min": 0,
+    "median": 0,
+    "max": 1
+  },
+  "first_45_second_websocket_capture": {
+    "telemetry": 109,
+    "heartbeat": 11,
+    "max_main_receive_gap_ms": 2959,
+    "max_heartbeat_receive_gap_ms": 8734,
+    "main_generation_gap_ms": [
+      400,
+      800
+    ],
+    "publish_error_counter_first": 96,
+    "publish_error_counter_last": 103,
+    "snapshot_contention_last": 0,
+    "status_rtt_ms": [
+      54
+    ],
+    "missing_sequence_numbers": 6,
+    "first_motion_fields": {
+      "left_mps": 0,
+      "right_mps": 0,
+      "distance_m": 0.643,
+      "left_encoder_count": 805,
+      "right_encoder_count": 832
+    }
+  },
+  "limits": "Two windows from the currently running stationary firmware, no interruption or actuator commands. Local UF2 hash identifies intended file, not flash readback. Packet timestamps are serialization time; this is not isolated AP/radio timing.",
+  "interpretation": "Paired 101 frames reached TCP and WebSocket within 0..1 ms; multi-second stalls are upstream of the local WebSocket link. Frames were generated every 400 ms; missing sequences caused observed 800..2000 ms generation gaps. Six missing sequence numbers and seven publish errors were recorded in the first window."
+}

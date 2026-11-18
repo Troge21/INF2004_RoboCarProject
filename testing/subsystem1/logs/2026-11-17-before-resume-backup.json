@@ -1,0 +1,9 @@
+{
+  "date": "2026-11-17",
+  "backup": "C:\\Users\\wilso\\AppData\\Local\\Temp\\robocar-before-resume-77rfuql4\\normal-stop-verified-source-firmware.zip",
+  "sha256": "5ce2d6132b1d06b942c8ec4ebc8888cb2851360e2ee32e55732e0098b9b99e22",
+  "old_uf2_sha256": "9c0dbfd56d03faf9eca242820f7ad56dd271cde735c83351839b238c34fc3314",
+  "public_source_files": 98,
+  "private_settings_copied": true,
+  "publication": "Local only. The archive includes an ignored dashboard rollback and must stay private."
+}

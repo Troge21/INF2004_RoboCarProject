@@ -6,11 +6,16 @@
 #include <string.h>
 #include <stdlib.h>
 #include "lwip/apps/mqtt.h"
+#include "lwip/altcp.h"
+#include "lwip/apps/mqtt_priv.h"
 #include "lwip/ip_addr.h"
 #include "lwip/timeouts.h"
 typedef uint8_t UB;
 #include "../../../app_program/subsystem1/s1_protocol.c"
 static mqtt_client_t fake_client;
+static struct altcp_pcb fake_transport;
+static struct mqtt_request_t fake_requests[4];
+void altcp_nagle_disable(struct altcp_pcb *conn) { conn->no_delay=1; }
 static u32_t clock_ms=1000;
 static int publications,status_calls,subscriptions,failures,checks,telemetry_available;
 static err_t subscribe_result,connect_result;
@@ -18,6 +23,7 @@ static int connect_calls,disconnect_calls,allocation_fails,ip_valid=1;
 static unsigned requested_keepalive;
 static u32_t boot_ms=1000,entropy_counter;
 static int stop_calls,submit_result,reply_ready;
+static int arm_calls,resume_calls,cancel_resume_calls,resume_submit_result;
 static UB controller_reply[10];
 static u32_t submitted_id,submitted_token,submitted_deadline;
 static unsigned control_word=APP_CTRL_TEST|APP_CTRL_DISABLED;
@@ -27,6 +33,7 @@ static char last_topic[64],subscribed_topic[64];
 static unsigned char last_payload[S1_TX_CAPACITY];
 static unsigned last_length;
 static err_t publish_result;
+static int track_pending;
 static mqtt_request_cb_t subscription_callback;
 static mqtt_client_t *mqtt_client_new(void) { return allocation_fails?NULL:&fake_client; }
 static int mqtt_client_is_connected(mqtt_client_t *c) { return c->connected; }
@@ -54,10 +61,17 @@ static void fire_timer(sys_timeout_handler fn) {
 static int tm_printf(UB *format,...) { (void)format;return 0; }
 static err_t mqtt_publish(mqtt_client_t *c,const char *topic,const void *payload,u16_t length,
                           u8_t qos,u8_t retain,mqtt_request_cb_t fn,void *arg) {
-    (void)c;(void)fn;(void)arg;
+    (void)fn;(void)arg;
     if(qos||retain||length>sizeof(last_payload))abort();
     ++publications;snprintf(last_topic,sizeof(last_topic),"%s",topic);
-    memcpy(last_payload,payload,length);last_length=length;return publish_result;
+    memcpy(last_payload,payload,length);last_length=length;
+    if(track_pending&&publish_result==ERR_OK) {
+        unsigned n=0;struct mqtt_request_t **tail=&c->pend_req_queue;
+        while(*tail){tail=&(*tail)->next;++n;}
+        if(n>=4)abort();
+        fake_requests[n].next=NULL;*tail=&fake_requests[n];
+    }
+    return publish_result;
 }
 static err_t mqtt_subscribe(mqtt_client_t *c,const char *topic,u8_t qos,mqtt_request_cb_t fn,void *arg) {
     (void)c;(void)arg;if(qos)abort();++subscriptions;subscription_callback=fn;
@@ -101,9 +115,20 @@ int s1_network_uptime(uint32_t *out){*out=boot_ms;return 0;}
 int s1_network_submit_stop(uint32_t id,uint32_t token,uint32_t deadline){
     ++stop_calls;submitted_id=id;submitted_token=token;submitted_deadline=deadline;return submit_result;
 }
-int s1_network_stop_reply(uint8_t out[10]){
+int s1_network_command_reply(uint8_t out[10]){
     if(!reply_ready)return -50;
     memcpy(out,controller_reply,10);reply_ready=0;return 10;
+}
+void app_controller_cancel_resume(void){++cancel_resume_calls;}
+int s1_network_arm_resume(const unsigned char *b,unsigned n,unsigned char *out,unsigned capacity,uint32_t session){
+    uint32_t id,token,deadline;
+    if(s1_parse_resume_request(b,n,0xa5,&id,&token,&deadline))return -17;
+    ++arm_calls;
+    if(token!=session)return s1_pack_resume_reply(id,session,APP_RESUME_SESSION,control_word,out,capacity);
+    return s1_pack_resume_arm_reply(id,boot_ms,2047,control_word,session,808,NULL,out,capacity);
+}
+int s1_network_submit_resume(uint32_t ticket,uint32_t token,uint32_t deadline){
+    ++resume_calls;submitted_id=ticket;submitted_token=token;submitted_deadline=deadline;return resume_submit_result;
 }
 #include "../../../lib/liblwip/sysdepend/pico_rp2040/mqtt_utk.c"
 static const UB request_a[5]={0xa0,12,0,0,0},request_b[5]={0xa0,13,0,0,0};
@@ -113,12 +138,15 @@ static void expect(int condition,const char *message) {
 static void reset(int acknowledge) {
     memset(timers,0,sizeof(timers));
     memset(&fake_client,0,sizeof(fake_client));fake_client.connected=1;
+    fake_transport.no_delay=0;fake_client.conn=&fake_transport;
     client=&fake_client;command_state=0;last_status_ms=0;clock_ms=1000;
     publications=status_calls=subscriptions=telemetry_available=0;subscribe_result=ERR_OK;
     connect_calls=disconnect_calls=allocation_fails=0;connect_result=ERR_OK;ip_valid=1;requested_keepalive=0;
     memset(network_counters,0,sizeof(network_counters));publish_result=ERR_OK;aux_available=0;aux_accepted=-1;
+    track_pending=0;
     connection_cb(client,NULL,MQTT_CONNECT_ACCEPTED);
     stop_calls=submit_result=reply_ready=0;boot_ms=1000;control_word=APP_CTRL_TEST|APP_CTRL_DISABLED;
+    arm_calls=resume_calls=cancel_resume_calls=resume_submit_result=0;
     if(acknowledge)subscription_callback(NULL,ERR_OK);
 }
 static void deliver(const char *topic,const UB *bytes,unsigned declared,unsigned count) {
@@ -289,6 +317,94 @@ int main(void) {
         reset(1);aux_available=1;publish_result=ERR_MEM;mqtt_utk_poll();
         expect(aux_accepted==0&&network_counters[0]==1,
             "scan backpressure is returned to the bounded S1 chunk sender and counted");
+    }
+    {
+        UB stop[13];int before;
+        reset(1);
+        expect(fake_transport.no_delay==1,"every accepted MQTT TCP session disables Nagle coalescing");
+        track_pending=1;telemetry_available=1;mqtt_utk_poll();
+        telemetry_available=1;mqtt_utk_poll();
+        expect(publications==2,"two bounded periodic sends preserve streaming with delayed TCP acknowledgments");
+        before=publications;telemetry_available=1;aux_available=1;
+        for(unsigned i=0;i<1000;++i)mqtt_utk_poll();
+        expect(publications==before&&telemetry_available&&aux_available,
+            "two outstanding sends bound backlog and preserve two SDK slots without consuming another source sample");
+        fire_timer(heartbeat_timeout);
+        expect(publications==before&&timer_count(heartbeat_timeout)==1,
+            "busy TCP defers heartbeat using one short recheck timer rather than filling request slots");
+        deliver(MQTT_COMMAND_TOPIC,request_a,5,5);mqtt_utk_poll();
+        expect(status_calls==1&&publications==before+1&&last_payload[0]==0xa1,
+            "read-only STATUS retains priority while a telemetry acknowledgment is pending");
+        make_stop(stop,910,session_nonce,boot_ms+1000);
+        deliver(MQTT_COMMAND_TOPIC,stop,13,13);mqtt_utk_poll();
+        expect(stop_calls==1,"busy periodic output cannot block controller STOP dispatch");
+        fake_client.pend_req_queue=NULL;
+        fire_timer(heartbeat_timeout);
+        expect(publications==before+2&&last_payload[0]==0x80&&timer_count(heartbeat_timeout)==1,
+            "TCP acknowledgment releases the deferred heartbeat without accumulating timer chains");
+        fake_client.pend_req_queue=NULL;mqtt_utk_poll();
+        expect(last_payload[0]==0xb4&&!telemetry_available&&aux_available,
+            "after acknowledgment main telemetry takes precedence over optional scan traffic");
+        mqtt_utk_set_link(0);
+        expect(!timer_count(heartbeat_timeout),"WiFi loss cancels a deferred heartbeat recheck");
+        reset(1);publish_result=ERR_MEM;fire_timer(heartbeat_timeout);
+        expect(network_counters[0]==1&&timer_count(heartbeat_timeout)==1,
+            "failed heartbeat enqueue is counted and retried without a four-second extra wait");
+    }
+
+    {
+        UB arm[13],commit[13],stop[13];unsigned private_word;
+        reset(1);control_word=APP_CTRL_STOP_LATCHED|APP_CTRL_LATCH;
+        make_stop(arm,501,session_nonce,boot_ms+1000);arm[0]=0xa5;
+        incoming_publish_cb(NULL,MQTT_COMMAND_TOPIC,13);incoming_data_cb(NULL,arm,4,0);
+        expect(arm_calls==0&&resume_calls==0,"partial Resume arm cannot authorize or execute movement");
+        incoming_data_cb(NULL,arm+4,9,MQTT_DATA_FLAG_LAST);mqtt_utk_poll();
+        expect(arm_calls==1&&resume_calls==0&&last_payload[0]==0xa6&&last_length==20&&s1_read_u32(last_payload+16)==808,
+            "Resume arm returns the server ticket without dispatching a motor action");
+        make_stop(commit,808,session_nonce,boot_ms+1000);commit[0]=0xa7;
+        deliver(MQTT_COMMAND_TOPIC,commit,13,13);mqtt_utk_poll();
+        expect(resume_calls==1&&submitted_id==808&&submitted_token==session_nonce,
+            "separate Resume commit routes its ticket/session/lease to the controller");
+        s1_write_u32(controller_reply,808);s1_write_u32(controller_reply+4,session_nonce);
+        private_word=APP_CTRL_FOLLOWING|APP_REPLY_RESUME;
+        controller_reply[8]=private_word;controller_reply[9]=private_word>>8;reply_ready=1;mqtt_utk_poll();
+        expect(last_payload[0]==0xa8&&last_length==11&&(last_payload[9]&APP_CTRL_LATCH)==0,
+            "only the matching controller completion produces a normal Resume success result");
+        clock_ms+=250;deliver(MQTT_COMMAND_TOPIC,commit,13,13);mqtt_utk_poll();
+        expect(resume_calls==1&&last_payload[0]==0xa8&&(last_payload[9]>>6)==APP_RESUME_REPLAY,
+            "replayed accepted ticket is not dispatched again");
+        reset(1);control_word=APP_CTRL_STOP_LATCHED|APP_CTRL_LATCH;
+        make_stop(commit,808,session_nonce+1,boot_ms+1000);commit[0]=0xa7;
+        deliver(MQTT_COMMAND_TOPIC,commit,13,13);mqtt_utk_poll();
+        expect(resume_calls==0&&(last_payload[9]>>6)==APP_RESUME_SESSION,
+            "Resume commit with another MQTT session cannot execute");
+        clock_ms+=250;make_stop(commit,808,session_nonce,boot_ms);commit[0]=0xa7;
+        deliver(MQTT_COMMAND_TOPIC,commit,13,13);mqtt_utk_poll();
+        expect(resume_calls==0&&(last_payload[9]>>6)==APP_RESUME_EXPIRED,
+            "expired Resume is rejected before controller dispatch");
+        reset(1);control_word=APP_CTRL_STOP_LATCHED|APP_CTRL_LATCH;
+        make_stop(arm,501,session_nonce,boot_ms+1000);arm[0]=0xa5;
+        make_stop(stop,502,session_nonce,boot_ms+1000);
+        deliver(MQTT_COMMAND_TOPIC,arm,13,13);deliver(MQTT_COMMAND_TOPIC,stop,13,13);mqtt_utk_poll();
+        expect(stop_calls==1&&arm_calls==0,
+            "STOP replaces a queued Resume authorization request, even while already latched");
+        reset(1);control_word=APP_CTRL_STOP_LATCHED|APP_CTRL_LATCH;
+        make_stop(commit,808,session_nonce,boot_ms+1000);commit[0]=0xa7;
+        make_stop(stop,503,session_nonce,boot_ms+1000);
+        deliver(MQTT_COMMAND_TOPIC,commit,13,13);deliver(MQTT_COMMAND_TOPIC,stop,13,13);mqtt_utk_poll();
+        expect(stop_calls==1&&resume_calls==0,"STOP preempts a queued Resume commit in the network mailbox");
+        reset(1);control_word=APP_CTRL_STOP_LATCHED|APP_CTRL_LATCH;
+        make_stop(commit,808,session_nonce,boot_ms+1000);commit[0]=0xa7;
+        deliver(MQTT_COMMAND_TOPIC,commit,13,13);deliver(MQTT_COMMAND_TOPIC,commit,13,13);mqtt_utk_poll();
+        expect(resume_calls==0,"only STOP can replace queued Resume; another replacement fails closed");
+        reset(1);control_word=APP_CTRL_STOP_LATCHED|APP_CTRL_LATCH;
+        make_stop(stop,504,session_nonce,boot_ms+1000);make_stop(arm,505,session_nonce,boot_ms+1000);arm[0]=0xa5;
+        deliver(MQTT_COMMAND_TOPIC,stop,13,13);deliver(MQTT_COMMAND_TOPIC,arm,13,13);mqtt_utk_poll();
+        expect(stop_calls==1&&arm_calls==0,"Resume cannot overwrite an already queued STOP");
+        reset(1);control_word=APP_CTRL_STOP_LATCHED|APP_CTRL_LATCH;
+        make_stop(commit,808,session_nonce,boot_ms+1000);commit[0]=0xa7;
+        deliver(MQTT_COMMAND_TOPIC,commit,13,13);mqtt_utk_set_link(0);mqtt_utk_poll();
+        expect(resume_calls==0&&cancel_resume_calls>0,"link loss cancels queued Resume and asks the owner to invalidate unused tickets");
     }
     printf("[MQTT STATUS] SUMMARY %d checks, %d failures\n",checks,failures);
     return failures?1:0;

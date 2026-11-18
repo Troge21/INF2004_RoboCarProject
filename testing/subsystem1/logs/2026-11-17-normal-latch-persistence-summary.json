@@ -1,0 +1,87 @@
+{
+  "duration_seconds_requested": 60,
+  "main_packets": 106,
+  "heartbeats": 13,
+  "scan_packets": 0,
+  "decode_errors": 0,
+  "matching_status_rtt_ms": [
+    68
+  ],
+  "latch_all": true,
+  "speeds_zero_all": false,
+  "unique_counts": [
+    [
+      21088,
+      19074
+    ],
+    [
+      21089,
+      19073
+    ],
+    [
+      21089,
+      19074
+    ],
+    [
+      21090,
+      19073
+    ],
+    [
+      21111,
+      19073
+    ],
+    [
+      21113,
+      19073
+    ]
+  ],
+  "line_bits": [
+    4,
+    5,
+    7
+  ],
+  "main_intervals_ms": {
+    "median": 399,
+    "max": 4568
+  },
+  "heartbeat_intervals_ms": {
+    "median": 4551.0,
+    "max": 6697
+  },
+  "first_diagnostics": {
+    "session_token": 1141228266,
+    "uptime_ms": 314110,
+    "static_ram_bytes": 84124,
+    "heap_free_bytes": 148744,
+    "largest_free_block_bytes": 148744,
+    "sampled_min_heap_free_bytes": 148744,
+    "task_stack_capacity_bytes": 12288,
+    "stack_high_water_bytes": null,
+    "publish_errors": 0,
+    "rejected_commands": 0,
+    "mqtt_connections": 1,
+    "snapshot_contention": 1
+  },
+  "last_diagnostics": {
+    "session_token": 1141228266,
+    "uptime_ms": 367270,
+    "static_ram_bytes": 84124,
+    "heap_free_bytes": 148744,
+    "largest_free_block_bytes": 148744,
+    "sampled_min_heap_free_bytes": 148744,
+    "task_stack_capacity_bytes": 12288,
+    "stack_high_water_bytes": null,
+    "publish_errors": 0,
+    "rejected_commands": 0,
+    "mqtt_connections": 1,
+    "snapshot_contention": 1
+  },
+  "limits": "Read-only latch evidence; user observation establishes physical stopping and dashboard reconnect. Recorder does not observe another browser connection directly. Counts/speeds are encoder feedback, not independent wheel-motion measurement.",
+  "post_capture_user_confirmation": {
+    "both_wheels_stopped_and_latch_persisted": true,
+    "conditions": "Requested four IR combinations, close-target scan and dashboard-only reconnect; continuous USB power; both wheels raised.",
+    "car_unplugged_after_test": true,
+    "observation_type": "User-reported physical result; not agent visual inspection or independent stop-time measurement.",
+    "record": "2026-11-17-normal-user-bench-observation.md"
+  }
+}

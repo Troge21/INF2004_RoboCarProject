@@ -15,12 +15,14 @@
 #define S1_STATUS_NO_SAMPLE 2047U
 #define S1_STOP_REQUEST_BYTES 13U
 #define S1_STOP_REPLY_BYTES 11U
+#define S1_RESUME_ARM_HEADER_BYTES 20U
+#define S1_RESUME_ARM_MAX_BYTES (S1_RESUME_ARM_HEADER_BYTES+S1_FRAME_BYTES)
 #define S1_COMMAND_MAX_BYTES S1_STOP_REQUEST_BYTES
 #define S1_SCAN_HEADER_BYTES 16U
 #define S1_SCAN_CHUNK_POINTS 16U
 #define S1_SCAN_PACKET_BYTES 56U
 #define S1_DIAGNOSTIC_BYTES 40U
-#define S1_TX_CAPACITY S1_STATUS_MAX_BYTES
+#define S1_TX_CAPACITY S1_RESUME_ARM_MAX_BYTES
 #define S1_SCAN_PACKED_BYTES 453U
 #define S1_SCAN_MAX_AGE_MS 10000U
 #define S1_EXTERNAL_FAULT_MASK 0x700U
@@ -69,6 +71,13 @@ int s1_parse_stop_request(const uint8_t *,unsigned length,uint32_t *id,
                            uint32_t *session,uint32_t *deadline);
 int s1_pack_stop_reply(uint32_t id,uint32_t session,unsigned result,unsigned control,
                         uint8_t *out,unsigned capacity);
+/* a5 arm / a7 commit requests reuse id:32/session:32/deadline:32.
+ * Arm returns a server-generated one-use ticket; commit echoes that ticket. */
+int s1_parse_resume_request(const uint8_t *,unsigned,uint8_t marker,uint32_t *,uint32_t *,uint32_t *);
+int s1_pack_resume_arm_reply(uint32_t id,uint32_t uptime,unsigned age,unsigned control,
+                           uint32_t session,uint32_t ticket,const uint8_t *frame,uint8_t *out,unsigned capacity);
+int s1_pack_resume_reply(uint32_t ticket,uint32_t session,unsigned result,unsigned control,
+                         uint8_t *out,unsigned capacity);
 /* scan is 181 * (angle:8,distance:12) packed bits, count 1..181. */
 int s1_pack_scan(uint32_t session,uint32_t sequence,uint32_t source_boot_ms,
                   const uint8_t *scan,unsigned total,unsigned start,

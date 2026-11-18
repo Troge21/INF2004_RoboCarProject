@@ -6,7 +6,7 @@ import {createHash,randomBytes} from 'node:crypto';
 import {performance} from 'node:perf_hooks';
 import {MqttConnection} from '../../dashboard/dist/mqtt.js';
 import {decodeTelemetry,decodeHeartbeat,decodeStatusReply,decodeStopReply,
-  decodeScan,decodeDiagnostics,encodeStatusRequest,hex} from '../../dashboard/dist/protocol.js';
+  decodeScan,decodeDiagnostics,decodeResumeArmReply,decodeResumeReply,encodeStatusRequest,hex} from '../../dashboard/dist/protocol.js';
 export function observe({seconds=60,out,url='ws://127.0.0.1:9001'}={}) {
   if(!Number.isInteger(seconds)||seconds<5||seconds>300)throw new Error('Use --seconds 5..300');
   const output=resolve(out??'testing/subsystem1/logs/'+new Date().toISOString().replace(/[:.]/g,'-')+'-controller-observation.json');
@@ -73,6 +73,11 @@ export function observe({seconds=60,out,url='ws://127.0.0.1:9001'}={}) {
             pending=null;confirmed=true;clearTimeout(requestTimer);
             note('Matching STATUS: TEST='+item.decoded.test_build+', '+item.decoded.controller_state+', '+item.round_trip_ms+' ms');
           }
+        }else if(message.topic===topics.statusTopic&&b[0]===0xa6){
+          item.decoded=decodeResumeArmReply(b); // Observe only. Never commit another client's authorization.
+        }else if(message.topic===topics.statusTopic&&b[0]===0xa8){
+          item.decoded=decodeResumeReply(b);
+          note('Observed Resume result: '+item.decoded.result_name+'. Another client sent it.');
         }else if(message.topic===topics.statusTopic&&b[0]===0xa4){
           item.decoded=decodeStopReply(b);
           note('Observed STOP result: '+item.decoded.result_name+'; '+item.decoded.controller_state+'. Another client sent it.');

@@ -1,0 +1,1 @@
+PASS: current dashboard and recorder JavaScript syntax.

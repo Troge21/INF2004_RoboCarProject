@@ -358,7 +358,7 @@ Development validation of the current working copy:
 | Packed Pico-to-browser delivery S1-M06 | Functional PASS, user-reported | Working line bits, six-/five-byte messages, target movement, stale readings, normal laptop and power-bank restarts. Exact per-pattern values and timings not captured. [Observation](logs/2026-11-06-cr1-user-bench-observation.md) |
 | Packed timing/recovery and runtime RAM S1-M07 | PENDING | Physical measurements required |
 
-See [implementation, bit table and measurements](CHANGE_REQUIREMENT_1.md)
+See [implementation, bit table and measurements](CHANGE_REQUIREMENT_1_HISTORY.md)
 and [source/image fingerprint and comparison data](logs/2026-11-06-cr1-evidence.json).
 Measured example payload: 69 to 6 bytes. Requested S1 queue buffers: 192 to
 144 bytes. Linked data+bss: 82740 bytes before and after. Runtime heap/stack
@@ -1770,3 +1770,363 @@ and target. No broker interruption or automated motor command occurred.
 [Live summary](logs/2026-11-13-sensor-integrated-live-summary.json),
 [integration contract](SENSOR_INTEGRATION.md),
 [remaining physical checklist](FINAL_ACCEPTANCE.md).
+
+
+## 17 November 2026 - real encoder motion in the stationary image
+
+User requested average wheel speed, distance travelled and wheel velocity.
+Inspection found that speed/counts/net travel were already wired through v4,
+but TEST=1 did not start the motor/encoder task. The path hook had no owner.
+User chose **Prepare the image; test later**. No USB, broker, flash, motor or
+other live hardware operation was performed in this stage.
+
+S2 now starts a passive encoder task in integrated TEST=1, with wheel GPIOs
+low and no PWM setup/output references in its object. Motor commands remain
+E_OBJ. Normal mode shares the measurement loop and retains PID, watchdog,
+line/scan arbitration and STOP. No wiring/calibration, S4 hump logic or S5
+behavior changed. A separate six-byte packed path accumulator publishes an
+eight-byte path/time cache under the existing feedback semaphore. The strong
+travel getter activates the existing v4 field; no wire format/version change.
+
+The odometer sums absolute mean signed wheel increments with fractional
+micrometre retention. Reverse increases path; signed net remains distinct.
+Encoder faults/overflow invalidate path until restart. Browser average speed
+is the instantaneous mean of both speed magnitudes; card sparkline and CSV
+now agree, and speed/distance display three decimal places.
+
+Offline checks: **18/18 groups passed** in
+[the batch summary](logs/s1-batch-2026-11-17T07-08-51/summary.json), including
+17 odometer assertions, 10 actual passive-loop checks with no PWM stub/link,
+22 existing normal controller/PID/STOP/scan checks, S1 23 codec plus 28 bridge
+checks, 51 MQTT-port checks, 43 dashboard tests, eight recorder tests, existing
+S5/controller/shared GPIO/analog/barcode/resource checks and 20089 wire vectors.
+ELF weak/strong linkage passed separately in WSL. Four ARM profile checks
+passed, including no motor_task/PWM references in integrated TEST=1 and the
+presence of encoder_feedback_task. Startup stack regression protection is
+retained. S2 static chain 544/2048; S1 collector 464/2048; S5 chain 136/2048;
+known startup test/console chains 312/1024 and 208/1024. Runtime peaks remain
+unmeasured. Initial new test runs exposed fixture mistakes (raw versus
+logical speed codes and the first speed-window boundary); these were fixed
+and original development results retained. They were offline test failures.
+
+Both full forced ARM builds passed without compiler warnings. Current single
+stationary UF2: **731136 bytes**, SHA-256
+**5cc04c0ab0da1dcafb0b61b49f719f8391359048916876ac8af39314e88f311c**.
+Linked static RAM 84860 (+168 versus preceding stationary), normal 84124 (+8).
+Passive feedback adds a 2048-byte dynamic task stack plus kernel overhead,
+reusing existing semaphores and adding no queue. The normal check UF2 was
+hashed then removed; its ELF, hash and log remain. Source base is a14220a plus
+local changes, not yet a new commit or push.
+
+[Build fingerprint](logs/2026-11-17-motion-fingerprint.json),
+[normal build](logs/2026-11-17-motion-normal-build.txt),
+[stationary build](logs/2026-11-17-motion-stationary-build.txt),
+[ARM modes](logs/2026-11-17-motion-build-modes.txt),
+[stack guard](logs/2026-11-17-motion-stack-frames.txt),
+[ELF linkage](logs/2026-11-17-motion-producer-linkage.txt),
+[contract and later test](MOTION_TELEMETRY.md).
+
+The previous working 3a8b79c3 UF2/ELF is archived outside the repository;
+[rollback record](logs/2026-11-17-before-motion-feedback-backup.json).
+No credentials were copied. Physical speeds/path accuracy and compatibility
+with live distance/IR/pitch/scan/STATUS/STOP remain pending for this new image.
+
+
+## 17 November 2026 - delivery pauses reproduced and corrected
+
+The user sees the new encoder measurements but reports intermittent slow
+telemetry since the expanded S1 batch. Read-only captures reproduced the
+issue. The first 45-second observation received 109 main frames, 11 heartbeats
+and a matching 54 ms STATUS. Main gap 2959 ms, heartbeat gap 8734 ms; six
+missing main sequences; publish counter 96 to 103, publication contention 0.
+A separate paired TCP/WebSocket window matched 101 frames within 0..1 ms of
+each other, while both had a 3104 ms gap. This locates the main stalls upstream
+of the local WebSocket/browser path. Captured motion included real counts
+805/832 and 0.643 m accumulated path; no physical distance accuracy claimed.
+
+The correction is confined to radio/MQTT delivery and UI scheduling:
+CYW43_NONE_PM after interface setup under owner lock; Nagle disabled on each
+accepted MQTT TCP connection; bounded periodic output using the SDK pending
+request queue, retaining command capacity; short single-timer heartbeat
+rechecks; receipt-triggered/coalesced dashboard redraw. No Windows TCP,
+adapter power, broker, sensor algorithm, wiring, PID, steering, scan or STOP
+lease/latch changes. Packet contract and 400 ms schedule are retained.
+No additional task, queue, semaphore or larger transport buffer.
+
+Initial correction af00fa94 was flashed by the user. Its 45-second capture
+had 85 main frames, 10 heartbeats, zero missing sequences, zero publish errors,
+STATUS 13 ms and maximum heartbeat 4803 ms. Maximum main gap 2096 ms remained;
+one-at-a-time TCP acknowledgment gating unnecessarily reduced streaming.
+The final correction allows **two outstanding periodic packets**, retaining
+two of the SDK's four slots for command/subscription work. This adjustment
+passed 61 actual-port checks, including delayed-ACK streaming, bounded backlog,
+STATUS/STOP priority, heartbeat retries and link-loss cleanup. It supersedes
+the initial single-packet policy; that first capture remains a partial result.
+
+During separate diagnosis, Pico ping 25/25, 6..161 ms(mean 61); gateway ping 25/25,
+2..101 ms(mean 25). Pings can keep the link active and are not pooled with the
+45-second no-ping windows. PktMon status/driver access was denied by Windows;
+no capture/filter settings were changed. The initial paired observer had a
+PacketReader API mistake; its empty/incomplete result is marked and excluded.
+The host compiler also flagged signedness in the new test and a potentially
+uninitialized completed-reply buffer; the test type and 10-byte initializer
+were corrected before successful builds. Original development logs remain.
+
+Nineteen offline groups passed, including 43 dashboard tests, existing encoder,
+S5/controller/STOP/GPIO tests, 20089 wire vectors and WiFi setup sequencing.
+[Full batch](logs/s1-batch-2026-11-17T07-33-00/summary.json);
+the final queue adjustment separately passed
+[61 MQTT-port checks](logs/s1-batch-2026-11-17T07-47-20/mqtt-port.txt).
+Both final full forced ARM builds pass with zero warnings; four actual ARM
+profile and startup/task stack guards pass. S2/S1/S5 chains 544/464/136 of 2048;
+known startup test/console 312/208 of 1024. Runtime peaks remain unmeasured.
+
+Final stationary UF2 731648 bytes, SHA-256
+62e5bd639e2f363aa364b5bcbc4087fce624922227672ffb619f81361d68cd69.
+Static RAM remains 84860 (normal 84124). Normal check UF2 hashed then removed;
+only the stationary _test file remains. Source is a14220a plus local motion
+and delivery changes; no commit/push in this stage. Source/working firmware
+rollback archive contains no private configuration.
+
+The user subsequently confirmed flashing final 62e5bd63 and refreshing the
+dashboard. A full 60-second live observer received 149 main frames, 15 heartbeats
+and six scans. Main receive min 196/median 402/p95 478/max 600 ms; generation
+exactly 400 ms throughout. Zero missing sequences, zero main gaps over 1 s,
+zero publish/rejected-command/decoding errors; publication contention 0.
+Heartbeat median 3999.5/max 4057 ms. Matching STATUS 41 ms; one continuous MQTT
+session. All 149 frames carried available pitch, wheel speed/counts and path;
+148 had valid range. This is transport delivery, not sensor calibration.
+Heap samples stayed 148008 free/largest/minimum and static 84860. The read-only
+observer did not interrupt services, reset the Pico, send STOP or operate
+actuators. These results close the reproduced stationary pauses in this
+one-minute window; repeated recovery, worst-case wireless latency and final
+group evidence remain separate.
+[Final summary](logs/2026-11-17-delivery-final-summary.json),
+[raw final capture](logs/2026-11-17-delivery-final-observation.json).
+[Delivery guide and raw evidence](TELEMETRY_DELIVERY.md),
+[current build fingerprint](logs/2026-11-17-delivery-fingerprint.json),
+[first correction fingerprint](logs/2026-11-17-delivery-initial-fingerprint.json),
+[final normal build](logs/2026-11-17-delivery-streaming-normal-build.txt),
+[final stationary build](logs/2026-11-17-delivery-streaming-stationary-build.txt),
+[final ARM profiles](logs/2026-11-17-delivery-streaming-build-modes.txt),
+[final stack guard](logs/2026-11-17-delivery-streaming-stack-frames.txt),
+[rollback record](logs/2026-11-17-before-delivery-fix-backup.json).
+
+
+## 17 November 2026 - normal demo operating profile prepared
+
+User requests motor-enabled normal operation while treating the completed S1
+communication path as its demo baseline. Verified110 public source hashes
+match the measured delivery image; no application, driver, calibration,
+controller, S1 or dashboard implementation was changed. Switched the build
+to NET=lwip MQTT=1 TEST=0 APP_MODE=integrated CONSOLE=usb_cdc CRASH_REPORT=0.
+Normal mode uses motor_task instead of the passive encoder task, retains
+PID/encoder feedback, line following, controller-owned S5 arbitration,
+odometer, scans, STATUS and STOP. Missing producer fields remain unavailable.
+Normal startup can drive after3 seconds; user confirms wheels raised and
+whole-car supply unplugged before preparation. Servo must remain free.
+
+Motor/STOP, normal controller,61 MQTT-port and WiFi latency checks pass in
+[the focused batch](logs/s1-batch-2026-11-17T08-19-25/summary.json).
+Full forced normal ARM build passes without warnings. ELF symbols confirm
+motor_task, vehicle_controller_task, telemetry_task, mqtt_utk_poll, travel
+and scan getters; passive encoder_feedback_task and on-board S1 test fixtures
+are absent. The rebuilt normal UF2 hash exactly matches the earlier normal
+check build from the same source,9c0dbfd5. Prior four-mode/stack checks remain
+applicable to those unchanged sources; this is not a new physical pass.
+
+Current single UF2: build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt.uf2,
+716800 bytes, SHA-256
+9c0dbfd56d03faf9eca242820f7ad56dd271cde735c83351839b238c34fc3314.
+Text358148, data108, BSS84016, linked static RAM84124 bytes. The preceding
+stationary image62e5bd63 and ELF were archived and verified before removing
+its obsolete _test UF2 from build_make. No private settings were copied.
+The current normal ELF remains. No source commit/push in this stage.
+
+The normal image was handed to the user for raised-wheel flash and check;
+flash confirmation and current normal hardware observations are pending.
+The observer will send read-only STATUS only. Physical both-wheel rotation,
+STOP and persistence require the user's observation; no floor driving trial
+or complete group-project acceptance is claimed.
+[Normal operating guide](MOTOR_STOP_TEST.md),
+[build fingerprint](logs/2026-11-17-normal-profile-fingerprint.json),
+[build log](logs/2026-11-17-normal-profile-build.txt),
+[ELF symbols](logs/2026-11-17-normal-profile-symbols.json),
+[stationary rollback](logs/2026-11-17-before-normal-profile-backup.json).
+
+
+### Current normal-image flash and physical STOP follow-up
+
+The user confirmed flashing the normal image and connecting the dashboard.
+Read-only STATUS reports TEST=false; the initial 45-second capture received
+111 main packets and 12 heartbeats, median 400 ms/max 688 ms main, no missing
+sequences or decoding/publish errors. Actual nonzero speeds/counts and path
+were observed. The user then confirms both wheels rotated and both stopped
+when dashboard STOP was clicked. A real 11-byte STOP result with result 0,
+controller state 6/latch=true/TEST=false was independently captured, followed
+by 84 telemetry samples with zero speeds and unchanged counts. Physical
+STOP persistence through IR/scan changes and dashboard reconnect is pending.
+
+**Timing acceptance remains open:** the longer 180-second normal run recorded
+main max 5499 ms and heartbeat max 9304 ms, despite zero missing sequence
+numbers and publish errors. Gaps also occurred after STOP was latched, so
+motor motion alone is not established as their cause. The later latched
+window also had gaps. The short stationary 60-second success is preserved
+as its measured window, not a general wireless guarantee. No control/sensor
+algorithms were changed while observing these results.
+
+STOP result ID3430453922/session1141228266 was nonretained, result0, control22
+(state Stop latched, latch set, TEST=false). The observer did not send STOP;
+the user clicked the dashboard button. The initial own STATUS took527 ms;
+the next observer's STATUS31 ms. The first180-second capture has373 main,
+42 heartbeats and nine scans, no decode errors or missing sequences. Main
+median400 ms/max5499 ms; heartbeat median4016 ms/max9304 ms. Post-STOP84
+samples (starting one second after reply) had zero speed and fixed encoder
+counts21088/19074. These are source feedback, not independent wheel sensing.
+The later60-second latched capture has106 main/13 heartbeats, all latched,
+but small count/speed changes while targets were being handled; do not
+infer active motor commands solely from those encoder changes. Its main
+max4568 ms and heartbeat max6697 ms keep delivery timing open. User physical
+persistence confirmation remains pending. Heap148744 free/largest/minimum,
+static84124, one MQTT session, no publish errors; true runtime peaks unknown.
+
+[Normal baseline](logs/2026-11-17-normal-profile-live-summary.json),
+[raw STOP run](logs/2026-11-17-normal-stop-live.json),
+[STOP summary](logs/2026-11-17-normal-stop-summary.json),
+[raw latched run](logs/2026-11-17-normal-latch-persistence-live.json),
+[latched summary](logs/2026-11-17-normal-latch-persistence-summary.json).
+
+
+### Normal STOP persistence confirmed - 17 November 2026
+
+The user confirms both wheels stayed stopped and Stop latched remained shown
+through the requested four IR combinations, close-target/servo-scan procedure
+and dashboard-only disconnect/reconnect, keeping USB power continuous. The
+user then unplugged the car and left it off. This completes the functional
+normal two-wheel STOP/persistence bench check for user-flashed9c0dbfd5.
+It is a user physical observation supported by the captured matching STOP
+result and latched telemetry, not agent visual inspection or measured stop
+time. The later small encoder changes are preserved, not rewritten as zero.
+No source changes, flash, new motor commands, broker or hotspot interruption
+were performed by the agent in recording this confirmation. The observer
+sessions finished; the car remains off by the user's report.
+
+Longer normal delivery timing still needs work: main max5499 ms, heartbeat
+max9304 ms in the mixed180-second run; latched-window gaps also occurred.
+No new timing pass is inferred from a physical STOP pass. Floor mission,
+STOP initiated during an active avoidance turn, calibration, recovery and
+resource peaks remain separate open items.
+[User bench record](logs/2026-11-17-normal-user-bench-observation.md).
+
+
+## Explicit Resume after STOP - 17 November 2026
+
+User requested a button to release STOP without unplugging/restarting. Resume
+is now implemented in Overview and Communications, through the existing S1
+radio owner and controller. Sensor/servo/PID/line algorithms were not edited:
+all 27 S2/S3/S4/S5 files match the verified pre-Resume archive byte for byte.
+The controller adds only Resume admission around its existing wheel policy.
+
+Resume arm a5/13 bytes obtains server-issued one-use authorization a6/20 or
+66 bytes; commit a7/13 bytes receives a8/11 bytes. The 46-byte v4 main frame,
+five-byte heartbeat, STATUS 16/62 and STOP 13/11 remain unchanged. Main data
+fields are not extended and no legacy decoder was added. An arm cannot
+release the latch. Commit must match the short-lived ticket/session/lease;
+actual fresh stopped/fault-free wheel feedback, valid line and clear S5
+navigation are checked by the controller before release. No counters, path,
+IMU peaks or faults are reset. TEST=1 explicitly rejects Resume.
+
+STOP invalidates unused tickets and preempts pending Resume in radio and
+controller slots. Its rate gate was removed so rapid Stop -> Resume -> Stop
+is not suppressed; bounded request/result slots and validation remain.
+The browser can use a pending STATUS or current valid clock/session for
+STOP interruption. A failed motor handoff restores the inhibit before any
+publication-lock acquisition. Tests include contention preserving that fault
+outcome. Unknown result after timeout is reported explicitly; disconnect or
+reconnect never retries a Resume. It cannot undo a release already executed.
+This is freshness handling on the trusted bench broker, not authentication.
+
+Offline evidence:
+
+- All 20 host check groups passed in
+  [the complete batch](logs/s1-batch-2026-11-17T11-41-37/summary.json):
+  controller normal 40 checks, stationary 19; MQTT port 73; actual controller/
+  S2 PID/PWM path 27 including Stop -> Resume -> Stop; S1 bridge 30 stationary
+  and 32 normal; 20099 C/JavaScript vectors including arm/results; existing
+  S2/S3/S4/S5/heap/recorder/layout and delivery-policy checks retained.
+- After the final STOP availability and export updates, all 58 dashboard
+  tests and JavaScript syntax passed in
+  [the final affected checks](logs/s1-batch-2026-11-17T11-53-06/summary.json).
+  Earlier fixture-only failures were corrected (TEST mode word and result
+  layout); their batch logs remain preserved. Host tests never contacted car.
+- Both forced ARM builds completed without compiler warnings:
+  [normal](logs/2026-11-17-resume-normal-build.txt),
+  [stationary](logs/2026-11-17-resume-stationary-build.txt).
+  [Four-profile compilation](logs/2026-11-17-resume-build_modes.txt),
+  [linked producer absence/override](logs/2026-11-17-resume-producer_hooks.txt)
+  and [actual ARM stack guards](logs/2026-11-17-resume-s1_stack_frames.txt) pass.
+  Static chains: collector464/2048, S2544/2048, S5136/2048, startup S1 console
+  312/1024, S5 console208/1024; radio Resume bridge/codec552/8192. These are
+  partial static call-chain budgets, not runtime high-water measurements.
+
+Current single normal UF2:
+**build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt.uf2**, **721920 bytes**,
+SHA-256 **2c5a4652c7c434fb1d27743a3579b6a9ff0dcf2f2f9a4ee79a813840ecd1bcbe**.
+Flags NET=lwip MQTT=1 TEST=0 APP_MODE=integrated CONSOLE=usb_cdc CRASH_REPORT=0.
+Text360680/data108/BSS84040, linked static RAM84148 (+24 from preceding normal).
+Stationary build735744 bytes, linked RAM84884, archived after offline checks;
+its UF2 was removed from build_make so only the normal image remains there.
+There are no new tasks, queues or semaphores. Existing request grows12->13
+bytes with packed action/result; reply stays10; authorization8/counter4;
+owner word packs progress/failure in its existing state byte. S1 queues stay0.
+
+[Current source/build fingerprint](logs/2026-11-17-resume-fingerprint.json),
+[previous verified normal rollback](logs/2026-11-17-before-resume-backup.json),
+[controller contract](CONTROLLER_COMMANDS.md), [physical procedure](MOTOR_STOP_TEST.md).
+Both new profiles are archived outside the workspace. The local archives also
+contain an ignored dashboard rollback with a private settings copy. Keep the
+archives local. Published fingerprints exclude the ignored rollback paths.
+
+**Not flashed or hardware tested.** Car remains unplugged by the prior user
+report. No live motor command, flash, broker or hotspot change occurred in
+this stage. Next physical work is raised-wheel Stop -> Resume -> Stop with
+continued source readings and preserved path, blocked-condition refusal and
+latch persistence across dashboard reconnect. The older normal STOP pass
+is not a Resume pass. Longer normal telemetry gaps (main5499 ms/heartbeat
+9304 ms), physical calibration, final recovery and heap/stack peaks remain
+open; no timing or whole-project acceptance is inferred from these builds.
+
+
+## Resume user functional confirmation - 18 November 2026
+
+After the instruction to test Stop -> Resume -> Stop, the user reported:
+"I tested it, it works." The basic Resume function is recorded as a
+user-reported pass. No new serial/MQTT/timing/visual capture was collected;
+blocked/faulted/expired admission, path retention and every persistence item
+are not inferred from the short confirmation.
+
+The local normal UF2 remains 721920 bytes, SHA-256
+2c5a4652c7c434fb1d27743a3579b6a9ff0dcf2f2f9a4ee79a813840ecd1bcbe,
+verified again without rebuilding. This is local identity, not flash readback.
+[Observation record](logs/2026-11-18-resume-user-bench-observation.md).
+The 17 November build fingerprint retains its original preparation-time
+hardware status; this entry supplies the later functional follow-up.
+
+Core S1 features for available producer interfaces are implemented. Final
+acceptance stays open for the previously measured normal delivery gaps,
+current-image outage/cold-boot/resource evidence and integrated demonstration.
+Missing producer integration remains with its owners. No new firmware/code,
+flash, car connection, motor request or service change occurred in this update.
+
+
+## Change Requirement 1 S1 evidence closeout - 18 November 2026
+
+The submission report covers current v4 fields and shared records, the
+matched 69-to-6 B payload and 192-to-144 B queue comparison, and current
+normal static RAM of 84148 B with zero S1 message-buffer requests. Eleven
+focused offline groups passed. The current UF2, both ELF hashes and 102
+public source hashes match the build fingerprint. Recalculated raw capture
+results preserve the longer normal delivery misses. Group validation still
+tracks those misses, final-image recovery, resources and the integrated demo.
+[Report](CHANGE_REQUIREMENT_1.md),
+[evidence index](logs/2026-11-18-cr1-s1-evidence.json).

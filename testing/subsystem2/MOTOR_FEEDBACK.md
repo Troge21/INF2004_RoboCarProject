@@ -1,3 +1,19 @@
+# Integrated passive feedback update - 17 November 2026
+
+Integrated TEST=1 now starts encoder_feedback_task on core 0, priority 14,
+every 20 ms. It collects the same real counts/velocity with wheel GPIOs low
+and no PWM calls compiled into S2. Motor commands still return E_OBJ. The
+existing servo remains active. Normal mode keeps motor_task, PID gains,
+watchdog, calibration and controller arbitration. Explicit encoder benches
+retain their previous powered/hand ownership.
+
+S2 now owns a packed centre-path accumulator and protected nonblocking
+telemetry_get_travel publication, reusing the feedback semaphore. Reverse
+adds path; net travel is still signed. No network code is added to S2.
+See [motion contract and later checks](../subsystem1/MOTION_TELEMETRY.md).
+The image is prepared only; no physical encoder validation in this update.
+The sections below record the earlier normal motor/bench implementation.
+
 # Current build-mode note — 12 November 2026
 
 The powered encoder/PID diagnostic now requires explicit TEST=1

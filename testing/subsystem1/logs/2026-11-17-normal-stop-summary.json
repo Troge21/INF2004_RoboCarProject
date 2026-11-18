@@ -1,0 +1,99 @@
+{
+  "duration_seconds": 180,
+  "main_packets": 373,
+  "heartbeats": 42,
+  "scan_packets": 9,
+  "decode_errors": 0,
+  "observer_commands": "Read-only STATUS only; user used dashboard STOP",
+  "user_physical_report": "Both wheels rotated, then both stopped; Stop latched confirmed. Persistence check pending.",
+  "controller_states": {
+    "Following line": 125,
+    "Stopped": 132,
+    "Scanning obstacle": 22,
+    "Turning right": 3,
+    "Turning left": 3,
+    "Waiting for line": 1,
+    "Stop latched": 87
+  },
+  "stop_results": [
+    {
+      "at_ms": 137329,
+      "topic": "mtk3smp-pico/status",
+      "length": 11,
+      "hex": "a4 a2 92 78 cc ea c2 05 44 16 00",
+      "retained": false,
+      "decoded": {
+        "request_id": 3430453922,
+        "session_token": 1141228266,
+        "result": 0,
+        "result_name": "Stop latched",
+        "controller_word": 22,
+        "controller_state_code": 6,
+        "controller_state": "Stop latched",
+        "controller_valid": true,
+        "stop_latched": true,
+        "test_build": false
+      }
+    }
+  ],
+  "main_receive_intervals_ms": {
+    "min": 0,
+    "median": 400.0,
+    "max": 5499
+  },
+  "heartbeat_receive_intervals_ms": {
+    "min": 1481,
+    "median": 4016,
+    "max": 9304
+  },
+  "missing_main_sequence_numbers": 0,
+  "after_stop_samples": 84,
+  "after_stop_latch_all": true,
+  "after_stop_speeds_all_zero": true,
+  "after_stop_unique_counts": [
+    [
+      21088,
+      19074
+    ]
+  ],
+  "after_stop_line_bits": [
+    4,
+    6,
+    7
+  ],
+  "first_diagnostics": {
+    "session_token": 1141228266,
+    "uptime_ms": 95350,
+    "static_ram_bytes": 84124,
+    "heap_free_bytes": 148744,
+    "largest_free_block_bytes": 148744,
+    "sampled_min_heap_free_bytes": 148744,
+    "task_stack_capacity_bytes": 12288,
+    "stack_high_water_bytes": null,
+    "publish_errors": 0,
+    "rejected_commands": 0,
+    "mqtt_connections": 1,
+    "snapshot_contention": 0
+  },
+  "last_diagnostics": {
+    "session_token": 1141228266,
+    "uptime_ms": 267610,
+    "static_ram_bytes": 84124,
+    "heap_free_bytes": 148744,
+    "largest_free_block_bytes": 148744,
+    "sampled_min_heap_free_bytes": 148744,
+    "task_stack_capacity_bytes": 12288,
+    "stack_high_water_bytes": null,
+    "publish_errors": 0,
+    "rejected_commands": 0,
+    "mqtt_connections": 1,
+    "snapshot_contention": 1
+  },
+  "post_capture_user_confirmation": {
+    "both_wheels_stopped_and_latch_persisted": true,
+    "conditions": "Requested four IR combinations, close-target scan and dashboard-only reconnect; continuous USB power; both wheels raised.",
+    "car_unplugged_after_test": true,
+    "observation_type": "User-reported physical result; not agent visual inspection or independent stop-time measurement.",
+    "record": "2026-11-17-normal-user-bench-observation.md"
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "duration_seconds": 60,
+  "user_confirmed_image_sha256": "62e5bd639e2f363aa364b5bcbc4087fce624922227672ffb619f81361d68cd69",
+  "main_packets": 149,
+  "heartbeats": 15,
+  "scan_packets": 6,
+  "decode_errors": 0,
+  "status_round_trip_ms": [
+    41
+  ],
+  "main_receive_intervals_ms": {
+    "count": 148,
+    "min": 196,
+    "median": 402.0,
+    "p95": 478,
+    "max": 600
+  },
+  "main_gaps_over_1000_ms": 0,
+  "heartbeat_receive_intervals_ms": {
+    "count": 14,
+    "min": 3949,
+    "median": 3999.5,
+    "p95": 4057,
+    "max": 4057
+  },
+  "missing_sequence_numbers": 0,
+  "generation_intervals_ms": [
+    400
+  ],
+  "first_diagnostics": {
+    "session_token": 2034672398,
+    "uptime_ms": 56480,
+    "static_ram_bytes": 84860,
+    "heap_free_bytes": 148008,
+    "largest_free_block_bytes": 148008,
+    "sampled_min_heap_free_bytes": 148008,
+    "task_stack_capacity_bytes": 12288,
+    "stack_high_water_bytes": null,
+    "publish_errors": 0,
+    "rejected_commands": 0,
+    "mqtt_connections": 1,
+    "snapshot_contention": 0
+  },
+  "last_diagnostics": {
+    "session_token": 2034672398,
+    "uptime_ms": 111480,
+    "static_ram_bytes": 84860,
+    "heap_free_bytes": 148008,
+    "largest_free_block_bytes": 148008,
+    "sampled_min_heap_free_bytes": 148008,
+    "task_stack_capacity_bytes": 12288,
+    "stack_high_water_bytes": null,
+    "publish_errors": 0,
+    "rejected_commands": 0,
+    "mqtt_connections": 1,
+    "snapshot_contention": 0
+  },
+  "publish_error_delta": 0,
+  "session_continuous": true,
+  "sensor_availability": {
+    "obstacle_mm": 148,
+    "pitch_deg": 149,
+    "left_mps": 149,
+    "right_mps": 149,
+    "left_encoder_count": 149,
+    "right_encoder_count": 149,
+    "distance_m": 149
+  },
+  "limits": "One uninterrupted stationary 60-second delivery window. Not a repeated outage, floor-motion, sensor calibration or worst-case timing guarantee; source identity is user flash confirmation plus local artifact hash, not flash readback."
+}

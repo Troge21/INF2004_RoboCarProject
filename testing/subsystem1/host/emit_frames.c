@@ -62,6 +62,19 @@ int main(void){
         n=s1_pack_stop_reply(UINT32_MAX,17,i,control,out,sizeof(out));if(n!=11)return 8;
         snprintf(fields,sizeof(fields),",\"result\":%u",i);emit("stop",out,n,fields);
     }
+
+    (void)s1_pack_frame(&s,1000,1000,17,APP_CTRL_STOP_LATCHED|APP_CTRL_LATCH,frame,sizeof(frame));
+    for(i=0;i<2;++i){
+        n=s1_pack_resume_arm_reply(UINT32_MAX,1000,i?2047:2000,
+             APP_CTRL_STOP_LATCHED|APP_CTRL_LATCH,17,UINT32_MAX,i?NULL:frame,out,sizeof(out));
+        if(n!=(i?20:66))return 11;
+        snprintf(fields,sizeof(fields),",\"missing\":%u",i);emit("resume_arm",out,n,fields);
+    }
+    for(i=0;i<8;++i){
+        unsigned control=i?APP_CTRL_STOP_LATCHED|APP_CTRL_LATCH:APP_CTRL_FOLLOWING;
+        n=s1_pack_resume_reply(UINT32_MAX,17,i,control,out,sizeof(out));if(n!=11)return 12;
+        snprintf(fields,sizeof(fields),",\"result\":%u",i);emit("resume",out,n,fields);
+    }
     for(i=0;i<181;++i){s1_set_bits(scan,20*i,8,i);s1_set_bits(scan,20*i+8,12,i%7?451:0);}
     for(i=0;i<181;i+=16){
         n=s1_pack_scan(17,99,900,scan,181,i,out,sizeof(out));if(n>56||n<19)return 9;

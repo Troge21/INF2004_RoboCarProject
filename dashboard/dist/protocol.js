@@ -3,12 +3,18 @@ export const FRAME_BYTES=46, STATUS_HEADER_BYTES=16;
 export const IMU_STATES=['Initializing','Calibrating','Monitoring','Ascending hump','Descending hump','Validating hump','Sensor fault'];
 export const CONTROLLER_STATES=['Unavailable','Control disabled','Starting','Following line','Recovering line','Waiting for line','Stop latched','Controller fault','Ready','Turning left','Turning right','Scanning obstacle','Avoiding obstacle','Stopped'];
 export const STOP_RESULTS=['Stop latched','Request expired','Robot session changed','Duplicate request','Controller busy','Controller fault'];
+export const RESUME_RESULTS=['Stop latch released','Request expired','Robot session changed','Duplicate request','Controller busy','Controller fault','Resume conditions not ready','Resume authorization changed'];
 export const FAULT_NAMES=['Encoder input fault','Motor timing fault','Left wheel stall','Right wheel stall','Left encoder direction','Right encoder direction','IMU sensor fault','Controller fault','Ultrasonic fault','Barcode input fault','Scan fault'];
 const ALPHABET='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-. $/+%';
 const bytesOf=p=>p instanceof Uint8Array?p:new Uint8Array(p);
 const viewOf=b=>new DataView(b.buffer,b.byteOffset,b.byteLength);
 function bits(b,offset,width){let n=0;for(let i=0;i<width;i++)n+=((b[(offset+i)>>3]>>((offset+i)&7))&1)*2**i;return n;}
 function signed(n){return n===0x80000000?null:n>=0x80000000?n-0x100000000:n;}
+// Instantaneous mean of wheel-speed magnitudes, not a time average or centre velocity.
+export function averageWheelSpeed(sample){
+  return Number.isFinite(sample?.left_mps)&&Number.isFinite(sample?.right_mps)?
+    (Math.abs(sample.left_mps)+Math.abs(sample.right_mps))/2:null;
+}
 export function decodeControlWord(word){
   const state=word&15,latch=Boolean(word&16);
   if(!Number.isInteger(word)||word<0||word>63||state>13||(state===6&&!latch)||(latch&&![1,6,7].includes(state)))throw new Error('Invalid controller state/flags');
@@ -43,6 +49,7 @@ export function decodeTelemetry(payload){
     Object.assign(sample,{pitch_deg:pitch?(pitch-901)/10:null,hump_mm:height||null,max_hump_mm:max||null,imu_state:IMU_STATES[state],imu_flags:(flags&15)|((flags&16)<<1)|((flags&32)<<2)|(pitch?16:0),imu_speed_source:flags&16?'supplied':'nominal'});
   }
   sample.state=sample.controller_valid?sample.controller_state:null;
+  sample.average_wheel_mps=averageWheelSpeed(sample);
   return {sample,format:'Packed v4'};
 }
 export function decodeScan(payload){
@@ -94,6 +101,26 @@ export function decodeStopReply(payload){
   if(!id||!session||(word>>>9)||result>5||(result===0&&(!control.stop_latched||control.controller_state_code===7)))throw new Error('Invalid STOP result');
   return {request_id:id,session_token:session,result,result_name:STOP_RESULTS[result],...control};
 }
+export function encodeResumeRequest(id,session,deadline,commit=false){
+  const b=encodeStopRequest(id,session,deadline);b[0]=commit?0xa7:0xa5;return b;
+}
+export function decodeResumeArmReply(payload){
+  const b=bytesOf(payload),v=viewOf(b);
+  if(![20,66].includes(b.length)||b[0]!==0xa6)throw new Error('Invalid Resume authorization reply');
+  const ticket=v.getUint32(16,true);
+  const status=new Uint8Array(b.length-4);status.set(b.subarray(0,16));status[0]=0xa1;
+  if(b.length>20)status.set(b.subarray(20),16);
+  const reply=decodeStatusReply(status);
+  if(!ticket||reply.test_build||!reply.stop_latched||reply.controller_state_code!==6)throw new Error('Invalid Resume authorization');
+  return {...reply,ticket};
+}
+export function decodeResumeReply(payload){
+  const b=bytesOf(payload),v=viewOf(b);
+  if(b.length!==11||b[0]!==0xa8)throw new Error('Invalid Resume result');
+  const id=v.getUint32(1,true),session=v.getUint32(5,true),word=v.getUint16(9,true),result=word>>>6,control=decodeControlWord(word&63);
+  if(!id||!session||(word>>>9)||result>7||(!result&&(control.stop_latched||control.test_build||[0,1,7].includes(control.controller_state_code))))throw new Error('Invalid Resume result fields');
+  return {request_id:id,session_token:session,result,result_name:RESUME_RESULTS[result],...control};
+}
 
 export function hex(bytes) { return [...bytes].map(x => x.toString(16).padStart(2,'0')).join(' '); }
 export function packetText(packet) {
@@ -106,7 +133,7 @@ export function packetText(packet) {
 export class TelemetryStore {
   constructor() { this.reset(); }
   needsClockSync(at=Date.now()) {
-    return this.seenSession!==null&&!this.pendingStatus&&!this.pendingStop&&
+    return this.seenSession!==null&&!this.pendingStatus&&!this.pendingStop&&!this.pendingResume&&
       (!this.clockAnchor||this.clockAnchor.session!==this.seenSession||at<this.clockAnchor.at||at-this.clockAnchor.at>=10000);
   }
   packetAge(value,at,limit=2000) {
@@ -158,11 +185,12 @@ export class TelemetryStore {
     this.totalBytes=0; this.lastPayloadBytes=0; this.lastInterval=null; this.format='â€”';
     this.clockAnchor=null;this.seenSession=null;this.scanProfile=null;this.scanPending=null;this.diagnostics=null;this.diagnosticHistory=[];this.heartbeatIntervals=[];this.lastBarcodeEvent=null;
     this.pendingStatus=null;this.statusReply=null;this.lastStatusId=0;this.statusLastSentAt=null;
-    this.statusNotice='Controller status is read-only. Stop stays latched until the Pico restarts.';
+    this.pendingResume=null;this.resumeReply=null;this.lastResumeId=0;this.resumeNotice='Resume releases STOP only after fresh controller checks.';
+    this.statusNotice='Controller status is read-only. Resume may restart autonomous movement.';
     this.controller=null;this.pendingStop=null;this.stopReply=null;this.stopNotice='Waiting for current controller status.';
   }
   beginStatus(id,at=Date.now(),forStop=false,purpose='user') {
-    if(this.pendingStop&&!forStop)throw new Error('A stop request is pending');
+    if((this.pendingStop&&!forStop)||this.pendingResume)throw new Error('A controller request is pending');
     if(this.pendingStatus)throw new Error('A STATUS request is already pending');
     if(this.statusLastSentAt!==null&&at-this.statusLastSentAt<250)throw new Error('Wait briefly before requesting STATUS again');
     const bytes=encodeStatusRequest(id);
@@ -173,6 +201,7 @@ export class TelemetryStore {
   cancelStatus(reason='Connection changed; STATUS request cancelled.') {
     if(this.pendingStatus){this.pendingStatus=null;this.statusNotice=reason;}
     if(this.pendingStop){this.pendingStop=null;this.stopNotice=reason;}
+    if(this.pendingResume){this.pendingResume=null;this.resumeNotice=reason;}
   }
   clearController(reason='Connection changed; pending commands cancelled.') {
     this.cancelStatus(reason);this.controller=null;this.clockAnchor=null;this.seenSession=null;this.scanPending=null;this.lastSequence=null;this.lastHeartbeatCounter=null;this.lastHeartbeat=null;
@@ -191,10 +220,27 @@ export class TelemetryStore {
       this.event(value.controller_state,value.stop_latched?'Controller stop inhibit is latched':'Controller publication',value.controller_state_code===7?'warning':'neutral',at);
   }
   beginStop(id,at=Date.now()) {
-    const control=this.currentController(at);
-    if(!control)throw new Error('Wait for current controller status');
-    if(control.stop_latched)throw new Error('Stop is already latched; restart the Pico for a new run');
-    if(this.pendingStop||this.pendingStatus)throw new Error('A request is already pending');
+    if(this.pendingStop)throw new Error('A stop request is already pending');
+    if(this.pendingStatus){
+      const p=this.pendingStatus;
+      this.pendingStop={phase:'checking',status_id:p.id,at:p.at,deadline:p.deadline};
+      this.stopNotice='Using the pending fresh STATUS reply before STOP...';
+      return null;
+    }
+    const cooling=this.statusLastSentAt!==null&&at-this.statusLastSentAt<250;
+    if(this.pendingResume||cooling){
+      const session=this.pendingResume?.session??this.clockAnchor?.session;
+      let deadline;try{deadline=this.commandDeadline(at,session);}catch{}
+      const bytes=deadline===undefined?null:encodeStopRequest(id,session,deadline);
+      if(this.pendingResume){this.pendingResume=null;this.resumeNotice='Resume cancelled by STOP.';}
+      if(bytes){
+        this.pendingStop={phase:'waiting',command_id:id,session,sent_at:at,deadline:at+3000};
+        this.stopNotice='STOP submitted; waiting for the controller result...';
+        return bytes;
+      }
+    }
+    /* STOP is harmless while latched and must remain possible after a lost
+     * Resume result. Refresh the session/clock instead of assuming its state. */
     const bytes=this.beginStatus(id,at,true);
     this.pendingStop={phase:'checking',status_id:id,at,deadline:at+3000};
     this.stopNotice='Checking fresh Pico status before sending STOP...';return bytes;
@@ -208,8 +254,35 @@ export class TelemetryStore {
     Object.assign(p,{phase:'waiting',command_id:id,sent_at:at,deadline:at+3000});
     this.stopNotice='STOP submitted; waiting for the controller result...';return bytes;
   }
+  commandDeadline(at,session){
+    const a=this.clockAnchor;
+    if(!a||a.session!==session||at<a.at||at-a.at>30000)throw new Error('Wait for fresh Pico clock synchronization');
+    return (a.boot+at-a.at+2000)>>>0;
+  }
+  beginResume(id,at=Date.now()){
+    const c=this.currentController(at);
+    if(!c||c.test_build||!c.stop_latched||c.controller_state_code!==6)throw new Error('Resume requires a current normal-mode stop latch');
+    if(this.pendingStatus||this.pendingStop||this.pendingResume)throw new Error('A controller request is pending');
+    const b=encodeResumeRequest(id,c.session_token,this.commandDeadline(at,c.session_token));
+    if(id===this.lastResumeId)throw new Error('Use a fresh Resume request ID');
+    this.pendingResume={phase:'arming',id,session:c.session_token,at,deadline:at+3000};this.lastResumeId=id;
+    this.resumeNotice='Requesting one-use Resume authorization...';return b;
+  }
+  beginResumeCommand(at=Date.now()){
+    const p=this.pendingResume,c=this.currentController(at);
+    if(!p||p.phase!=='ready'||!c||c.session_token!==p.session||at>=p.valid_until)throw new Error('Resume authorization expired or session changed');
+    const b=encodeResumeRequest(p.ticket,p.session,p.boot_deadline,true);
+    Object.assign(p,{phase:'waiting',sent_at:at,deadline:at+3000});
+    this.resumeNotice='Resume submitted; waiting for the controller result...';return b;
+  }
   expireCommands(at=Date.now()) {
     this.expireStatus(at);
+    const resume=this.pendingResume;
+    if(resume&&((resume.phase==='ready'&&at>=resume.valid_until)||at>=resume.deadline)){
+      this.pendingResume=null;
+      this.resumeNotice=resume.phase==='waiting'?'No matching Resume result; outcome unknown. Check live controller state.':'No Resume sent; authorization expired.';
+      this.event('Resume expired',this.resumeNotice,'warning',at);
+    }
     const p=this.pendingStop;if(!p)return;
     if((p.phase==='ready'&&at>=p.valid_until)||at>=p.deadline) {
       this.pendingStop=null;
@@ -234,6 +307,27 @@ export class TelemetryStore {
       if (retained) throw new Error('Retained message ignored; waiting for a fresh sample');
       if(kind==='telemetry'&&(bytes[0]===0xb5||bytes[0]===0xb6))return this.ingestAux(bytes,at,packet);
       if(kind==='status') {
+        if(bytes[0]===0xa6){
+          const reply=decodeResumeArmReply(bytes),p=this.pendingResume;this.expireCommands(at);
+          if(!p||p!==this.pendingResume||p.phase!=='arming'||reply.request_id!==p.id||at<p.at)throw new Error('Unmatched or expired Resume authorization');
+          const elapsed=at-p.at;
+          if(reply.session_token!==p.session||elapsed>=2000){this.pendingResume=null;throw new Error('Resume session changed or authorization too old');}
+          this.clockAnchor={session:reply.session_token,boot:reply.uptime_ms,at,rtt:elapsed};
+          this.observeController(reply,at);
+          Object.assign(p,{phase:'ready',ticket:reply.ticket,boot_deadline:(reply.uptime_ms+2000)>>>0,valid_until:at+2000-elapsed});
+          this.resumeNotice='Fresh Resume authorization received.';
+          packet.accepted=true;packet.decoded=reply;packet.detail='Resume authorization';return true;
+        }
+        if(bytes[0]===0xa8){
+          const reply=decodeResumeReply(bytes),p=this.pendingResume;this.expireCommands(at);
+          const id=p?.phase==='arming'?p.id:p?.ticket;
+          if(!p||p!==this.pendingResume||!['arming','waiting'].includes(p.phase)||reply.request_id!==id||at<(p.phase==='arming'?p.at:p.sent_at)||
+             (p.phase==='arming'&&reply.result===0)||(reply.session_token!==p.session&&reply.result!==2))throw new Error('Unmatched or expired Resume result');
+          this.pendingResume=null;this.resumeReply={...reply,received_at:at};this.observeController(reply,at);
+          this.resumeNotice=reply.result===0?'STOP latch released; autonomous control may move the car.':`Resume not applied: ${reply.result_name}.`;
+          this.event(reply.result===0?'Resume confirmed':'Resume blocked',this.resumeNotice,reply.result===0?'success':'warning',at);
+          packet.accepted=true;packet.decoded=reply;packet.detail='Controller Resume result';return true;
+        }
         if(bytes[0]===0xa4) {
           const reply=decodeStopReply(bytes),p=this.pendingStop;
           this.expireCommands(at);
@@ -255,8 +349,8 @@ export class TelemetryStore {
         this.observeController(reply,at);
         this.statusNotice=`Pico STATUS reply confirmed in ${elapsed} ms.`;
         if(this.pendingStop?.phase==='checking'&&this.pendingStop.status_id===reply.request_id) {
-          if(!reply.controller_valid||reply.stop_latched||elapsed>=2000) {
-            this.pendingStop=null;this.stopNotice=reply.stop_latched?'Controller already reports stop latched.':'No STOP sent; controller unavailable or status reply too old.';
+          if(!reply.controller_valid||elapsed>=2000) {
+            this.pendingStop=null;this.stopNotice='No STOP sent; controller unavailable or status reply too old.';
           } else {
             Object.assign(this.pendingStop,{phase:'ready',session:reply.session_token,
               boot_deadline:(reply.uptime_ms+2000)>>>0,valid_until:at+2000-elapsed});

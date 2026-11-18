@@ -132,3 +132,12 @@ test('diagnostic history is bounded and disconnected/stale values unavailable',(
   assert.equal(s.diagnosticHistory.length,120);assert.equal(s.currentDiagnostics(8125),null);
   assert.equal(s.currentDiagnostics(1125,false),null);
 });
+
+
+test('average wheel speed uses both signed velocities and preserves unknown/zero',()=>{
+  const mean=decodeTelemetry(telemetry({left:1191,right:-1191})).sample;
+  assert.equal(mean.average_wheel_mps,0.1191);
+  assert.equal(decodeTelemetry(telemetry({left:0,right:0})).sample.average_wheel_mps,0);
+  assert.equal(decodeTelemetry(telemetry({left:null,right:0})).sample.average_wheel_mps,null);
+  assert.equal(decodeTelemetry(telemetry({left:0,right:2000})).sample.average_wheel_mps,0.1);
+});

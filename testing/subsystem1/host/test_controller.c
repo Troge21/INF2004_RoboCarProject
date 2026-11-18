@@ -24,6 +24,12 @@ static int tk_get_otm(SYSTIM *t){t->lo=clock_ms;t->hi=0;return E_OK;}
 #include "../../../app_program/controller.c"
 static void check(int ok,const char *name){checks++;if(!ok)failures++;printf("[controller] %s %s\n",ok?"PASS":"FAIL",name);}
 static void reset(void){controller_sem=0;held=blocked=0;clock_ms=1000;(void)app_controller_init();app_controller_publish(APP_CTRL_FOLLOWING,E_OK);}
+static void latch(void){
+    uint8_t b[10];
+    (void)app_controller_submit_stop(91,99,clock_ms+1000U);
+    (void)app_controller_poll();app_controller_publish(APP_CTRL_STOP_LATCHED,E_OK);
+    (void)app_controller_take_reply(b);
+}
 int main(void){
     uint8_t reply[10],state[5];
     reset();
@@ -64,6 +70,93 @@ int main(void){
     check(app_controller_submit_stop(1,99,clock_ms+1000)==E_OBJ,"stale owner publication cannot admit commands");
     reset();app_controller_publish(APP_CTRL_UNAVAILABLE,E_OK);
     check(app_controller_submit_stop(1,99,2000)==E_OBJ,"unavailable/calibration controller does not admit stop");
+
+    {
+        uint32_t ticket=777;
+        reset();check(app_controller_arm_resume(clock_ms+1000,&ticket)==APP_RESUME_NOT_READY&&ticket==777,
+            "unlatched control cannot arm Resume or change output on refusal");
+        latch();
+        check(app_controller_arm_resume(clock_ms+1000,&ticket)==(APP_TEST?APP_RESUME_NOT_READY:0),
+            "only a normal latched controller offers Resume authorization");
+#if !APP_TEST
+        uint32_t old=ticket;check(app_controller_poll()&APP_CTRL_LATCH,"arming alone cannot release STOP");
+        check(app_controller_arm_resume(clock_ms+1000,&ticket)==0&&ticket!=old,
+            "server issues a new one-use ticket instead of trusting a replayed client ID");
+        check(app_controller_submit_resume(old,99,clock_ms+1000)==APP_RESUME_AUTH_CHANGED,
+            "superseded authorization cannot resume");
+        check(app_controller_submit_resume(ticket,99,clock_ms+1000)==0&&
+              (app_controller_poll()&APP_CTRL_LATCH),"commit waits for current controller source checks");
+        check(app_controller_poll_ready(1)==0&&app_controller_take_reply(reply)==E_TMOUT,
+            "eligible explicit Resume releases latch but waits for motor handoff before reply");
+        app_controller_publish(APP_CTRL_FOLLOWING,E_OK);
+        check(app_controller_take_reply(reply)==E_OK&&(reply[9]&2U)&&
+              (((reply[8]|((unsigned)reply[9]<<8))>>6)&7U)==0&&!(reply[8]&APP_CTRL_LATCH),
+            "successful Resume reply identifies its command kind and released controller state");
+        check(app_controller_submit_resume(ticket,99,clock_ms+1000)==APP_RESUME_AUTH_CHANGED,
+            "consumed ticket is never usable again");
+        reset();latch();(void)app_controller_arm_resume(clock_ms+1000,&ticket);
+        (void)app_controller_submit_resume(ticket,99,clock_ms+1000);
+        check(app_controller_poll_ready(0)&APP_CTRL_LATCH,"invalid or blocked source checks retain STOP");
+        app_controller_publish(APP_CTRL_STOP_LATCHED,E_OK);(void)app_controller_take_reply(reply);
+        check((((reply[8]|((unsigned)reply[9]<<8))>>6)&7U)==APP_RESUME_NOT_READY,
+            "not-ready is an explicit failure, not a fabricated successful resume");
+        reset();latch();(void)app_controller_arm_resume(clock_ms+1000,&ticket);
+        (void)app_controller_submit_resume(ticket,99,clock_ms+1000);
+        (void)app_controller_poll_ready(1);app_controller_publish(APP_CTRL_FOLLOWING,E_TMOUT);
+        (void)app_controller_take_reply(reply);
+        check((app_controller_poll()&APP_CTRL_LATCH)&&
+              (((reply[8]|((unsigned)reply[9]<<8))>>6)&7U)==APP_RESUME_FAULT,
+            "failed motor submission immediately restores inhibit and cannot report Resume success");
+        reset();latch();(void)app_controller_arm_resume(clock_ms+1000,&ticket);
+        (void)app_controller_submit_resume(ticket,99,clock_ms+1000);
+        (void)app_controller_poll_ready(1);blocked=1;
+        app_controller_publish(APP_CTRL_FOLLOWING,E_TMOUT);blocked=0;
+        check(app_controller_poll()&APP_CTRL_LATCH,
+            "failed Resume handoff restores the latch even when publication is contended");
+        app_controller_publish(APP_CTRL_STOP_LATCHED,E_OK);(void)app_controller_take_reply(reply);
+        check((((reply[8]|((unsigned)reply[9]<<8))>>6)&7U)==APP_RESUME_FAULT,
+            "contended publication preserves the failed Resume outcome until its reply is delivered");
+        reset();latch();(void)app_controller_arm_resume(clock_ms+1000,&ticket);
+        (void)app_controller_submit_resume(ticket,99,clock_ms+1000);
+        (void)app_controller_submit_stop(92,99,clock_ms+1000);
+        (void)app_controller_poll_ready(1);app_controller_publish(APP_CTRL_STOP_LATCHED,E_OK);
+        (void)app_controller_take_reply(reply);
+        check(read32(reply)==92&&!(reply[9]&2U)&&(app_controller_poll()&APP_CTRL_LATCH),
+            "STOP preempts a queued Resume in the one-slot controller mailbox");
+        check(app_controller_submit_resume(ticket,99,clock_ms+1000)==APP_RESUME_AUTH_CHANGED,
+            "STOP invalidates the previous authorization even after its own reply is drained");
+        (void)app_controller_arm_resume(clock_ms+1000,&old);
+        check(old!=ticket,"a replayed old arm cannot recreate the old server token after STOP");
+        reset();latch();(void)app_controller_arm_resume(clock_ms+1000,&ticket);
+        clock_ms+=2000;
+        check(app_controller_submit_resume(ticket,99,clock_ms+1000)==APP_RESUME_AUTH_CHANGED,
+            "unused authorization expires at its hard two-second boundary");
+        reset();latch();(void)app_controller_arm_resume(clock_ms+1000,&ticket);
+        (void)app_controller_submit_resume(ticket,99,clock_ms+1000);clock_ms+=1000;
+        (void)app_controller_poll_ready(1);app_controller_publish(APP_CTRL_STOP_LATCHED,E_OK);
+        (void)app_controller_take_reply(reply);
+        check((((reply[8]|((unsigned)reply[9]<<8))>>6)&7U)==APP_RESUME_EXPIRED&&(reply[8]&APP_CTRL_LATCH),
+            "queued Resume expiry is checked again immediately before release");
+        reset();latch();(void)app_controller_arm_resume(clock_ms+1000,&ticket);
+        (void)app_controller_submit_resume(ticket,99,clock_ms+1000);
+        app_controller_cancel_resume();
+        check((app_controller_poll_ready(1)&APP_CTRL_LATCH)&&read32(request_slot)==0,
+            "connection cancellation discards unprocessed Resume and preserves the latch");
+        reset();latch();(void)app_controller_arm_resume(clock_ms+1000,&ticket);
+        app_controller_publish(APP_CTRL_FAULT,E_OK);
+        check(app_controller_submit_resume(ticket,99,clock_ms+1000)==APP_RESUME_AUTH_CHANGED&&
+              app_controller_arm_resume(clock_ms+1000,&ticket)==APP_RESUME_FAULT,
+            "fault publication invalidates tickets and cannot be cleared by Resume");
+        reset();clock_ms=0xfffffff0U;app_controller_publish(APP_CTRL_FOLLOWING,E_OK);latch();
+        (void)app_controller_arm_resume(clock_ms+1000,&ticket);
+        (void)app_controller_submit_resume(ticket,99,clock_ms+1000);clock_ms=8;
+        check(app_controller_poll_ready(1)==0,"Resume authorization and lease handle uint32 uptime wrap");
+        app_controller_publish(APP_CTRL_FOLLOWING,E_OK);(void)app_controller_take_reply(reply);
+        reset();latch();blocked=1;
+        check(app_controller_arm_resume(clock_ms+1000,&ticket)==APP_RESUME_BUSY,
+            "Resume authorization never waits behind a controller lock");blocked=0;
+#endif
+    }
     printf("[controller] SUMMARY %d checks, %d failures (TEST=%d)\n",checks,failures,APP_TEST);
     return failures?1:0;
 }

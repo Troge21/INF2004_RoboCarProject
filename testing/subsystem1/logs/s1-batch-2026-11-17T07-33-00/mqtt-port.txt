@@ -1,0 +1,61 @@
+[MQTT STATUS] PASS firmware subscribes to real command topic, replacing heartbeat loopback
+[MQTT STATUS] PASS partial command cannot trigger a reply
+[MQTT STATUS] PASS fragmented STATUS completes once and echoes exact correlation ID
+[MQTT STATUS] PASS completed request is consumed exactly once
+[MQTT STATUS] PASS heartbeat and unrelated topics cannot dispatch commands
+[MQTT STATUS] PASS ASCII and oversized declared requests are ignored
+[MQTT STATUS] PASS early LAST fragment cannot execute a partial request
+[MQTT STATUS] PASS extra fragment bytes invalidate the whole request
+[MQTT STATUS] PASS single occupied slot drops new requests without overwriting pending ID
+[MQTT STATUS] PASS firmware limits accepted STATUS requests to one per 250 ms
+[MQTT STATUS] PASS rate limit accepts exact boundary with fresh ID
+[MQTT STATUS] PASS rate limiting remains correct over uint32 uptime wrap
+[MQTT STATUS] PASS disconnect cancels pending requests instead of replaying after reconnect
+[MQTT STATUS] PASS command handling waits for its subscription acknowledgment
+[MQTT STATUS] PASS failed command subscription can retry and recover
+[MQTT STATUS] PASS normal telemetry is still published independently
+[MQTT STATUS] PASS five-byte heartbeat is unchanged
+[MQTT STATUS] PASS WiFi loss cancels pending work and all port timers, closes TCP once
+[MQTT STATUS] PASS offline polling and late callbacks cannot publish, reconnect or rearm heartbeat
+[MQTT STATUS] PASS late MQTT acceptance while WiFi is down closes the stale session
+[MQTT STATUS] PASS restored WiFi creates a clean command subscription without replaying old requests
+[MQTT STATUS] PASS fresh STATUS works after WiFi recovery
+[MQTT STATUS] PASS synchronous connect error backs off instead of retrying every poll
+[MQTT STATUS] PASS failed timer retry schedules exactly one further retry
+[MQTT STATUS] PASS repeated failure callbacks do not accumulate retry timers
+[MQTT STATUS] PASS successful recovery removes stale retry and arms one heartbeat
+[MQTT STATUS] PASS twenty MQTT reconnects retain one heartbeat chain and no stale retry
+[MQTT STATUS] PASS client allocation failure also uses bounded backoff
+[MQTT STATUS] PASS allocation retry can resume normal connection setup
+[MQTT STATUS] PASS invalid broker address does not hammer the poll loop
+[MQTT STATUS] PASS connection advertises five-second MQTT keepalive and arms one connection deadline
+[MQTT STATUS] PASS stalled TCP/MQTT connect is closed and replaced after five seconds
+[MQTT STATUS] PASS network polls cannot bypass an in-flight connection deadline
+[MQTT STATUS] PASS successful CONNACK cancels the pending connection deadline
+[MQTT STATUS] PASS a late deadline callback never closes a healthy accepted session
+[MQTT STATUS] PASS WiFi loss cancels an in-flight deadline and its stale callback cannot reconnect
+[MQTT STATUS] PASS fragmented STOP cannot execute before completion
+[MQTT STATUS] PASS STOP follows STATUS immediately but sends no success before controller result
+[MQTT STATUS] PASS real controller completion produces correlated logical-stop result
+[MQTT STATUS] PASS duplicate STOP is not re-executed
+[MQTT STATUS] PASS expired boot deadline cannot reach controller
+[MQTT STATUS] PASS overlong future leases are rejected
+[MQTT STATUS] PASS STOP expiry uses boot uptime and handles wrap independently of lwIP clock
+[MQTT STATUS] PASS new MQTT session rejects retained/replayed old-session STOP bytes
+[MQTT STATUS] PASS busy controller is reported without a fabricated applied acknowledgment
+[MQTT STATUS] PASS unavailable controller cannot receive actuator intent
+[MQTT STATUS] PASS a latched motor-handoff fault cannot become a successful STOP result
+[MQTT STATUS] PASS declared length and command marker must agree, including early LAST
+[MQTT STATUS] PASS late controller result is drained but never replayed into another session
+[MQTT STATUS] PASS current telemetry carries real controller state without a duplicate beacon path
+[MQTT STATUS] PASS scan backpressure is returned to the bounded S1 chunk sender and counted
+[MQTT STATUS] PASS every accepted MQTT TCP session disables Nagle coalescing
+[MQTT STATUS] PASS unacknowledged periodic traffic cannot queue old frames or consume a fresh source sample
+[MQTT STATUS] PASS busy TCP defers heartbeat using one short recheck timer rather than filling request slots
+[MQTT STATUS] PASS read-only STATUS retains priority while a telemetry acknowledgment is pending
+[MQTT STATUS] PASS busy periodic output cannot block controller STOP dispatch
+[MQTT STATUS] PASS TCP acknowledgment releases the deferred heartbeat without accumulating timer chains
+[MQTT STATUS] PASS after acknowledgment main telemetry takes precedence over optional scan traffic
+[MQTT STATUS] PASS WiFi loss cancels a deferred heartbeat recheck
+[MQTT STATUS] PASS failed heartbeat enqueue is counted and retried without a four-second extra wait
+[MQTT STATUS] SUMMARY 60 checks, 0 failures

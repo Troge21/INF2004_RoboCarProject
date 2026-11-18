@@ -35,9 +35,9 @@ export function stopReply({id=100,session=0x12345678,result=0,word=22}={}){
   const b=new Uint8Array(11),v=new DataView(b.buffer);b[0]=0xa4;
   v.setUint32(1,id,true);v.setUint32(5,session,true);v.setUint16(9,word|(result<<6),true);return b;
 }
-export function syncStore(store,{at=1000,uptime=1000,session=0x12345678,state=1,testBuild=true,id=1}={}){
+export function syncStore(store,{at=1000,uptime=1000,session=0x12345678,state=1,testBuild=true,id=1,latched=false}={}){
   store.beginStatus(id,at-20);
-  if(!store.ingest(statusReply({id,uptime,session,state,testBuild}),'status',at))throw new Error('Fixture clock sync failed');
+  if(!store.ingest(statusReply({id,uptime,session,state,testBuild,latched}),'status',at))throw new Error('Fixture clock sync failed');
   return store;
 }
 export function scanChunk({session=0x12345678,sequence=1,uptime=900,total=181,start=0,
@@ -54,3 +54,11 @@ export function diagnostics({session=0x12345678,uptime=1000,values=[82596,5000,4
   values.forEach((n,i)=>putBits(b.subarray(9,24),19*i,19,n??0x7ffff));
   counters.forEach((n,i)=>v.setUint32(24+4*i,n,true));return b;
 }
+
+export function resumeArmReply(options={}){
+  const {ticket=77,...rest}=options;
+  const base=statusReply({state:6,latched:true,testBuild:false,...rest});
+  const b=new Uint8Array(base.length+4);b.set(base.subarray(0,16));b[0]=0xa6;
+  new DataView(b.buffer).setUint32(16,ticket,true);if(base.length>16)b.set(base.subarray(16),20);return b;
+}
+export function resumeReply(options={}){const b=stopReply({id:77,word:3,...options});b[0]=0xa8;return b;}

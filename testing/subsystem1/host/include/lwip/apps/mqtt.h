@@ -12,7 +12,13 @@ typedef int err_t;
 #define MQTT_DATA_FLAG_LAST 1U
 typedef int mqtt_connection_status_t;
 #define MQTT_CONNECT_ACCEPTED 0
-typedef struct { int connected; } mqtt_client_t;
+struct altcp_pcb;
+struct mqtt_request_t;
+typedef struct {
+    int connected;
+    struct altcp_pcb *conn;
+    struct mqtt_request_t *pend_req_queue;
+} mqtt_client_t;
 typedef void (*mqtt_request_cb_t)(void *, err_t);
 typedef void (*mqtt_connection_cb_t)(mqtt_client_t *, void *, mqtt_connection_status_t);
 typedef void (*mqtt_incoming_publish_cb_t)(void *, const char *, u32_t);

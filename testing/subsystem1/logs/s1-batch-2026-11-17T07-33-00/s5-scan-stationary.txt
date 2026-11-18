@@ -1,0 +1,9 @@
+PASS: passive API errors do not manufacture measurements
+PASS: thresholds, missing echoes and clearance margin preserve a clear escape
+PASS: actual task scans while publishing intent; centre range never becomes a side echo
+PASS: real strong scan getter feeds the existing three-point v4 scan frame
+PASS: snapshot contention returns immediately with caller output intact
+PASS: scan ID wrap and invalid-echo sentinel survive packed publication
+PASS: no centre echo publishes invalid range and a blocking intent without a fabricated scan
+PASS: missing side echoes remain gaps in a completed profile and never authorize a turn
+SUMMARY: 8 actual S5 scan/publication checks passed, APP_TEST=1; no motor API linked.

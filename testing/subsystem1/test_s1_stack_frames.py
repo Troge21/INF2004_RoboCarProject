@@ -2,11 +2,14 @@
 from pathlib import Path
 import subprocess,shlex,tempfile,sys,re
 root=Path(__file__).resolve().parents[2]
-log=Path(sys.argv[1]) if len(sys.argv)>1 else root/'testing/subsystem1/logs/2026-11-13-s1-batch-stationary-build.txt'
+log=Path(sys.argv[1]) if len(sys.argv)>1 else root/'testing/subsystem1/logs/2026-11-17-resume-stationary-build.txt'
 raw=log.read_bytes();text=raw.decode('utf-16') if raw[:2] in [bytes([255,254]),bytes([254,255])] else raw.decode('utf-8-sig')
 sources=['../app_program/subsystem1/subsystem1.c','../app_program/subsystem1/subsystem1_test.c',
          '../app_program/app_main.c','../lib/libtm/libtm_printf.c',
-         '../app_program/subsystem5/subsystem5.c','../app_program/subsystem5/subsystem5_test.c']
+         '../app_program/subsystem5/subsystem5.c','../app_program/subsystem5/subsystem5_test.c',
+         '../app_program/subsystem2/subsystem2.c','../app_program/subsystem2/motion_control.c',
+         '../app_program/subsystem2/odometry.c','../app_program/subsystem1/s1_protocol.c',
+         '../lib/liblwip/sysdepend/pico_rp2040/mqtt_utk.c']
 frames={}
 with tempfile.TemporaryDirectory(prefix='robocar-s1-stack-') as folder:
     for source in sources:
@@ -39,4 +42,13 @@ assert s5<=768,'S5 must leave substantial space for kernel/interrupt calls'
 s5_startup=known-frames['subsystem1_test']+frames['subsystem5_test']
 print('Known S5 startup-test/console chain:',s5_startup,'/',initial,'bytes')
 assert s5_startup<=initial-512,'S5 on-board tests must preserve the startup stack margin'
-print('PASS: collector, S5 and startup-test stack budgets. Actual runtime high-water still requires measurement.')
+s2=frames.get('encoder_feedback_task',frames.get('motor_task',0))+frames['motion_loop']+max(
+    frames['s2_control_step']+frames.get('pid_step',0)+max(frames.get('clamp',0),frames.get('pid_reset',0)),
+    frames['s2_odometer_step']+max(frames.get('store',0),frames.get('s2_odometer_invalidate',0)+frames.get('store',0)),
+    frames.get('s2_encoder_read',0))
+print('S2 motion/odometer static chain:',s2,'/ 2048 bytes')
+assert s2<=768,'Encoder task must reserve substantial space for kernel/compiler/interrupt calls'
+resume=frames['mqtt_utk_poll']+frames['s1_network_arm_resume']+frames['s1_pack_resume_arm_reply']+frames['s1_pack_status_reply']
+print('Radio Resume bridge/codec static chain:',resume,'/ 8192 bytes')
+assert resume<=1536,'Resume serialization must reserve substantial space for SDK/kernel/radio calls'
+print('PASS: collector, S2, S5, Resume bridge and startup-test stack budgets. Actual runtime high-water still requires measurement.')

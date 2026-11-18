@@ -112,7 +112,9 @@ typedef struct {
  * Refresh at least every S2_COMMAND_MAX_AGE_MS; zero stops immediately.
  * Faults latch until reboot. Existing set_duty remains an open-loop API. */
 EXPORT ER subsystem2_set_rpm_x10(INT left, INT right);
-/* E_OBJ until first snapshot; E_TMOUT on contention: retry later.
+/* Integrated TEST=1 runs passive encoder feedback with wheel PWM disabled.
+ * Commands still return E_OBJ; measurements include hand-turned wheels.
+ * E_OBJ until first snapshot; E_TMOUT on contention: retry later.
  * Consumers check timestamp age and speed_valid before showing live values. */
 EXPORT ER subsystem2_get_motion(S2_MOTION_DATA *sample);
 
