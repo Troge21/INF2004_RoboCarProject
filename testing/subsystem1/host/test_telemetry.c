@@ -154,6 +154,25 @@ int main(void){
     expect(n==46&&s1_get_bits(b+13,S1_B_TRAVEL,32)==1234,"owner path snapshot reaches the existing 46-byte wire field");
     advance(2001);n=s1_network_poll(b,sizeof(b),17);
     expect(n==46&&s1_get_bits(b+13,S1_B_TRAVEL,32)==UINT32_MAX,"stale path expires instead of appearing current");
+    imu_ready=1;imu.state=S4_STATE_MONITORING;
+    imu.timestamp_ms=imu.pitch_timestamp_ms=calendar_ms;
+    imu.flags=S4_FLAG_SENSOR_OK|S4_FLAG_PITCH_VALID|S4_FLAG_ENCODER_HEIGHT;
+    imu.current_hump_mm=10;imu.max_hump_mm=20;
+    s1_set_bits(imu.terrain,0,11,849);
+    s1_set_bits(imu.terrain,11,9,256);
+    s1_set_bits(imu.terrain,20,4,S4_MOTION_FORWARD);
+    s1_set_bits(imu.terrain,24,2,S4_HUMP_RIGHT);
+    s1_set_bits(imu.terrain,26,16,1);
+    collect();
+    (void)s1_network_aux(b,sizeof(b),17,counters); /* a resource packet may be due */
+    advance(500);imu.timestamp_ms=imu.pitch_timestamp_ms=calendar_ms;collect();
+    n=s1_network_aux(b,sizeof(b),17,counters);
+    expect(n==S1_TERRAIN_BYTES&&b[0]==0xb7&&s1_get_bits(b+9,0,11)==849&&
+        s1_get_bits(b+9,24,2)==S4_HUMP_RIGHT,"S4 owner snapshot reaches the bounded terrain auxiliary path");
+    advance(500);n=s1_network_aux(b,sizeof(b),17,counters);
+    if(n==S1_DIAGNOSTIC_BYTES)n=s1_network_aux(b,sizeof(b),17,counters);
+    expect(n==S1_TERRAIN_BYTES&&s1_get_bits(b+9,0,24)==0&&
+        s1_get_bits(b+9,24,2)==S4_HUMP_RIGHT,"old live S4 motion expires while the last measured hump remains");
 
     {
         UB arm[13]={0xa5};

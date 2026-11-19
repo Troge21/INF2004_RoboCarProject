@@ -83,6 +83,7 @@ int main(void){
         clock_ms=100;s3_line_sample(&sample);
         assert(calls==9&&sample.valid&&sample.pattern==pattern);
         assert(subsystem3_get_line(&out)==E_OK&&out.pattern==pattern&&out.timestamp_ms==100);
+        assert(out.centre_adc==(pattern&2?950:949)&&out.right_adc==(pattern&1?1420:1419));
         levels(pattern&2?950:949,pattern&1?1420:1419,0);
         s3_line_sample(&sample);assert(sample.pattern==pattern); /* barcode never steers */
     }

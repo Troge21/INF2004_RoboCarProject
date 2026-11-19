@@ -26,8 +26,14 @@ def c_case(name,source,extra=(),wire=False):
     return name,run
 cases=[
     c_case('odometer','testing/subsystem2/test_odometry.c',[root/'app_program/subsystem2/odometry.c','-I',root/'app_program/subsystem2']),
+    c_case('encoder-move','testing/subsystem2/test_encoder_move.c',['-I',root/'app_program/subsystem2']),
+    c_case('s4-samples','testing/subsystem4/test_gy511_io.c'),
+    c_case('s4-snapshot','testing/subsystem1/host/test_imu_snapshot.c',['-I',root/'config']),
+    c_case('s4-trace','testing/subsystem1/host/test_imu_snapshot.c',['-I',root/'config','-DAPP_TEST=1']),
+    c_case('s4-motor-trace','testing/subsystem1/host/test_imu_snapshot.c',['-I',root/'config','-DAPP_S4_MOTOR_TRACE=1']),
     c_case('s5-scan-stationary','testing/subsystem1/host/test_s5_scan.c',['-DAPP_TEST=1']),
     c_case('s5-scan-normal','testing/subsystem1/host/test_s5_scan.c',['-DAPP_TEST=0']),
+    c_case('s5-scan-bypass','testing/subsystem1/host/test_s5_scan.c',['-DAPP_TEST=0','-DAPP_OBSTACLE_BYPASS=1']),
     c_case('current-layout','testing/subsystem1/host/measure_layout.c'),
     c_case('s1-codec-bridge','testing/subsystem1/host/test_telemetry.c'),
     c_case('s1-bridge-normal','testing/subsystem1/host/test_telemetry.c',['-DAPP_TEST=0']),

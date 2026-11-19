@@ -1,7 +1,7 @@
 // Actual C output decoded by the current JavaScript and MQTT framing.
 import {spawnSync} from 'node:child_process';
 import assert from 'node:assert/strict';
-import {decodeTelemetry,decodeScan,decodeDiagnostics,decodeStatusReply,decodeStopReply,decodeHeartbeat,decodeResumeArmReply,decodeResumeReply} from '../../../dashboard/dist/protocol.js';
+import {decodeTelemetry,decodeScan,decodeDiagnostics,decodeTerrain,decodeStatusReply,decodeStopReply,decodeHeartbeat,decodeResumeArmReply,decodeResumeReply} from '../../../dashboard/dist/protocol.js';
 import {packet,concat,mqttString,parsePublish,PacketReader} from '../../../dashboard/dist/mqtt.js';
 assert.ok(process.argv[2],'Pass the compiled emit_frames executable');
 const result=spawnSync(process.argv[2],[],{encoding:'utf8',maxBuffer:16*1024*1024});
@@ -28,6 +28,9 @@ for(const line of result.stdout.trim().split(/\r?\n/)){
     const s=decodeScan(b);assert.equal(s.start,e.start);assert.equal(s.total,181);
     s.points.forEach(p=>assert.equal(p.distance_mm,p.angle%7?451:null));
   }else if(e.kind==='resources'){const d=decodeDiagnostics(b);assert.equal(d.heap_free_bytes,0);assert.equal(d.stack_high_water_bytes,null);assert.equal(d.rejected_commands,0xffffffff);}
+  else if(e.kind==='terrain')assert.deepEqual(decodeTerrain(b),{
+    session_token:17,uptime_ms:1000,roll_deg:-5.2,turn_deg_s:113,motion_class:'Turning left',
+    hump_kind:'Right-wheel hump',hump_event_sequence:65535});
   else if(e.kind==='heartbeat')assert.equal(decodeHeartbeat(b),0xffffffff);
   else throw new Error('Unknown C fixture kind');
   const reader=new PacketReader(),framed=packet(0x30,concat(mqttString('car/telemetry'),b));

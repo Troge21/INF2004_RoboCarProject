@@ -1,6 +1,6 @@
 import { TelemetryStore,hex,packetText } from './protocol.js';
 import { MqttConnection,validateTopics } from './mqtt.js';
-import { lineChart,sparkline,scanChart } from './charts.js';
+import { lineChart,sparkline,renderObstacleRadar,renderScanReadings } from './charts.js';
 
 const $=id=>document.getElementById(id);
 const icons={
@@ -57,12 +57,23 @@ function overview(){
   <div class="main-grid">${chartCard('Obstacle proximity','Distance ahead of the ultrasonic sensor','obstacle-chart',obstacleLegend,obstacleFoot)}${card('Activity feed','The latest events from your vehicle','<div class="events" id="events"></div><div class="card-bottom-note" data-value="events-note">Showing the latest 4 events</div>','<span class="activity-count">RECENT</span>')}</div>
   <div class="health-strip"><div class="health-intro"><span>${icon('shield')}</span><div><strong data-value="health-title">Awaiting connection</strong><small data-value="health-description">Connect your RoboCar to receive live measurements</small></div></div><div class="health-facts"><div><strong data-value="heartbeat-age">—</strong>Heartbeat age</div><div><strong data-value="interval">—</strong>Telemetry interval</div><div><strong data-value="packet-size">—</strong>Last payload</div><div><strong data-value="sequence">—</strong>Sequence</div></div></div>`;
 }
+function obstacleScanCard(){
+  return card('Obstacle radar','View from behind the car',`<div class="scan-panel" id="scan-panel">
+    <div class="scan-radar" id="scan-radar"></div>
+    <dl class="scan-directions" aria-label="Latest scan distances"></dl>
+    <details class="scan-more" hidden><summary>Other scan angles</summary><dl></dl></details>
+    <div class="chart-foot scan-footer">
+      <span data-value="scan-age">No scan yet</span>
+      <button class="button button-white" data-export="scan" disabled>Export scan CSV</button>
+    </div>
+  </div>`,'','scan-card');
+}
 function sensors(){
   return `<div class="metrics">${metric('speed','Average wheel speed','m/s','From encoder feedback','speed')}${metric('distance','Distance travelled','m','Current run','distance')}${metric('obstacle','Obstacle distance','mm','Latest valid range','radar')}${metric('hump','Highest hump estimate','mm','Maximum for this run','mountain')}</div>
   <div class="two-columns">${chartCard('Wheel velocity','Compare the two encoder speed estimates','speed-chart',speedLegend,speedFoot)}${chartCard('Obstacle proximity','Live ultrasonic range measurements','obstacle-chart',obstacleLegend,obstacleFoot)}</div>
-  <div class="two-columns">${chartCard('Vehicle pitch','Live IMU angle; front-up is positive','pitch-chart','<div class="legend"><span><i class="teal"></i>Pitch</span></div>','<span>Sensor angle <strong>· degrees</strong></span><span>Calibrating or stale samples appear as gaps</span>')}${card('IMU & height status','Real sensor status and estimator assumptions','<div class="vehicle-details"><div class="vehicle-detail"><span>Pitch</span><strong data-value="pitch">Unavailable</strong></div><div class="vehicle-detail"><span>IMU state</span><strong data-value="imu-state">Unavailable</strong></div><div class="vehicle-detail"><span>Last accepted hump</span><strong data-value="last-hump">Unavailable</strong></div><div class="vehicle-detail"><span>Run maximum estimate</span><strong data-value="run-hump">Unavailable</strong></div></div><div class="card-bottom-note" data-value="imu-note">Waiting for IMU telemetry</div>')}</div>
+  <div class="two-columns">${chartCard('Vehicle pitch','Live IMU angle; front-up is positive','pitch-chart','<div class="legend"><span><i class="teal"></i>Pitch</span></div>','<span>Sensor angle <strong>· degrees</strong></span><span>Calibrating or stale samples appear as gaps</span>')}${card('IMU & height status','Real sensor status and estimator assumptions','<div class="vehicle-details"><div class="vehicle-detail"><span>Pitch</span><strong data-value="pitch">Unavailable</strong></div><div class="vehicle-detail"><span>Roll from level</span><strong data-value="roll">Unavailable</strong></div><div class="vehicle-detail"><span>Motion</span><strong data-value="motion-class">Unavailable</strong></div><div class="vehicle-detail"><span>Turn rate estimate</span><strong data-value="turn-rate">Unavailable</strong></div><div class="vehicle-detail"><span>Last hump type</span><strong data-value="hump-kind">Unavailable</strong></div><div class="vehicle-detail"><span>IMU state</span><strong data-value="imu-state">Unavailable</strong></div><div class="vehicle-detail"><span>Last accepted hump</span><strong data-value="last-hump">Unavailable</strong></div><div class="vehicle-detail"><span>Run maximum estimate</span><strong data-value="run-hump">Unavailable</strong></div></div><div class="card-bottom-note" data-value="imu-note">Waiting for IMU telemetry</div>')}</div>
   <div class="two-columns">${chartCard('Terrain & hump height','Current estimate and highest hump of the run','hump-chart','<div class="legend"><span><i class="teal"></i>Current</span><span><i class="purple"></i>Run maximum</span></div>','<span>Estimated height <strong>· mm</strong></span><span data-value="height-source">Waiting for IMU telemetry</span>')}${chartCard('Distance travelled','Cumulative encoder estimate for the current run','distance-chart','<div class="legend"><span><i class="teal"></i>Distance</span></div>','<span>Measured distance <strong>· m</strong></span><span>Since Pico restart; wheel slip affects accuracy</span>')}</div>
-  ${motionCard()}<div class="two-columns">${card('Line & navigation','Analog line pair GP27/GP26; GP28 reserved for barcode','<div class="sensor-status" id="sensor-status"></div><div class="barcode-row">'+icon('barcode')+'Latest barcode<strong data-value="barcode">Unavailable</strong></div><div class="card-bottom-note">Filled = black · empty = white · ? = unavailable. White/white and black/black drive forward.</div>')}${card('Obstacle scan profile','Latest servo sweep · angle vs measured range','<div class="chart scan-chart" id="scan-chart"></div><div class="chart-foot"><span>0°–180° · outer ring = 4000 mm</span><span data-value="scan-age">No completed scan received</span><button class="button button-white" data-export="scan">Export scan CSV</button></div>','<span class="card-label">LATEST SCAN</span>')}</div>`;
+  ${motionCard()}<div class="two-columns">${card('Line & navigation','Analog line pair GP27/GP26; GP28 reserved for barcode','<div class="sensor-status" id="sensor-status"></div><div class="barcode-row">'+icon('barcode')+'Latest barcode<strong data-value="barcode">Unavailable</strong></div><div class="card-bottom-note">Filled = black · empty = white · ? = unavailable. White/white and black/black drive forward.</div>')}${obstacleScanCard()}</div>`;
 }
 function communications(){
   return `<div class="metrics">${metric('broker','Broker connection','','MQTT WebSocket session','radio')}${metric('messages','Received messages','','Includes rejected messages','packet')}${metric('interval-metric','Telemetry interval','ms','Target ≤ 2000 ms','clock')}${metric('payload','Latest payload','bytes','Application payload only','chip')}</div>
@@ -124,7 +135,14 @@ function update(force=false){
   value('obstacle-note',stale?'Waiting for fresh telemetry':sample?.obstacle_valid?'Measurement valid':sample?'No valid echo':'Waiting for sensor data');value('hump-note',!current?.imu_state?'Waiting for IMU feed':current.max_hump_mm==null?'No accepted hump received':current.imu_speed_source==='nominal'?'Nominal speed · accuracy unverified':'Maximum estimate for this run');
   value('pitch',current?.pitch_deg==null?'Unavailable':`${format(current.pitch_deg,1)}°`);value('imu-state',current?.imu_state??'Unavailable');
   value('last-hump',!current?.imu_state?'Unavailable':current.hump_mm==null?'No accepted hump received':`${current.hump_mm} mm`);value('run-hump',!current?.imu_state?'Unavailable':current.max_hump_mm==null?'No accepted hump received':`${current.max_hump_mm} mm`);
-  const imuNote=!current?.imu_state?'Waiting for fresh IMU telemetry':current.imu_speed_source==='nominal'?'Nominal speed: 150 mm/s. Height accuracy is unverified; encoder speed is not connected.':'External speed supplied. Validate estimated height on the course.';
+  const terrain=store.currentTerrain(now,status==='connected');
+  value('roll',terrain?.roll_deg==null?'Unavailable':format(terrain.roll_deg,1)+'?');
+  value('motion-class',terrain?.motion_class??'Unavailable');
+  value('turn-rate',terrain?.turn_deg_s==null?'Unavailable':format(terrain.turn_deg_s,0)+' ?/s');
+  value('hump-kind',current?.hump_mm!=null?terrain?.hump_kind??'Unavailable':'Unavailable');
+  const imuNote=!current?.imu_state?'Waiting for fresh IMU telemetry':
+    terrain?'Height uses IMU tilt and encoder travel. Positive turn rate means left.':
+    'Waiting for S4 motion and terrain telemetry.';
   value('imu-note',imuNote);value('height-source',imuNote);
   const control=store.currentController(now,status==='connected');
   value('state',control?`${control.controller_state}${control.stop_latched&&control.controller_state_code!==6?' · stop latched':''}`:'Controller unavailable');value('barcode',current?.barcode?(current.barcode_navigation?current.barcode+' ? '+current.barcode_navigation:current.barcode):'Unavailable');
@@ -137,7 +155,7 @@ function update(force=false){
   for(const [label,key]of [['static-ram','static_ram_bytes'],['heap-free','heap_free_bytes'],['heap-min','sampled_min_heap_free_bytes'],['heap-largest','largest_free_block_bytes'],['stack-capacity','task_stack_capacity_bytes'],['stack-high','stack_high_water_bytes']])value(label,resource(diag?.[key]));
   value('runtime-after',resource(diag?.heap_free_bytes));
   value('network-errors',diag?diag.publish_errors+' / '+diag.rejected_commands:'Unavailable');value('network-rejoins',diag?.mqtt_connections??'Unavailable');
-  value('scan-age',store.scanProfile?'Last completed scan received '+age(store.scanProfile.at,now)+' ago':'No completed scan received');
+  value('scan-age',store.scanProfile?'Scan received '+age(store.scanProfile.at,now)+' ago':'No scan yet');
   document.querySelector('.state-pill')?.classList.toggle('unavailable',!control);
   value('speed-pair',`${format(current?.left_mps,3)} / ${format(current?.right_mps,3)}`);
   value('range-valid',stale?'Stale / unavailable':sample?.obstacle_valid?'Latest measurement valid':'No valid measurement');
@@ -164,7 +182,8 @@ function update(force=false){
   lineChart($('hump-chart'),store.history,[{key:'hump_mm',label:'Current height',color:'#208f85'},{key:'max_hump_mm',label:'Run maximum',color:'#8b78df'}],{...opts,unit:'mm',precision:0,empty:'Hump estimates require the IMU telemetry feed.'});
   lineChart($('distance-chart'),store.history,[{key:'distance_m',label:'Distance',color:'#208f85'}],{...opts,unit:'m',precision:3,empty:'Distance requires the encoder telemetry feed.'});
   lineChart($('interval-chart'),store.history,[{key:'interval',label:'Receive interval',color:'#208f85'}],{...opts,unit:'ms',precision:0,min:0,empty:'Receive at least two fresh telemetry messages.'});
-  scanChart($('scan-chart'),store.scanProfile?.points);
+  renderScanReadings($('scan-panel'),store.scanProfile?.points);
+  renderObstacleRadar($('scan-radar'),store.scanProfile?.points);
   if($('events'))$('events').innerHTML=store.events.slice(0,tab==='communications'?3:4).map(e=>`<div class="event-row"><span class="event-symbol ${escape(e.tone)}">${icon(e.tone==='success'?'check':e.tone==='warning'?'info':'wave')}</span><div class="event-copy"><strong>${escape(e.title)}</strong><small>${escape(e.detail)}</small></div><time>${new Date(e.at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false})}</time></div>`).join('')||'<div class="empty-events">Your vehicle events will appear here.<br>Connect to receive telemetry.</div>';
   if($('requirements')){
     const interval=store.lastInterval!==null&&!stale&&store.lastInterval<=2000,hb=store.lastHeartbeat!==null&&now-store.lastHeartbeat<=5000,rt=reconnects.at(-1);
@@ -284,7 +303,7 @@ function exportScan(){
 function exportEvidence(){
   if(!store.history.length&&!store.diagnosticHistory.length){toast('No received evidence to export');return;}
   const intervals=store.history.map(s=>s.interval).filter(v=>v!==null),hb=store.heartbeatIntervals;
-  const report={exported_at:new Date().toISOString(),source:'mqtt',format:'Packed v4',telemetry:store.history,diagnostics:store.diagnosticHistory,latest_scan:store.scanProfile,last_status:store.statusReply,last_stop:store.stopReply,last_resume:store.resumeReply,arrival_intervals_ms:{telemetry_max:intervals.length?Math.max(...intervals):null,heartbeat_max:hb.length?Math.max(...hb):null},limits:'Arrival intervals include radio/broker/laptop delay. Sampled heap minima are not exact allocation peaks. Physical motion, height accuracy and recovery require separate trials.'};
+  const report={exported_at:new Date().toISOString(),source:'mqtt',format:'Packed v4',telemetry:store.history,diagnostics:store.diagnosticHistory,latest_scan:store.scanProfile,latest_terrain:store.terrain,last_status:store.statusReply,last_stop:store.stopReply,last_resume:store.resumeReply,arrival_intervals_ms:{telemetry_max:intervals.length?Math.max(...intervals):null,heartbeat_max:hb.length?Math.max(...hb):null},limits:'Arrival intervals include radio/broker/laptop delay. Sampled heap minima are not exact allocation peaks. Physical motion, height accuracy and recovery require separate trials.'};
   downloadFile(JSON.stringify(report,null,2),'application/json','robocar-evidence.json');
 }
 

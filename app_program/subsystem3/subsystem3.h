@@ -29,6 +29,7 @@ typedef struct {
     UINT pattern;
     UW timestamp_ms;
     BOOL valid;
+    uint16_t centre_adc, right_adc; /* Raw AO values from the same valid sample. */
 } S3_LINE_DATA;
 EXPORT ER subsystem3_get_line(S3_LINE_DATA *sample);
 /* One consumer; nonblocking pop. E_TMOUT means no new barcode.

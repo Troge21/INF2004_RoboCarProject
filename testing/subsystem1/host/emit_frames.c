@@ -82,6 +82,19 @@ int main(void){
     }
     {uint32_t values[6]={82596,0,0,0,12288,UINT32_MAX},counters[4]={0,UINT32_MAX,3,4};
         n=s1_pack_diagnostics(17,1000,values,counters,out,sizeof(out));if(n!=40)return 10;emit("resources",out,n,"");}
+    {
+        uint8_t terrain[S1_TERRAIN_BODY_BYTES]={0};
+        s1_set_bits(terrain,0,11,849); /* -5.2 degrees roll */
+        s1_set_bits(terrain,11,9,369); /* +113 degrees/s yaw */
+        s1_set_bits(terrain,20,4,6);   /* turning left */
+        s1_set_bits(terrain,24,2,3);   /* last hump under right wheel */
+        s1_set_bits(terrain,26,16,UINT16_MAX);
+        n=s1_pack_terrain(17,1000,terrain,out,sizeof(out));
+        if(n!=S1_TERRAIN_BYTES)return 13;
+        emit("terrain",out,n,"");
+        terrain[5]|=128;
+        if(s1_pack_terrain(17,1000,terrain,out,sizeof(out))>=0)return 14;
+    }
     n=s1_pack_heartbeat(UINT32_MAX,out,sizeof(out));emit("heartbeat",out,n,"");
     return 0;
 }

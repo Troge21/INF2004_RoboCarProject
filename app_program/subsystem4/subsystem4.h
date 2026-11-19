@@ -39,7 +39,8 @@ extern "C" {
 #define S4_MIN_TRAVERSAL_MS         (100U)  /* Reject quick transient spikes */
 #define S4_MAX_TRAVERSAL_MS         (3000U) /* Max allowable hump duration */
 
-#define S4_DEFAULT_SPEED_MM_S       (150U)  /* Nominal straight vehicle speed */
+#define S4_WHEEL_CENTRES_MM         (110U) /* Measured physical spacing for roll geometry */
+#define S4_TURN_TRACK_MM            (120U) /* Effective spacing from the S2 turn bench */
 
 /* -------------------------------------------------------------------------
  * State Machine & Telemetry Types
@@ -60,8 +61,18 @@ typedef enum {
 #define S4_FLAG_NEW_HUMP_EVENT      (1U << 2)
 #define S4_FLAG_MAX_UPDATED         (1U << 3)
 #define S4_FLAG_PITCH_VALID         (1U << 4) /* Fresh, calibrated sensor sample */
-#define S4_FLAG_SPEED_SUPPLIED      (1U << 5) /* Speed setter used; otherwise nominal */
+#define S4_FLAG_ENCODER_HEIGHT     (1U << 5) /* Last accepted height used encoder feedback */
 #define S4_FLAG_FAULT               (1U << 7)
+
+typedef enum {
+    S4_MOTION_UNAVAILABLE, S4_MOTION_STATIONARY, S4_MOTION_FORWARD, S4_MOTION_REVERSE,
+    S4_MOTION_ACCELERATING, S4_MOTION_SLOWING, S4_MOTION_LEFT, S4_MOTION_RIGHT,
+    S4_MOTION_CLIMBING, S4_MOTION_DESCENDING, S4_MOTION_PICKUP, S4_MOTION_IMPACT
+} S4_MOTION_CLASS;
+
+typedef enum {
+    S4_HUMP_NONE, S4_HUMP_FULL_WIDTH, S4_HUMP_LEFT, S4_HUMP_RIGHT
+} S4_HUMP_KIND;
 
 /*
  * Interface IF-02 Telemetry Structure:
@@ -75,15 +86,16 @@ typedef struct {
     uint8_t     state;              /* S4_STATE_E */
     uint8_t     flags;              /* S4_FLAG_* bitmask */
     uint32_t    traversal_time_ms;  /* Duration of the current/last hump */
-    uint32_t    timestamp_ms;       /* Snapshot publication uptime; not getter time */
-    uint32_t    pitch_timestamp_ms; /* Last successful acceleration sample uptime */
+    uint32_t    timestamp_ms;       /* Snapshot publication time on the S1/S2 source clock */
+    uint32_t    pitch_timestamp_ms; /* Last successful acceleration sample on the same clock */
+    uint8_t     terrain[6];        /* Compact S4 telemetry extension, shared with S1 */
 } HUMP_TELEMETRY_T;
 
 /* -------------------------------------------------------------------------
  * Subsystem 4 Public Lifecycle & Interface APIs
  * ------------------------------------------------------------------------- */
 
-/* Phase 1: Create synchronization objects and queues */
+/* Phase 1: Create the snapshot semaphore and publish initializing state */
 EXPORT ER subsystem4_init(void);
 
 /* Phase 2: Create and start the imu_hump_task */
@@ -100,14 +112,6 @@ EXPORT ER subsystem4_get_telemetry(HUMP_TELEMETRY_T *p_telemetry);
  * In accordance with NC3, this is the ONLY authorized mechanism to clear max_hump_mm.
  */
 EXPORT ER subsystem4_reset_run(void);
-
-/*
- * Dynamic measured speed update from Subsystem 2 (Motor Encoders).
- * Zero is a valid stationary speed. Applied by the IMU owner task.
- * Without this input, S4_FLAG_SPEED_SUPPLIED stays clear and estimates
- * still use S4_DEFAULT_SPEED_MM_S; they are not encoder-validated heights.
- */
-EXPORT void subsystem4_set_speed_mm_s(uint16_t speed_mm_s);
 
 /* Current mounting: front-up makes sensor Y more negative.
  * Returns vehicle pitch in tenths of a degree; front-up is positive. */

@@ -15,6 +15,17 @@
 #define ECHO_EDGES (ECHO_FALL | ECHO_RISE)
 #define ECHO_TIMEOUT_MS 40
 #define SAMPLE_PAUSE_MS 80 /* trigger spacing remains greater than 60 ms */
+#define S5_NAV_REFRESH_MS 50U
+#ifdef APP_OBSTACLE_BYPASS
+/* A scan can finish during startup. Leave time for the full 90-degree
+ * encoder move and stopped-speed confirmation after the controller starts. */
+#define S5_TURN_WAIT_MS (APP_START_DELAY_MS + 6000U)
+#else
+#define S5_TURN_WAIT_MS 4000U
+#endif
+#define S5_STATIONARY_TURN_MS 500U
+#define S5_NAV_PHASE_MASK 7U
+#define S5_NAV_TURN_ENDED 8U
 #define S5_PWM_SLICE 6U
 #define S5_PWM_TOP 39062U
 #define S5_PWM_REG(offset) (PWM_BASE + S5_PWM_SLICE * 0x14U + (offset))
@@ -49,9 +60,9 @@ EXPORT ER subsystem5_get_range(S5_RANGE_DATA *out)
     out->sequence=seq;out->timestamp_ms=t;out->distance_mm=word&4095U;
     out->valid=out->distance_mm!=0;return E_OK;
 }
-/* Shared under range_sem. time32 + phase3; completed scan is time32 +
+/* Shared under range_sem. time32 + turn ID32 + phase3/end1; completed scan is time32 +
  * ID32 + three distance12 values + present1/reserved3. Fixed angles implicit. */
-static UB navigation_publication[5],scan_publication[13];
+static UB navigation_publication[9],scan_publication[13];
 static void write32(UB *out,UW value)
 {
     UINT i;for(i=0;i<4;++i)out[i]=(UB)(value>>(8*i));
@@ -60,23 +71,48 @@ static UW read32(const UB *in)
 {
     UW value=0;UINT i;for(i=0;i<4;++i)value|=(UW)in[i]<<(8*i);return value;
 }
-static void navigation_write(S5_NAV_PHASE phase)
+static BOOL navigation_write(S5_NAV_PHASE phase,UW turn_id)
 {
     SYSTIM now={0};(void)tk_get_tim(&now);
-    if(tk_wai_sem(range_sem,1,TMO_POL)!=E_OK)return;
-    write32(navigation_publication,now.lo);navigation_publication[4]=(UB)phase;
+    if(tk_wai_sem(range_sem,1,TMO_POL)!=E_OK)return FALSE;
+    BOOL ended=turn_id && read32(navigation_publication+4)==turn_id &&
+        (navigation_publication[8]&S5_NAV_TURN_ENDED);
+    write32(navigation_publication,now.lo);
+    write32(navigation_publication+4,ended?0U:turn_id);
+    navigation_publication[8]=(UB)(ended?S5_NAV_SCANNING:phase);
     (void)tk_sig_sem(range_sem,1);
+    return ended;
 }
 EXPORT ER subsystem5_get_navigation(S5_NAV_DATA *out)
 {
-    UB copy[5];UINT i;ER er;
+    UB copy[sizeof(navigation_publication)];UINT i;ER er;
     if(!out)return E_PAR;
     if(range_sem<=0)return E_OBJ;
     er=tk_wai_sem(range_sem,1,TMO_POL);if(er!=E_OK)return er;
-    for(i=0;i<5;++i)copy[i]=navigation_publication[i];
+    for(i=0;i<sizeof(copy);++i)copy[i]=navigation_publication[i];
     (void)tk_sig_sem(range_sem,1);
-    if(copy[4]==S5_NAV_UNAVAILABLE)return E_TMOUT;
-    out->timestamp_ms=read32(copy);out->phase=copy[4];return E_OK;
+    UINT phase=copy[8]&S5_NAV_PHASE_MASK;
+    if(phase==S5_NAV_UNAVAILABLE)return E_TMOUT;
+    out->timestamp_ms=read32(copy);out->turn_id=read32(copy+4);out->phase=phase;
+    return E_OK;
+}
+EXPORT ER subsystem5_end_turn(UW turn_id)
+{
+    if(!turn_id)return E_PAR;
+    if(range_sem<=0)return E_OBJ;
+    ER er=tk_wai_sem(range_sem,1,TMO_POL);
+    if(er!=E_OK)return er;
+    SYSTIM now={0};
+    UINT phase=navigation_publication[8]&S5_NAV_PHASE_MASK;
+    (void)tk_get_tim(&now);
+    if(read32(navigation_publication+4)==turn_id &&
+       (phase==S5_NAV_LEFT||phase==S5_NAV_RIGHT) &&
+       (UW)(now.lo-read32(navigation_publication))<=S5_NAV_MAX_AGE_MS) {
+        navigation_publication[8]|=S5_NAV_TURN_ENDED;
+        er=E_OK;
+    } else er=E_OBJ;
+    (void)tk_sig_sem(range_sem,1);
+    return er;
 }
 static void scan_write(UW sequence,UW right,UW centre,UW left)
 {
@@ -98,11 +134,11 @@ int telemetry_get_scan(TELEMETRY_SCAN *out)
     (void)tk_sig_sem(range_sem,1);
     if(!(copy[12]&16U))return E_TMOUT;
     out->timestamp_ms=read32(copy);out->sequence=read32(copy+4);out->count=3;
-    out->points[0].angle=S5_SERVO_RIGHT_DEG;
+    out->points[0].angle=S5_SCAN_RIGHT_DEG;
     out->points[0].distance_mm=(uint16_t)(copy[8]|((copy[9]&15U)<<8));
-    out->points[1].angle=S5_SERVO_CENTRE_DEG;
+    out->points[1].angle=S5_SCAN_CENTRE_DEG;
     out->points[1].distance_mm=(uint16_t)((copy[9]>>4)|((UINT)copy[10]<<4));
-    out->points[2].angle=S5_SERVO_LEFT_DEG;
+    out->points[2].angle=S5_SCAN_LEFT_DEG;
     out->points[2].distance_mm=(uint16_t)(copy[11]|((copy[12]&15U)<<8));
     return E_OK;
 }
@@ -119,20 +155,32 @@ EXPORT S5_MOTION s5_choose_motion(BOOL centre_valid,UW centre_mm,
     if(!left_clear)return S5_MOTION_RIGHT;
     return left_mm+S5_CLEARANCE_MARGIN_MM>=right_mm?S5_MOTION_LEFT:S5_MOTION_RIGHT;
 }
-static void servo_set_angle(UINT degrees)
+static void servo_point_to(UINT bearing)
 {
-    UW pulse_us=1000U+(1000U*degrees)/180U;
+    UW pulse_us=1000U+(1000U*bearing)/180U;
     UW compare=(pulse_us*(S5_PWM_TOP+1U)+10000U)/20000U;
     (void)pwm_set_cc(S5_SERVO_PIN,compare);
 }
 static void phase_delay(UW delay_ms,S5_NAV_PHASE phase)
 {
     while(delay_ms) {
-        UW step=delay_ms>50U?50U:delay_ms;
-        navigation_write(phase);
+        UW step=delay_ms>S5_NAV_REFRESH_MS?S5_NAV_REFRESH_MS:delay_ms;
+        (void)navigation_write(phase,0U);
         (void)tk_dly_tsk(step);delay_ms-=step;
     }
-    navigation_write(phase);
+    (void)navigation_write(phase,0U);
+}
+static void wait_for_turn(S5_NAV_PHASE phase,UW turn_id)
+{
+    const UW limit=(APP_TEST||!APP_LINE_FOLLOW_ENABLED)?S5_STATIONARY_TURN_MS:S5_TURN_WAIT_MS;
+    SYSTIM started={0},now={0};
+    (void)tk_get_otm(&started);
+    do {
+        if(navigation_write(phase,turn_id))return;
+        (void)tk_dly_tsk(S5_NAV_REFRESH_MS);
+        (void)tk_get_otm(&now);
+    } while((UW)(now.lo-started.lo)<limit);
+    (void)navigation_write(S5_NAV_SCANNING,0U);
 }
 static volatile UINT echo_state;
 static volatile UW rise_us, width_us;
@@ -208,7 +256,7 @@ static void ultrasonic_task(INT stacd, void *exinf)
         return;
     }
     (void)tk_dly_tsk(100);
-    servo_set_angle(S5_SERVO_CENTRE_DEG);
+    servo_point_to(S5_SCAN_CENTRE_DEG);
     phase_delay(S5_SERVO_SETTLE_MS,S5_NAV_SCANNING);
     {
         UW sequence=0,profile=0;
@@ -217,7 +265,7 @@ static void ultrasonic_task(INT stacd, void *exinf)
             UW centre=0,left=0,right=0,pulse;
             const char *centre_error,*left_error,*right_error;
             S5_MOTION choice;
-            servo_set_angle(S5_SERVO_CENTRE_DEG);
+            servo_point_to(S5_SCAN_CENTRE_DEG);
             phase_delay(S5_SERVO_SETTLE_MS,current);
             centre_error=measure(&centre,&pulse);
             /* Only actual centre samples reach the front-distance tile. */
@@ -230,19 +278,20 @@ static void ultrasonic_task(INT stacd, void *exinf)
             }
             /* Stop through the controller before moving to a side view. */
             phase_delay(SAMPLE_PAUSE_MS,S5_NAV_SCANNING);
-            servo_set_angle(S5_SERVO_LEFT_DEG);
+            servo_point_to(S5_SCAN_LEFT_DEG);
             phase_delay(S5_SERVO_SETTLE_MS,S5_NAV_SCANNING);
             left_error=measure(&left,&pulse);
             phase_delay(SAMPLE_PAUSE_MS,S5_NAV_SCANNING);
-            servo_set_angle(S5_SERVO_RIGHT_DEG);
+            servo_point_to(S5_SCAN_RIGHT_DEG);
             phase_delay(S5_SERVO_SETTLE_MS,S5_NAV_SCANNING);
             right_error=measure(&right,&pulse);
-            servo_set_angle(S5_SERVO_CENTRE_DEG);
-            scan_write(++profile,right,centre,left);
+            servo_point_to(S5_SCAN_CENTRE_DEG);
+            if(++profile==0U)++profile; /* Zero is reserved for no turn request. */
+            scan_write(profile,right,centre,left);
             choice=s5_choose_motion(TRUE,centre,left_error==NULL,left,
                                     right_error==NULL,right);
             if(choice==S5_MOTION_LEFT||choice==S5_MOTION_RIGHT) {
-                phase_delay(S5_TURN_MS,choice==S5_MOTION_LEFT?S5_NAV_LEFT:S5_NAV_RIGHT);
+                wait_for_turn(choice==S5_MOTION_LEFT?S5_NAV_LEFT:S5_NAV_RIGHT,profile);
                 current=S5_NAV_SCANNING; /* stop until a fresh centre check */
             } else {
                 current=S5_NAV_BLOCKED;phase_delay(SAMPLE_PAUSE_MS,current);
@@ -280,7 +329,7 @@ EXPORT ER subsystem5_init(void)
         out_w(S5_PWM_REG(PWM_CHx_CC),0U);
         out_w(S5_PWM_REG(PWM_CHx_TOP),S5_PWM_TOP);
         er=pwm_set_pin(S5_SERVO_PIN);if(er<E_OK)return er;
-        servo_set_angle(S5_SERVO_CENTRE_DEG);
+        servo_point_to(S5_SCAN_CENTRE_DEG);
         er=pwm_set_enabled(S5_SERVO_PIN,TRUE);if(er<E_OK)return er;
     }
     csem.sematr = TA_TFIFO;

@@ -71,6 +71,21 @@ int main(void){
     reset();app_controller_publish(APP_CTRL_UNAVAILABLE,E_OK);
     check(app_controller_submit_stop(1,99,2000)==E_OBJ,"unavailable/calibration controller does not admit stop");
 
+    reset();blocked=1;
+    app_controller_report_pickup();
+    app_controller_report_pickup();
+    check(app_controller_poll()==(APP_CTRL_LATCH|APP_CTRL_POLL_BUSY),
+        "pickup is retained even when the command mailbox is contended");
+    blocked=0;app_controller_cancel_resume();app_controller_publish(APP_CTRL_FOLLOWING,E_OK);
+    check(app_controller_snapshot(state)==E_OK&&(state[4]&APP_CTRL_LATCH)&&
+          (state[4]&APP_CTRL_STATE_MASK)==APP_CTRL_STOP_LATCHED&&
+          app_controller_take_reply(reply)==E_TMOUT,
+        "pickup publishes a local latch without a fabricated command reply");
+    check(app_controller_init()==E_OBJ&&(app_controller_poll_ready(1)&APP_CTRL_LATCH),
+        "pickup stays latched through reinitialization attempts and ready input");
+    reset();
+    check(app_controller_poll()==0,"a fresh boot starts with the pickup latch clear");
+
     {
         uint32_t ticket=777;
         reset();check(app_controller_arm_resume(clock_ms+1000,&ticket)==APP_RESUME_NOT_READY&&ticket==777,
@@ -155,6 +170,28 @@ int main(void){
         reset();latch();blocked=1;
         check(app_controller_arm_resume(clock_ms+1000,&ticket)==APP_RESUME_BUSY,
             "Resume authorization never waits behind a controller lock");blocked=0;
+
+        reset();latch();(void)app_controller_arm_resume(clock_ms+1000,&ticket);
+        (void)app_controller_submit_resume(ticket,99,clock_ms+1000);
+        app_controller_report_pickup();
+        check(app_controller_poll_ready(1)&APP_CTRL_LATCH,"pickup wins over a queued Resume");
+        app_controller_publish(APP_CTRL_FOLLOWING,E_OK);
+        check(app_controller_take_reply(reply)==E_OK&&(reply[9]&2U)&&
+              (((reply[8]|((unsigned)reply[9]<<8))>>6)&7U)==APP_RESUME_NOT_READY&&
+              (reply[8]&APP_CTRL_LATCH),"queued Resume reports a refusal with the pickup latch held");
+        check(app_controller_arm_resume(clock_ms+1000,&ticket)==APP_RESUME_NOT_READY&&
+              app_controller_submit_resume(ticket,99,clock_ms+1000)==APP_RESUME_NOT_READY,
+            "pickup refuses both fresh Resume authorizations and existing tickets");
+
+        reset();latch();(void)app_controller_arm_resume(clock_ms+1000,&ticket);
+        (void)app_controller_submit_resume(ticket,99,clock_ms+1000);
+        check(app_controller_poll_ready(1)==0,"fixture releases Resume before pickup arrives");
+        app_controller_report_pickup();
+        check(app_controller_poll()&APP_CTRL_LATCH,"pickup before motor submission cancels in-flight Resume");
+        app_controller_publish(APP_CTRL_FOLLOWING,E_OK);
+        check(app_controller_take_reply(reply)==E_OK&&
+              (((reply[8]|((unsigned)reply[9]<<8))>>6)&7U)==APP_RESUME_NOT_READY&&
+              (reply[8]&APP_CTRL_LATCH),"a pickup during Resume prevents a success reply");
 #endif
     }
     printf("[controller] SUMMARY %d checks, %d failures (TEST=%d)\n",checks,failures,APP_TEST);

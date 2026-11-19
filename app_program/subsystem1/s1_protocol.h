@@ -22,6 +22,8 @@
 #define S1_SCAN_CHUNK_POINTS 16U
 #define S1_SCAN_PACKET_BYTES 56U
 #define S1_DIAGNOSTIC_BYTES 40U
+#define S1_TERRAIN_BYTES 15U
+#define S1_TERRAIN_BODY_BYTES 6U
 #define S1_TX_CAPACITY S1_RESUME_ARM_MAX_BYTES
 #define S1_SCAN_PACKED_BYTES 453U
 #define S1_SCAN_MAX_AGE_MS 10000U
@@ -39,8 +41,9 @@ enum {
 };
 typedef struct {
     uint8_t body[S1_BODY_BYTES], timestamp[S1_AGE_COUNT][4], sequence[4];
+    uint8_t terrain[S1_TERRAIN_BODY_BYTES];
 } S1_SNAPSHOT;
-_Static_assert(sizeof(S1_SNAPSHOT)==73, "S1 snapshot must have no native padding");
+_Static_assert(sizeof(S1_SNAPSHOT)==79, "S1 snapshot must have no native padding");
 typedef struct {
     uint32_t timestamp_ms, speed_timestamp_ms;
     int64_t left_speed_x10, right_speed_x10, left_count, right_count, net_mm_x10;
@@ -87,4 +90,6 @@ int s1_pack_scan(uint32_t session,uint32_t sequence,uint32_t source_boot_ms,
  * S1 snapshot contention. These retain all 32 bits and wrap naturally. */
 int s1_pack_diagnostics(uint32_t session,uint32_t uptime,const uint32_t values[6],
                          const uint32_t counters[4],uint8_t *out,unsigned capacity);
+int s1_pack_terrain(uint32_t session, uint32_t uptime, const uint8_t terrain[S1_TERRAIN_BODY_BYTES],
+                    uint8_t *out, unsigned capacity);
 #endif

@@ -21,7 +21,7 @@ static TELEMETRY_SCAN scan_workspace;
 static UB resource_data[19],sampled_heap_min[3]={255,255,7};
 static UB requested_stack_bytes[3];
 /* Network owner only. Full-width counters/clocks wrap with unsigned arithmetic. */
-static UW next_sequence,last_tx,last_aux,last_chunk,last_scan,last_session,network_busy,scan_boot;
+static UW next_sequence,last_tx,last_aux,last_terrain,last_chunk,last_scan,last_session,network_busy,scan_boot;
 static UB scan_cursor,last_chunk_count;
 static UW source_now(void){SYSTIM t={0};(void)tk_get_tim(&t);return t.lo;}
 EXPORT void s1_resource_add_stack(uint32_t bytes)
@@ -132,7 +132,7 @@ EXPORT int s1_network_aux(unsigned char *out,unsigned capacity,uint32_t session,
     UB packed[S1_SCAN_PACKED_BYTES],count;unsigned i;int n;
     if(!out||!session||!counters||capacity<S1_SCAN_PACKET_BYTES)return E_PAR;
     if(s1_network_uptime(&boot)!=E_OK)return E_OBJ;
-    if(session!=last_session){last_session=session;scan_cursor=0;last_aux=boot-5000U;}
+    if(session!=last_session){last_session=session;scan_cursor=0;last_aux=boot-5000U;last_terrain=boot-500U;}
     if((UW)(boot-last_aux)>=5000U) {
         if(tk_wai_sem(publication_sem,1,TMO_POL)!=E_OK){++network_busy;return E_TMOUT;}
         t=s1_read_u32(resource_data+15);
@@ -144,6 +144,22 @@ EXPORT int s1_network_aux(unsigned char *out,unsigned capacity,uint32_t session,
         n=s1_pack_diagnostics(session,boot,values,counts,out,capacity);
         if(n>0)last_aux=boot;
         return n;
+    }
+    if((UW)(boot-last_terrain)>=500U) {
+        UB terrain[S1_TERRAIN_BODY_BYTES];
+        if(tk_wai_sem(publication_sem,1,TMO_POL)!=E_OK){++network_busy;return E_TMOUT;}
+        t=s1_read_u32(publication.timestamp[S1_AGE_IMU]);
+        uint32_t pitch=s1_read_u32(publication.timestamp[S1_AGE_PITCH]);
+        copy_bytes(terrain,publication.terrain,sizeof(terrain));
+        (void)tk_sig_sem(publication_sem,1);
+        last_terrain=boot;
+        if((UW)(now-t)<=1000U) {
+            if((UW)(now-pitch)>100U)terrain[0]=terrain[1]=terrain[2]=0;
+            if(s1_get_bits(terrain,0,11)||s1_get_bits(terrain,24,2)) {
+                n=s1_pack_terrain(session,boot-(UW)(now-t),terrain,out,capacity);
+                if(n>0)return n;
+            }
+        }
     }
     if((UW)(boot-last_chunk)<100U)return E_TMOUT;
     if(tk_wai_sem(publication_sem,1,TMO_POL)!=E_OK){++network_busy;return E_TMOUT;}
@@ -224,9 +240,10 @@ static void gather_sources(S1_SNAPSHOT *s)
         (void)s1_set_range(s,range.distance_mm,range.valid!=0,range.timestamp_ms);
     if(subsystem3_get_line(&line)==E_OK)
         (void)s1_set_line(s,line.pattern,line.valid!=0,line.timestamp_ms);
-    if(subsystem4_get_telemetry(&imu)==E_OK)
-        (void)s1_set_imu(s,imu.pitch_deg_x10,imu.current_hump_mm,imu.max_hump_mm,
-                         imu.state,imu.flags,imu.timestamp_ms,imu.pitch_timestamp_ms);
+    if(subsystem4_get_telemetry(&imu)==E_OK &&
+       s1_set_imu(s,imu.pitch_deg_x10,imu.current_hump_mm,imu.max_hump_mm,
+                  imu.state,imu.flags,imu.timestamp_ms,imu.pitch_timestamp_ms)==0)
+        copy_bytes(s->terrain,imu.terrain,sizeof(s->terrain));
     if(subsystem2_get_motion(&motion)==E_OK) {
         m.timestamp_ms=motion.timestamp_ms;m.speed_timestamp_ms=motion.speed_timestamp_ms;
         /* Exact same 355/113 circumference approximation as S2; unit change only. */

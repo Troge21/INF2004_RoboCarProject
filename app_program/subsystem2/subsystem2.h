@@ -92,7 +92,7 @@ typedef enum {
 
 /* Coherent snapshot, readable from either core; no Wi-Fi dependencies.
  * Counts/distances are signed net travel since S2 startup, forward positive.
- * x10 fields divide by 10; duty x100 fields divide by 100 for percent. */
+ * x10 fields divide by 10; signed duty x100 fields divide by 100 for percent. */
 typedef struct {
     UW sequence, timestamp_ms, speed_timestamp_ms, speed_period_ms;
     BOOL encoder_valid, speed_valid, command_active;
@@ -112,6 +112,9 @@ typedef struct {
  * Refresh at least every S2_COMMAND_MAX_AGE_MS; zero stops immediately.
  * Faults latch until reboot. Existing set_duty remains an open-loop API. */
 EXPORT ER subsystem2_set_rpm_x10(INT left, INT right);
+/* Signed RPM targets in tenths. Negative requests vehicle reverse. A wheel
+ * changing direction must coast to a measured stop first. Same watchdog. */
+EXPORT ER subsystem2_set_signed_rpm_x10(INT left, INT right);
 /* Integrated TEST=1 runs passive encoder feedback with wheel PWM disabled.
  * Commands still return E_OBJ; measurements include hand-turned wheels.
  * E_OBJ until first snapshot; E_TMOUT on contention: retry later.

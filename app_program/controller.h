@@ -44,6 +44,9 @@
  * Reply: ID:32 + session:32 + control:6/result:3/reserved:7. */
 int app_controller_init(void);
 int app_controller_submit_stop(uint32_t id,uint32_t session,uint32_t deadline_ms);
+/* S4 calls this after controller init when pickup is confirmed. Nonblocking
+ * and idempotent. The controller applies zero wheel targets until reboot. */
+void app_controller_report_pickup(void);
 /* A fresh arm creates a one-use server ticket, invalidated by STOP. */
 int app_controller_arm_resume(uint32_t deadline_ms,uint32_t *ticket);
 int app_controller_submit_resume(uint32_t ticket,uint32_t session,uint32_t deadline_ms);

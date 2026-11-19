@@ -10,11 +10,14 @@ typedef struct {
 } S2_COMMAND;
 typedef struct {
     INT integral_x100, output_x100, previous_rpm_x10, previous_target_x10;
+    UW last_update_ms;
     BOOL previous_valid;
 } S2_PID_STATE;
 typedef struct {
     S2_ENCODER_COUNTS previous, speed_counts;
     UW last_ms, speed_ms, no_edge_ms[2], direction_ms[2];
+    UW last_powered_ms[2];
+    int8_t last_drive_direction[2];
     BOOL stall_armed[2], direction_armed[2];
     S2_CONTROL_MODE previous_mode;
     S2_PID_STATE pid[2];

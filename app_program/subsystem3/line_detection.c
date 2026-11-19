@@ -19,9 +19,11 @@ static void decode(const UB *b, S3_LINE_DATA *sample)
     for(i=0;i<5U;++i) word|=(uint64_t)b[4U+i]<<(8U*i);
     sample->timestamp_ms=read32(b);
     sample->valid=(BOOL)((word>>36)&1U);
+    sample->centre_adc=(uint16_t)((word>>12)&4095U);
+    sample->right_adc=(uint16_t)((word>>24)&4095U);
     sample->pattern=sample->valid ?
-        ((((word>>12)&4095U)>=S3_IR_CENTRE_THRESHOLD ? 2U:0U) |
-         (((word>>24)&4095U)>=S3_IR_RIGHT_THRESHOLD ? 1U:0U)):0U;
+        ((sample->centre_adc>=S3_IR_CENTRE_THRESHOLD ? 2U:0U) |
+         (sample->right_adc>=S3_IR_RIGHT_THRESHOLD ? 1U:0U)):0U;
 }
 EXPORT ER subsystem3_get_line(S3_LINE_DATA *sample)
 {

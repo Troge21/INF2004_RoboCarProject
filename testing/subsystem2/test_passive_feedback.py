@@ -67,7 +67,7 @@ static ER tk_dly_tsk(INT ms){
     assert(subsystem2_set_rpm_x10(350,350)==E_OBJ);
     assert(m.duty_left_x100==0&&m.duty_right_x100==0&&!m.command_active);
     if(ticks<=40){
-        assert(telemetry_get_travel(&t)==E_OK&&t.timestamp_ms==now);
+        assert(telemetry_get_travel(&t)==E_OK&&t.timestamp_ms==now&&t.timestamp_ms==m.timestamp_ms);
         assert(t.distance_mm>=previous);previous=t.distance_mm;
     }
     if(ticks==10){assert(m.encoder_valid&&m.speed_valid&&m.actual_left_rpm_x10==0&&t.distance_mm==0);checks++;}
@@ -87,16 +87,54 @@ static ER tk_dly_tsk(INT ms){
         assert(telemetry_get_travel(&t)==E_OBJ&&!m.encoder_valid);checks++;
         assert(telemetry_get_travel(NULL)==E_PAR);checks++;
         assert(s_started==FALSE); /* direct entry; no startup/PWM functions extracted */
-        printf("PASS: %u actual passive S2 checks; forward/reverse/wrap, path, faults, contention; no PWM linked.\n",checks);
+        printf("PASS: %u passive S2 checks; packed boundaries, forward/reverse/wrap, path, faults, contention; no PWM linked.\n",checks);
         longjmp(done,1);
     }
     ++ticks;now+=(UW)ms;return E_OK;
+}
+static void test_feedback_record(void){
+    const S2_MOTION_DATA input = {
+        .sequence=UINT32_MAX,.timestamp_ms=UINT32_MAX-17U,.speed_timestamp_ms=98765U,
+        .speed_period_ms=1234567U,.encoder_valid=TRUE,.speed_valid=FALSE,.command_active=TRUE,
+        .mode=S2_MODE_RPM,.stop_reason=S2_STOP_FEEDBACK_WAIT,
+        .faults=S2_FAULT_ENCODER|S2_FAULT_TIMING|S2_FAULT_LEFT_STALL|S2_FAULT_RIGHT_STALL|
+                S2_FAULT_LEFT_DIRECTION|S2_FAULT_RIGHT_DIRECTION,
+        .target_left_rpm_x10=-S2_MAX_RPM_X10,.target_right_rpm_x10=S2_MAX_RPM_X10,
+        .actual_left_rpm_x10=-10000123,.actual_right_rpm_x10=9000123,
+        .duty_left_x100=-S2_PID_MAX_DUTY_X100,.duty_right_x100=10000,
+        .count_left=-INT64_C(5000000001),.count_right=INT64_C(6000000001),
+        .distance_left_mm_x10=-INT64_C(7000000001),.distance_right_mm_x10=INT64_C(6000000000),
+        .speed_centre_mm_s_x10=-1701696
+    };
+    S2_MOTION_DATA m={.sequence=123};
+    TELEMETRY_TRAVEL travel;
+    assert(sizeof(s_feedback)==72);
+    assert(subsystem2_get_motion(&m)==E_OBJ&&m.sequence==123);
+    assert(tk_wai_sem(2,1,TMO_POL)==E_OK);
+    publish_feedback(&input,UINT32_MAX-1U);
+    assert(tk_sig_sem(2,1)==E_OK);
+    assert(subsystem2_get_motion(&m)==E_OK);
+    assert(m.sequence==input.sequence&&m.timestamp_ms==input.timestamp_ms);
+    assert(m.speed_timestamp_ms==input.speed_timestamp_ms&&m.speed_period_ms==input.speed_period_ms);
+    assert(m.encoder_valid&&!m.speed_valid&&m.command_active);
+    assert(m.mode==input.mode&&m.stop_reason==input.stop_reason&&m.faults==input.faults);
+    assert(m.target_left_rpm_x10==input.target_left_rpm_x10&&m.target_right_rpm_x10==input.target_right_rpm_x10);
+    assert(m.actual_left_rpm_x10==input.actual_left_rpm_x10&&m.actual_right_rpm_x10==input.actual_right_rpm_x10);
+    assert(m.duty_left_x100==input.duty_left_x100&&m.duty_right_x100==input.duty_right_x100);
+    assert(m.count_left==input.count_left&&m.count_right==input.count_right);
+    assert(m.distance_left_mm_x10==input.distance_left_mm_x10&&m.distance_right_mm_x10==input.distance_right_mm_x10);
+    assert(m.distance_centre_mm_x10==-INT64_C(500000000)&&m.speed_centre_mm_s_x10==input.speed_centre_mm_s_x10);
+    assert(m.error_left_rpm_x10==9999523&&m.error_right_rpm_x10==-8999523);
+    assert(telemetry_get_travel(&travel)==E_OK&&travel.distance_mm==UINT32_MAX-1U&&travel.timestamp_ms==m.timestamp_ms);
+    s_feedback.controls=0;
+    checks++;
 }
 int main(void){
     TELEMETRY_TRAVEL t={123,456};
     assert(telemetry_get_travel(&t)==E_OBJ&&t.distance_mm==456);checks++;
     s_command_sem=1;s_feedback_sem=2;
     assert(telemetry_get_travel(&t)==E_OBJ&&t.distance_mm==456);checks++;
+    test_feedback_record();
     counts=(S2_ENCODER_COUNTS){UINT32_MAX-30,UINT32_MAX-25};
     now=0;
     if(setjmp(done)==0)encoder_feedback_task(0,NULL);

@@ -22,7 +22,7 @@ EXPORT void subsystem1_test(void)
     TEST_INIT();
     motion=(S1_MOTION_INPUT){0};
     s1_snapshot_init(&s,UINT32_MAX);
-    TEST_CHECK("S1-V4-01",sizeof(s)==73&&s1_pack_frame(&s,0,100,17,APP_CTRL_STARTING,frame,sizeof(frame))==46,
+    TEST_CHECK("S1-V4-01",sizeof(s)==79&&s1_pack_frame(&s,0,100,17,APP_CTRL_STARTING,frame,sizeof(frame))==46,
         "one packed frame and byte-packed shared snapshot");
     TEST_CHECK("S1-V4-02",s1_read_u32(frame+1)==UINT32_MAX&&s1_validate_frame(frame,46)==0,
         "full sequence and current framing preserved");

@@ -7,6 +7,8 @@ static uint8_t request_slot[13];
 /* ID/session + control:6/result:3/resume-kind:1/spare:6. */
 static uint8_t reply_slot[10],published[5];
 static uint8_t owner_word; /* state:4/latch:1/TEST:1/Resume in-flight:1/failed:1 */
+/* Monotonic end-of-run event, independent of contention on the MQTT mailbox. */
+static uint8_t pickup_stop;
 #define OWNER_RESUMING 64U /* release awaiting the controller's motor handoff */
 #define OWNER_RESUME_FAILED 128U
 /* Protected authorization, not motor state: ticket:32/expiry:32. */
@@ -29,6 +31,16 @@ static void write32(uint8_t *b,uint32_t v) {
 }
 static uint32_t uptime(void) { SYSTIM t={0};(void)tk_get_otm(&t);return t.lo; }
 static int lock(void) { return controller_sem>0?tk_wai_sem(controller_sem,1,TMO_POL):E_OBJ; }
+static int pickup_stop_active(void) {
+    return __atomic_load_n(&pickup_stop,__ATOMIC_ACQUIRE)!=0U;
+}
+void app_controller_report_pickup(void) {
+    __atomic_store_n(&pickup_stop,1U,__ATOMIC_RELEASE);
+}
+static unsigned motor_inhibit(void) {
+    if(pickup_stop_active())owner_word|=APP_CTRL_LATCH;
+    return owner_word&APP_CTRL_LATCH;
+}
 static int lease_valid(uint32_t deadline) {
     uint32_t remaining=deadline-uptime();
     return remaining>0U&&remaining<=APP_CTRL_STOP_LEASE_MS;
@@ -46,6 +58,7 @@ int app_controller_init(void) {
     if(controller_sem<0)return controller_sem;
     zero_bytes(request_slot,sizeof(request_slot));zero_bytes(reply_slot,sizeof(reply_slot));
     zero_bytes(published,sizeof(published));zero_bytes(resume_ticket,sizeof(resume_ticket));
+    __atomic_store_n(&pickup_stop,0U,__ATOMIC_RELEASE);
     ticket_counter=0;owner_word=APP_TEST?APP_CTRL_TEST:0U;
     return E_OK;
 }
@@ -69,6 +82,7 @@ int app_controller_arm_resume(uint32_t deadline_ms,uint32_t *ticket) {
     if(!ticket)return E_PAR;
     if(lock()!=E_OK)return APP_RESUME_BUSY;
     if(!lease_valid(deadline_ms))result=APP_RESUME_EXPIRED;
+    else if(pickup_stop_active())result=APP_RESUME_NOT_READY;
     else if((published[4]&APP_CTRL_STATE_MASK)==APP_CTRL_FAULT)result=APP_RESUME_FAULT;
     else if(read32(request_slot)||read32(reply_slot))result=APP_RESUME_BUSY;
     else if(!APP_TEST&&publication_fresh()&&
@@ -86,6 +100,7 @@ int app_controller_submit_resume(uint32_t ticket,uint32_t session,uint32_t deadl
     if(!ticket||!session)return E_PAR;
     if(lock()!=E_OK)return APP_RESUME_BUSY;
     if(!lease_valid(deadline_ms))result=APP_RESUME_EXPIRED;
+    else if(pickup_stop_active())result=APP_RESUME_NOT_READY;
     else if(read32(request_slot)||read32(reply_slot))result=APP_RESUME_BUSY;
     else if(ticket==read32(resume_ticket)&&lease_valid(read32(resume_ticket+4))) {
         write32(request_slot,ticket);write32(request_slot+4,session);write32(request_slot+8,deadline_ms);
@@ -115,12 +130,15 @@ int app_controller_take_reply(uint8_t out[10]) {
 }
 static unsigned poll_command(int resume_ready) {
     if(lock()==E_OK) {
+        const int picked_up=pickup_stop_active();
+        if(picked_up)write32(resume_ticket,0);
         if(read32(request_slot)&&request_result()==7U) {
             unsigned resume=request_slot[12]&REQUEST_RESUME,result=APP_STOP_EXPIRED;
             if(lease_valid(read32(request_slot+8))) {
                 if(!resume) {owner_word=(uint8_t)((owner_word|APP_CTRL_LATCH)&~(OWNER_RESUMING|OWNER_RESUME_FAILED));write32(resume_ticket,0);result=APP_STOP_LATCHED;}
+                else if(picked_up)result=APP_RESUME_NOT_READY;
                 else if(!APP_TEST&&resume_ready<0) { /* Wait for this iteration's actual source checks. */
-                    (void)tk_sig_sem(controller_sem,1);return owner_word&APP_CTRL_LATCH;
+                    (void)tk_sig_sem(controller_sem,1);return motor_inhibit();
                 } else if((owner_word&APP_CTRL_STATE_MASK)==APP_CTRL_FAULT)result=APP_RESUME_FAULT;
                 else if(!(owner_word&APP_CTRL_LATCH))result=APP_RESUME_AUTH_CHANGED;
                 else if(APP_TEST||!resume_ready)result=APP_RESUME_NOT_READY;
@@ -129,8 +147,8 @@ static unsigned poll_command(int resume_ready) {
             request_slot[12]=(uint8_t)(resume|(result<<1));
         }
         (void)tk_sig_sem(controller_sem,1);
-    } else return (owner_word&APP_CTRL_LATCH)|APP_CTRL_POLL_BUSY;
-    return owner_word&APP_CTRL_LATCH;
+    } else return motor_inhibit()|APP_CTRL_POLL_BUSY;
+    return motor_inhibit();
 }
 unsigned app_controller_poll(void) { return poll_command(-1); }
 unsigned app_controller_poll_ready(int ready) { return poll_command(ready!=0); }
@@ -147,11 +165,14 @@ void app_controller_publish(unsigned state,int motor_result) {
         state=APP_CTRL_FAULT;
     }
     if(owner_word&OWNER_RESUME_FAILED)state=APP_CTRL_FAULT;
+    const int locked=lock()==E_OK;
+    const int picked_up=pickup_stop_active();
+    if(picked_up)owner_word|=APP_CTRL_LATCH;
     if((owner_word&APP_CTRL_LATCH)&&state!=APP_CTRL_DISABLED&&state!=APP_CTRL_FAULT&&state!=APP_CTRL_UNAVAILABLE)
         state=APP_CTRL_STOP_LATCHED;
     owner_word=(uint8_t)((owner_word&~APP_CTRL_STATE_MASK)|state);
-    if(lock()!=E_OK)return;
-    if(state==APP_CTRL_FAULT)write32(resume_ticket,0);
+    if(!locked)return;
+    if(picked_up||state==APP_CTRL_FAULT)write32(resume_ticket,0);
     result=request_result();resume=request_slot[12]&REQUEST_RESUME;
     if(read32(request_slot)&&result!=7U&&resume&&result==0U&&
        (motor_result!=E_OK||state==APP_CTRL_FAULT||state==APP_CTRL_UNAVAILABLE||state==APP_CTRL_DISABLED)) {
@@ -167,7 +188,8 @@ void app_controller_publish(unsigned state,int motor_result) {
             (void)tk_sig_sem(controller_sem,1);return;
         }
         if(!resume&&result==APP_STOP_LATCHED&&(motor_result!=E_OK||state==APP_CTRL_FAULT))result=APP_STOP_FAULT;
-        if(resume&&result==0U&&(owner_word&APP_CTRL_LATCH))result=APP_RESUME_AUTH_CHANGED;
+        if(resume&&result==0U&&(owner_word&APP_CTRL_LATCH))
+            result=picked_up?APP_RESUME_NOT_READY:APP_RESUME_AUTH_CHANGED;
         copy_bytes(reply_slot,request_slot,8);
         result=(result<<RESULT_SHIFT)|published[4]|(resume?APP_REPLY_RESUME:0U);
         reply_slot[8]=(uint8_t)result;reply_slot[9]=(uint8_t)(result>>8);

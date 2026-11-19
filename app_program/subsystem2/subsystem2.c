@@ -14,11 +14,48 @@
 #define S2_FEEDBACK_ENABLED (S2_DRIVE_ENABLED || S2_PASSIVE_FEEDBACK)
 
 static ID s_command_sem, s_feedback_sem;
-static BOOL s_motor_ready, s_feedback_ready, s_started;
-static S2_COMMAND s_command;
-static S2_MOTION_DATA s_feedback;
-/* Protected by the existing feedback semaphore: path mm:32 + source time:32. */
-static uint8_t s_travel[8];
+static BOOL s_motor_ready, s_started;
+#define S2_COMMAND_TARGET_BITS 11U
+#define S2_COMMAND_TARGET_MASK ((1U << S2_COMMAND_TARGET_BITS) - 1U)
+#define S2_COMMAND_TARGET_BIAS (1 << (S2_COMMAND_TARGET_BITS - 1U))
+#define S2_COMMAND_MODE_SHIFT (2U * S2_COMMAND_TARGET_BITS)
+_Static_assert(S2_MAX_RPM_X10 < S2_COMMAND_TARGET_BIAS, "Command target out of range");
+_Static_assert(S2_MODE_RPM < 3, "Command mode out of range");
+/* Under s_command_sem: little-endian time:32, biased left/right:11 each,
+ * mode:2. Mode zero means empty; populated modes store S2_CONTROL_MODE + 1. */
+static uint8_t s_command[7];
+
+/* One semaphore protects both motion and path at the same source tick.
+ * Controls in order: targets 11+11, duties 14+14, validity/activity 3,
+ * mode 2 (zero for no publication), stop reason 3, fault mask 6. */
+#define S2_FEEDBACK_DUTY_BITS 14U
+#define S2_FEEDBACK_DUTY_MASK ((1U << S2_FEEDBACK_DUTY_BITS) - 1U)
+enum {
+    S2_FEEDBACK_LEFT_DUTY = 2 * S2_COMMAND_TARGET_BITS,
+    S2_FEEDBACK_RIGHT_DUTY = S2_FEEDBACK_LEFT_DUTY + S2_FEEDBACK_DUTY_BITS,
+    S2_FEEDBACK_ENCODER_VALID = S2_FEEDBACK_RIGHT_DUTY + S2_FEEDBACK_DUTY_BITS,
+    S2_FEEDBACK_SPEED_VALID = S2_FEEDBACK_ENCODER_VALID + 1,
+    S2_FEEDBACK_COMMAND_ACTIVE = S2_FEEDBACK_SPEED_VALID + 1,
+    S2_FEEDBACK_MODE = S2_FEEDBACK_COMMAND_ACTIVE + 1,
+    S2_FEEDBACK_STOP_REASON = S2_FEEDBACK_MODE + 2,
+    S2_FEEDBACK_FAULTS = S2_FEEDBACK_STOP_REASON + 3
+};
+_Static_assert(S2_PID_MAX_DUTY_X100 + 10000U <= S2_FEEDBACK_DUTY_MASK,
+               "Feedback duty out of range");
+_Static_assert(S2_STOP_FEEDBACK_WAIT < 8, "Feedback stop reason out of range");
+_Static_assert((S2_FAULT_ENCODER | S2_FAULT_TIMING | S2_FAULT_LEFT_STALL |
+                S2_FAULT_RIGHT_STALL | S2_FAULT_LEFT_DIRECTION |
+                S2_FAULT_RIGHT_DIRECTION) < (UINT64_C(1) << (64 - S2_FEEDBACK_FAULTS)),
+               "Feedback faults out of range");
+typedef struct {
+    int64_t count_left, count_right;
+    int64_t distance_left_mm_x10, distance_right_mm_x10;
+    uint64_t controls;
+    UW sequence, timestamp_ms, speed_timestamp_ms, speed_period_ms;
+    INT actual_left_rpm_x10, actual_right_rpm_x10, speed_centre_mm_s_x10;
+    uint32_t path_mm;
+} S2_FEEDBACK_RECORD;
+static S2_FEEDBACK_RECORD s_feedback;
 
 static uint32_t s2_read32(const uint8_t *p)
 {
@@ -36,6 +73,7 @@ static ER submit_command(S2_CONTROL_MODE mode, INT left, INT right)
 {
     SYSTIM now;
     ER er;
+    uint32_t word;
     if (s_command_sem <= 0) return E_OBJ;
     er = tk_wai_sem(s_command_sem, 1, TMO_POL);
     if (er != E_OK) return er;
@@ -44,11 +82,14 @@ static ER submit_command(S2_CONTROL_MODE mode, INT left, INT right)
         return E_OBJ;
     }
     (void)tk_get_tim(&now);
-    s_command.mode = left == 0 && right == 0 ? S2_MODE_STOP : mode;
-    s_command.left = left;
-    s_command.right = right;
-    s_command.timestamp_ms = (UW)now.lo;
-    s_command.valid = TRUE;
+    if (left == 0 && right == 0) mode = S2_MODE_STOP;
+    word = (uint32_t)(left + S2_COMMAND_TARGET_BIAS) |
+           (uint32_t)(right + S2_COMMAND_TARGET_BIAS) << S2_COMMAND_TARGET_BITS |
+           ((uint32_t)mode + 1U) << S2_COMMAND_MODE_SHIFT;
+    s2_write32(s_command, (UW)now.lo);
+    s_command[4] = (uint8_t)word;
+    s_command[5] = (uint8_t)(word >> 8);
+    s_command[6] = (uint8_t)(word >> 16);
     (void)tk_sig_sem(s_command_sem, 1);
     return E_OK;
 }
@@ -61,21 +102,62 @@ EXPORT ER subsystem2_set_duty(INT left, INT right)
 
 EXPORT ER subsystem2_set_rpm_x10(INT left, INT right)
 {
-    if (left < 0 || left > S2_MAX_RPM_X10 || right < 0 || right > S2_MAX_RPM_X10) return E_PAR;
+    if (left < 0 || right < 0) return E_PAR;
+    return subsystem2_set_signed_rpm_x10(left, right);
+}
+
+EXPORT ER subsystem2_set_signed_rpm_x10(INT left, INT right)
+{
+    if (left < -S2_MAX_RPM_X10 || left > S2_MAX_RPM_X10 ||
+        right < -S2_MAX_RPM_X10 || right > S2_MAX_RPM_X10) return E_PAR;
     return submit_command(S2_MODE_RPM, left, right);
 }
 
 EXPORT ER subsystem2_get_motion(S2_MOTION_DATA *sample)
 {
     ER er;
+    uint64_t controls;
     if (sample == NULL) return E_PAR;
     if (s_feedback_sem <= 0) return E_OBJ;
     er = tk_wai_sem(s_feedback_sem, 1, TMO_POL);
     if (er != E_OK) return er;
-    if (s_feedback_ready) *sample = s_feedback;
-    er = s_feedback_ready ? E_OK : E_OBJ;
+    controls = s_feedback.controls;
+    if (!controls) {
+        (void)tk_sig_sem(s_feedback_sem, 1);
+        return E_OBJ;
+    }
+    sample->count_left = s_feedback.count_left;
+    sample->count_right = s_feedback.count_right;
+    sample->distance_left_mm_x10 = s_feedback.distance_left_mm_x10;
+    sample->distance_right_mm_x10 = s_feedback.distance_right_mm_x10;
+    sample->sequence = s_feedback.sequence;
+    sample->timestamp_ms = s_feedback.timestamp_ms;
+    sample->speed_timestamp_ms = s_feedback.speed_timestamp_ms;
+    sample->speed_period_ms = s_feedback.speed_period_ms;
+    sample->actual_left_rpm_x10 = s_feedback.actual_left_rpm_x10;
+    sample->actual_right_rpm_x10 = s_feedback.actual_right_rpm_x10;
+    sample->speed_centre_mm_s_x10 = s_feedback.speed_centre_mm_s_x10;
     (void)tk_sig_sem(s_feedback_sem, 1);
-    return er;
+
+    sample->target_left_rpm_x10 = (INT)(controls & S2_COMMAND_TARGET_MASK) - S2_COMMAND_TARGET_BIAS;
+    sample->target_right_rpm_x10 =
+        (INT)((controls >> S2_COMMAND_TARGET_BITS) & S2_COMMAND_TARGET_MASK) - S2_COMMAND_TARGET_BIAS;
+    sample->duty_left_x100 =
+        (INT)((controls >> S2_FEEDBACK_LEFT_DUTY) & S2_FEEDBACK_DUTY_MASK) - S2_PID_MAX_DUTY_X100;
+    sample->duty_right_x100 =
+        (INT)((controls >> S2_FEEDBACK_RIGHT_DUTY) & S2_FEEDBACK_DUTY_MASK) - S2_PID_MAX_DUTY_X100;
+    sample->encoder_valid = (controls >> S2_FEEDBACK_ENCODER_VALID) & 1U;
+    sample->speed_valid = (controls >> S2_FEEDBACK_SPEED_VALID) & 1U;
+    sample->command_active = (controls >> S2_FEEDBACK_COMMAND_ACTIVE) & 1U;
+    sample->mode = (S2_CONTROL_MODE)(((controls >> S2_FEEDBACK_MODE) & 3U) - 1U);
+    sample->stop_reason = (S2_STOP_REASON)((controls >> S2_FEEDBACK_STOP_REASON) & 7U);
+    sample->faults = (UW)(controls >> S2_FEEDBACK_FAULTS);
+    sample->error_left_rpm_x10 = sample->target_left_rpm_x10 != 0 ?
+        sample->target_left_rpm_x10 - sample->actual_left_rpm_x10 : 0;
+    sample->error_right_rpm_x10 = sample->target_right_rpm_x10 != 0 ?
+        sample->target_right_rpm_x10 - sample->actual_right_rpm_x10 : 0;
+    sample->distance_centre_mm_x10 = (sample->distance_left_mm_x10 + sample->distance_right_mm_x10) / 2;
+    return E_OK;
 }
 
 int telemetry_get_travel(TELEMETRY_TRAVEL *out)
@@ -85,22 +167,66 @@ int telemetry_get_travel(TELEMETRY_TRAVEL *out)
     if (s_feedback_sem <= 0) return E_OBJ;
     er = tk_wai_sem(s_feedback_sem, 1, TMO_POL);
     if (er != E_OK) return er;
-    er = s_feedback_ready && s2_read32(s_travel) != UINT32_MAX ? E_OK : E_OBJ;
+    er = s_feedback.controls && s_feedback.path_mm != UINT32_MAX ? E_OK : E_OBJ;
     if (er == E_OK) {
-        out->distance_mm = s2_read32(s_travel);
-        out->timestamp_ms = s2_read32(s_travel + 4);
+        out->distance_mm = s_feedback.path_mm;
+        out->timestamp_ms = s_feedback.timestamp_ms;
     }
     (void)tk_sig_sem(s_feedback_sem, 1);
     return er;
 }
 
 #if S2_FEEDBACK_ENABLED
+static void publish_feedback(const S2_MOTION_DATA *sample, uint32_t path_mm)
+{
+    s_feedback.count_left = sample->count_left;
+    s_feedback.count_right = sample->count_right;
+    s_feedback.distance_left_mm_x10 = sample->distance_left_mm_x10;
+    s_feedback.distance_right_mm_x10 = sample->distance_right_mm_x10;
+    s_feedback.sequence = sample->sequence;
+    s_feedback.timestamp_ms = sample->timestamp_ms;
+    s_feedback.speed_timestamp_ms = sample->speed_timestamp_ms;
+    s_feedback.speed_period_ms = sample->speed_period_ms;
+    s_feedback.actual_left_rpm_x10 = sample->actual_left_rpm_x10;
+    s_feedback.actual_right_rpm_x10 = sample->actual_right_rpm_x10;
+    s_feedback.speed_centre_mm_s_x10 = sample->speed_centre_mm_s_x10;
+    s_feedback.path_mm = path_mm;
+    s_feedback.controls = (uint64_t)(sample->target_left_rpm_x10 + S2_COMMAND_TARGET_BIAS) |
+        (uint64_t)(sample->target_right_rpm_x10 + S2_COMMAND_TARGET_BIAS) << S2_COMMAND_TARGET_BITS |
+        (uint64_t)(sample->duty_left_x100 + S2_PID_MAX_DUTY_X100) << S2_FEEDBACK_LEFT_DUTY |
+        (uint64_t)(sample->duty_right_x100 + S2_PID_MAX_DUTY_X100) << S2_FEEDBACK_RIGHT_DUTY |
+        (uint64_t)(sample->encoder_valid != 0) << S2_FEEDBACK_ENCODER_VALID |
+        (uint64_t)(sample->speed_valid != 0) << S2_FEEDBACK_SPEED_VALID |
+        (uint64_t)(sample->command_active != 0) << S2_FEEDBACK_COMMAND_ACTIVE |
+        ((uint64_t)sample->mode + 1U) << S2_FEEDBACK_MODE |
+        (uint64_t)sample->stop_reason << S2_FEEDBACK_STOP_REASON |
+        (uint64_t)sample->faults << S2_FEEDBACK_FAULTS;
+}
+
+static S2_COMMAND read_command(void)
+{
+    uint32_t word = (uint32_t)s_command[4] | (uint32_t)s_command[5] << 8 |
+                    (uint32_t)s_command[6] << 16;
+    unsigned mode = word >> S2_COMMAND_MODE_SHIFT;
+    if (mode == 0U) return (S2_COMMAND){0};
+    return (S2_COMMAND){
+        .mode = (S2_CONTROL_MODE)(mode - 1U),
+        .left = (INT)(word & S2_COMMAND_TARGET_MASK) - S2_COMMAND_TARGET_BIAS,
+        .right = (INT)((word >> S2_COMMAND_TARGET_BITS) & S2_COMMAND_TARGET_MASK) -
+                 S2_COMMAND_TARGET_BIAS,
+        .timestamp_ms = s2_read32(s_command),
+        .valid = TRUE
+    };
+}
+
 #if S2_DRIVE_ENABLED
 static void motor_duty(UINT a, UINT b, INT duty_x100, BOOL reversed)
 {
-    UW compare = ((S2_PWM_TOP + 1U) * (UW)duty_x100) / 10000U;
-    (void)pwm_set_cc(reversed ? a : b, 0);
-    (void)pwm_set_cc(reversed ? b : a, compare);
+    const BOOL drive_b = (reversed != 0) != (duty_x100 < 0);
+    const UW magnitude = (UW)(duty_x100 < 0 ? -duty_x100 : duty_x100);
+    const UW compare = ((S2_PWM_TOP + 1U) * magnitude) / 10000U;
+    (void)pwm_set_cc(drive_b ? a : b, 0);
+    (void)pwm_set_cc(drive_b ? b : a, compare);
 }
 #endif
 
@@ -126,7 +252,7 @@ static void motion_loop(void)
         S2_COMMAND command = {0};
         BOOL available = tk_wai_sem(s_command_sem, 1, TMO_POL) == E_OK;
         if (available) {
-            command = s_command;
+            command = read_command();
             (void)tk_sig_sem(s_command_sem, 1);
         }
         (void)tk_get_tim(&now);
@@ -144,10 +270,7 @@ static void motion_loop(void)
         motor_duty(10, 11, control.data.duty_right_x100, S2_RIGHT_REVERSED);
 #endif
         if (tk_wai_sem(s_feedback_sem, 1, TMO_POL) == E_OK) {
-            s_feedback = control.data;
-            s2_write32(s_travel, s2_odometer_mm(&odometer));
-            s2_write32(s_travel + 4, (UW)now.lo);
-            s_feedback_ready = TRUE;
+            publish_feedback(&control.data, s2_odometer_mm(&odometer));
             (void)tk_sig_sem(s_feedback_sem, 1);
         }
         (void)tk_dly_tsk(S2_PERIOD_MS);
@@ -169,9 +292,9 @@ EXPORT ER subsystem2_init(void)
     UINT pin;
     T_CSEM sem = {0};
     if (s_command_sem > 0) return E_OBJ;
-    s_motor_ready = s_feedback_ready = s_started = FALSE;
-    s_command.valid = FALSE;
-    s2_write32(s_travel, UINT32_MAX);
+    s_motor_ready = s_started = FALSE;
+    s_command[6] = 0; /* Clear the mode to mark the mailbox empty. */
+    s_feedback.controls = 0;
     sem.sematr = TA_TFIFO | TA_FIRST;
     sem.isemcnt = sem.maxsem = 1;
     /* Preload low before selecting SIO or enabling any PWM slice. */

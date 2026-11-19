@@ -12,6 +12,7 @@
 #define APP_TEST 1
 #endif
 #define S2_ENCODER_CALIBRATION 0
+#define APP_LINE_FOLLOW_ENABLED 1
 #define EXPORT
 #define IMPORT extern
 #define TRUE 1
@@ -46,10 +47,15 @@ typedef void (*FP)(INT,void *);
 typedef struct {UW lo,hi;} SYSTIM;
 typedef struct {UW sematr;INT isemcnt,maxsem;} T_CSEM;
 static UW source_ms=1000,raw_us=1000000;
+enum { LEFT_ESCAPE=4, SLOW_BYPASS_TURN };
 static UINT created,counts[4],busy,measured,scenario,seen[6],servo_calls,checks;
+static UW turn_started_ms,servo_compare;
+static BOOL turn_acknowledged;
+#define APP_START_DELAY_MS 3000U
 static jmp_buf done;
 static FP started;
 static ER tk_get_tim(SYSTIM *s){s->lo=source_ms;s->hi=0;return E_OK;}
+static ER tk_get_otm(SYSTIM *s){return tk_get_tim(s);}
 static ER tk_wai_sem(ID,INT,INT);
 static ER tk_sig_sem(ID,INT);
 static ER tk_dly_tsk(INT);
@@ -66,7 +72,10 @@ static UINT gpio_get_val(UINT pin){assert(pin==5);return 0;}
 static void WaitUsec(UINT us){raw_us+=us;}
 static ER pwm_set_pin(UINT pin){assert(pin==12);return E_OK;}
 static ER pwm_set_enabled(UINT pin,BOOL enabled){assert(pin==12&&enabled);return E_OK;}
-static ER pwm_set_cc(UINT pin,UW value){assert(pin==12&&value>=1953&&value<=3907);++servo_calls;return E_OK;}
+static ER pwm_set_cc(UINT pin,UW value){
+    assert(pin==12&&value>=1953&&value<=3907);
+    servo_compare=value;++servo_calls;return E_OK;
+}
 static ID app_start_task(FP fn,INT priority,UW core,const char *name){
     (void)name;assert(priority==20&&core==1);started=fn;return 10;
 }
@@ -90,11 +99,16 @@ static ER tk_wai_sem(ID id,INT n,INT timeout){
         --counts[id];return E_OK;
     }
     assert(timeout==40);
+    /* The installed servo points left at the higher pulse width. Check the
+     * actual PWM at each echo as well as the published 30/right and 150/left. */
+    if(measured==1)assert(servo_compare==3580U);
+    else if(measured==2)assert(servo_compare==2277U);
+    else assert(servo_compare==2930U);
     UW mm;
     if(scenario==1)mm=0;
     else if(measured==0)mm=100;
-    else if(measured==1)mm=scenario==2?0:240;
-    else if(measured==2)mm=scenario==2?0:260;
+    else if(measured==1)mm=scenario==2?0:scenario==LEFT_ESCAPE?400:240;
+    else if(measured==2)mm=scenario==2?0:scenario==LEFT_ESCAPE?160:260;
     else mm=600;
     ++measured;
     if(!mm){source_ms+=40;return E_TMOUT;}
@@ -109,17 +123,28 @@ static ER tk_dly_tsk(INT ms){
     if(subsystem5_get_navigation(&nav)==E_OK){
         assert(nav.phase<=S5_NAV_BLOCKED&&source_ms-nav.timestamp_ms<=50);
         ++seen[nav.phase];
-        if(nav.phase==S5_NAV_RIGHT){
+        if(nav.phase==S5_NAV_LEFT||nav.phase==S5_NAV_RIGHT){
             S5_RANGE_DATA range;static TELEMETRY_SCAN scan;
+            BOOL left_escape=scenario==LEFT_ESCAPE;
+            assert(nav.phase==(left_escape?S5_NAV_LEFT:S5_NAV_RIGHT));
+            assert(nav.turn_id==1U);
+            if(!turn_started_ms)turn_started_ms=nav.timestamp_ms;
+            assert(subsystem5_end_turn(nav.turn_id+1U)==E_OBJ);
+            if(!APP_TEST&&(scenario==0||left_escape)&&seen[nav.phase]==2U)
+                assert(subsystem5_end_turn(nav.turn_id)==E_OK);
+            if(scenario==SLOW_BYPASS_TURN&&source_ms-turn_started_ms>=5500U){
+                assert(subsystem5_end_turn(nav.turn_id)==E_OK);
+                turn_acknowledged=TRUE;
+            }
             assert(subsystem5_get_range(&range)==E_OK&&range.valid&&range.distance_mm==100);
             assert(telemetry_get_scan(&scan)==E_OK&&scan.count==3&&scan.sequence==1);
-            assert(scan.points[0].angle==30&&scan.points[0].distance_mm==260);
+            assert(scan.points[0].angle==30&&scan.points[0].distance_mm==(left_escape?160:260));
             assert(scan.points[1].angle==90&&scan.points[1].distance_mm==100);
-            assert(scan.points[2].angle==150&&scan.points[2].distance_mm==240);
-        }
+            assert(scan.points[2].angle==150&&scan.points[2].distance_mm==(left_escape?400:240));
+        }else assert(nav.turn_id==0U);
         if((scenario==1&&measured==1&&nav.phase==S5_NAV_BLOCKED)||
            (scenario==2&&measured==3&&nav.phase==S5_NAV_BLOCKED)||
-           (scenario==0&&measured==4&&nav.phase==S5_NAV_CLEAR))longjmp(done,1);
+           (measured==4&&nav.phase==S5_NAV_CLEAR))longjmp(done,1);
     }
     source_ms+=(UW)ms;raw_us+=(UW)ms*1000U;
     assert(source_ms<20000);
@@ -128,6 +153,7 @@ static ER tk_dly_tsk(INT ms){
 static void pass(const char *name){++checks;printf("PASS: %s\n",name);}
 static void reset(unsigned which){
     created=busy=measured=servo_calls=0;scenario=which;source_ms=1000;raw_us=1000000;
+    turn_started_ms=0;turn_acknowledged=FALSE;
     echo_done=range_sem=0;memset(counts,0,sizeof(counts));memset(seen,0,sizeof(seen));
     memset(range_publication,0,sizeof(range_publication));memset(navigation_publication,0,sizeof(navigation_publication));
     memset(scan_publication,0,sizeof(scan_publication));
@@ -135,7 +161,7 @@ static void reset(unsigned which){
 }
 int main(void){
     static TELEMETRY_SCAN scan,before;
-    S5_NAV_DATA nav={123,9};S5_RANGE_DATA range;
+    S5_NAV_DATA nav={.timestamp_ms=123,.phase=9};S5_RANGE_DATA range;
     assert(subsystem5_get_navigation(NULL)==E_PAR&&telemetry_get_scan(NULL)==E_PAR);
     assert(subsystem5_get_navigation(&nav)==E_OBJ&&nav.phase==9);
     pass("passive API errors do not manufacture measurements");
@@ -153,6 +179,9 @@ int main(void){
     assert(servo_calls>=6&&subsystem5_get_range(&range)==E_OK&&range.distance_mm==600);
     assert(telemetry_get_scan(&scan)==E_OK&&scan.sequence==1);
     pass("actual task scans while publishing intent; centre range never becomes a side echo");
+    assert(seen[S5_NAV_RIGHT]==(APP_TEST?10U:2U));
+    assert(subsystem5_end_turn(1U)==E_OBJ&&subsystem5_end_turn(0U)==E_PAR);
+    pass("only the current turn ID can end a request; stationary scan dwell is preserved");
     {
         UB packed[S1_SCAN_PACKED_BYTES]={0},wire[S1_SCAN_PACKET_BYTES];
         for(UINT i=0;i<3;++i){
@@ -179,6 +208,21 @@ int main(void){
     assert(telemetry_get_scan(&scan)==E_OK&&scan.points[0].distance_mm==0&&scan.points[2].distance_mm==0);
     assert(!seen[S5_NAV_LEFT]&&!seen[S5_NAV_RIGHT]);
     pass("missing side echoes remain gaps in a completed profile and never authorize a turn");
+    reset(LEFT_ESCAPE);if(setjmp(done)==0)started(0,NULL);
+    assert(seen[S5_NAV_LEFT]==(APP_TEST?10U:2U)&&!seen[S5_NAV_RIGHT]&&seen[S5_NAV_CLEAR]);
+    pass("blocked right and measured clear left publish a left turn through the actual scan task");
+    if(!APP_TEST){
+        reset(3);if(setjmp(done)==0)started(0,NULL);
+        assert(seen[S5_NAV_RIGHT]==S5_TURN_WAIT_MS/S5_NAV_REFRESH_MS);
+        assert(source_ms-turn_started_ms>=S5_TURN_WAIT_MS&&seen[S5_NAV_CLEAR]);
+        assert(subsystem5_end_turn(1U)==E_OBJ);
+        pass("normal sensing resumes after an unanswered turn request expires");
+#ifdef APP_OBSTACLE_BYPASS
+        reset(SLOW_BYPASS_TURN);if(setjmp(done)==0)started(0,NULL);
+        assert(turn_acknowledged&&seen[S5_NAV_CLEAR]);
+        pass("the 90-degree bypass still accepts a settled turn acknowledgement at 5500 ms");
+#endif
+    }
     printf("SUMMARY: %u actual S5 scan/publication checks passed, APP_TEST=%d; no motor API linked.\n",checks,APP_TEST);
     return 0;
 }

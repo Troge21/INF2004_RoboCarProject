@@ -4,25 +4,38 @@ Local real-MQTT dashboard for Buddy/Subsystem 1: Overview, Sensors & motion,
 Communications, charts and exports. No cloud hosting, demo feed, npm packages
 or website build step.
 
-## Current batch - 17 November 2026
+## Current integrated firmware - 19 November 2026
 
 One current **Packed v4** contract covers distance, IR, IMU, measured wheel
 velocity/counts/net travel, controller state, faults, encoder path and future barcode
-data. Typed scan chunks and diagnostics share the telemetry topic. The old
+data. Typed scan chunks, diagnostics and S4 terrain reports share the telemetry topic. The old
 v3/JSON decoders and controller beacon path are removed.
 
 Current normal operating image (motor control enabled):
 **build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt.uf2** (NO _test suffix)
 
 Profile: **NET=lwip MQTT=1 TEST=0 APP_MODE=integrated CONSOLE=usb_cdc CRASH_REPORT=0**.
-Bytes: **721920**; SHA-256: **2c5a4652c7c434fb1d27743a3579b6a9ff0dcf2f2f9a4ee79a813840ecd1bcbe**.
+Bytes: **734208**; SHA-256: **55613bd59c5679964684dc3101f680ff1e41f9e789a7fbca2c9657962f76d3ee**.
+This single image runs S1 MQTT and S2 motor control, including the packed
+command and feedback records and the verified left/right obstacle turns.
+It adds S4's pickup detector. The user confirmed a powered ramp crossing
+followed by pickup STOP on the preceding trace image.
 
-This normal image adds **Resume** in Overview and Communications. After Latch
+For the combined S4 bench session, use
+**build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_s4_motor_trace.uf2**.
+This powered image adds encoder-assisted hump measurement, run maximum,
+roll, motion events and an encoder-based turn-rate estimate. Size is
+741888 bytes and SHA-256 starts `c396fa80`. The rebuild matches the earlier
+version that detected the right-wheel ramp. Use **Sensors & motion** for
+the right-wheel height and pickup checks. The demo layout places the barcode
+on the left and the hump under the right wheel.
+
+The dashboard offers **Resume** in Overview and Communications. After Latch
 stop, Resume explicitly releases the inhibit without rebooting or resetting
 run distance. It requires fresh stopped-wheel feedback, valid line data, a
 clear front and no motor fault. STOP takes priority; reconnect never resumes
-movement automatically. Existing sensor, PID, line and obstacle algorithms
-are unchanged. Barcode/navigation and external faults still await producers.
+movement automatically. A pickup ends the run and requires a Pico restart.
+Barcode/navigation and external faults still await producers.
 
 On **18 November**, the user reported that the Resume test works after the
 requested Stop -> Resume -> Stop procedure. This is a user-reported basic
@@ -52,12 +65,14 @@ Those are measured stationary results, not a physical normal-mode pass.
 That delivery policy remains in the Resume image. Its WiFi no-sleep mode
 trades power saving for latency; current draw remains unmeasured.
 [Delivery evidence](../testing/subsystem1/TELEMETRY_DELIVERY.md),
-[current build identity](../testing/subsystem1/logs/2026-11-17-resume-fingerprint.json).
+[17 November Resume build identity](../testing/subsystem1/logs/2026-11-17-resume-fingerprint.json).
 
-Only this normal UF2 is kept in build_make. The preceding verified normal
-image and public source are preserved in [the rollback archive record](../testing/subsystem1/logs/2026-11-17-before-resume-backup.json).
-To build an explicit stationary hand-turn image later, use TEST=1; it is a
-separate profile, with wheel PWM disabled and existing servo scanning active.
+Use the normal UF2 for integrated driving and telemetry. The
+`_s2_bypass.uf2` image is for the pending 6b track test. Build standalone
+motion diagnostics on demand with `TEST=1` and `APP_MODE=distance`,
+`APP_MODE=reverse` or `APP_MODE=turn S2_TURN_TRACK_MM=120`. A stationary
+hand-turn image can be built with `TEST=1 APP_MODE=integrated`, with wheel
+PWM disabled and servo scanning active.
 
 ## Start the bench
 
@@ -129,8 +144,12 @@ Net travel can decrease in reverse; total centre path accumulates absolute
 mean wheel increments. Both rely on encoder calibration and wheel traction.
 Metres and m/s show three decimal places.
 
-S4 still uses its nominal 150 mm/s input unless its owner supplies measured
-speed. One-wheel/curb detection and height accuracy remain Buddy 4 work.
+On the combined S4 image, full-width estimates integrate pitch over actual
+encoder travel. One-wheel estimates use sustained roll and measured wheel
+spacing. **Last hump** shows a completed crossing, and **Run maximum** keeps
+the highest accepted estimate until a Pico restart or explicit new-run reset.
+Positive turn rate indicates left. The rate comes from the difference in wheel
+speeds and is sensitive to slip. Height calibration needs physical checks.
 Missing measurements are null, not fabricated zeroes. A valid accepted
 packet can contain unavailable measurements. Validity does not prove wiring
 or sensor calibration.
@@ -163,10 +182,13 @@ is not a motor-stop condition. The old digital barcode sampler is inactive.
 
 Bring a target to **250 mm or closer in front** to trigger a scan. S5 samples
 left/right, returns the head to centre and publishes a completed three-point
-profile. Under Sensors & motion, the scan plot should update at angles
-30/90/150 and its CSV export should contain those points. Invalid echoes
-remain gaps. Angles are servo commands; physical orientation/calibration
-still needs the bench check. A clear centre alone does not trigger a profile.
+profile. The Obstacle radar in Sensors & motion shows degree guides at
+30°, 60°, 90°, 120° and 150°. The view is from behind the car, with higher
+angles on the left. Each measured echo uses its reported bearing, including
+bearings between the guides. The scale fits the sweep, and distances are in
+millimetres. The card flags readings within 250 mm and labels a missing
+return **No echo**. The current firmware samples 30°, 90° and 150°. The CSV
+includes the bearing and distance of each sample.
 
 In normal mode, a clear front uses the existing IR line targets. Scanning
 requests zero wheels; a clear side permits a brief controller-owned turn.
@@ -201,6 +223,7 @@ See [the controller contract](../testing/subsystem1/CONTROLLER_COMMANDS.md) and
 | Main telemetry, b4 | 46 |
 | Completed scan chunk, b5 | 19..56 |
 | Diagnostics, b6 | 40 |
+| S4 motion and terrain, b7 | 15 |
 | Heartbeat, 80 | 5 |
 | STATUS request / reply | 5 / 16 or 62 |
 | STOP request / result | 13 / 11 |
@@ -225,6 +248,9 @@ exclude kernel/radio stacks and are not stack high-water.
 ~~~sh
 make -B -C build_make PICO_SDK_PATH=/opt/robocar/pico-sdk-2.2.0 NET=lwip MQTT=1 TEST=0 APP_MODE=integrated CONSOLE=usb_cdc CRASH_REPORT=0 -j8
 ~~~
+
+Add `S4_MOTOR_TRACE=1` to build the powered S4 bench image with USB trace
+support. Build locally with your ignored WiFi configuration.
 
 The current image is already normal TEST=0. Use TEST=1 only for an explicit
 stationary hand-turn/sensor profile. Standalone IR and

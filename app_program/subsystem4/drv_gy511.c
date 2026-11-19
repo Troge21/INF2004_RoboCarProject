@@ -11,7 +11,6 @@
 #include "drv_gy511.h"
 #include <sys/sysdef.h>
 #include <tk/syslib.h>
-#include <tm/tmonitor.h>
 
 /* I2C timing delay in microseconds (5 us gives ~100 kHz standard mode) */
 #define I2C_HALF_CLOCK_US           (5U)
@@ -24,7 +23,7 @@ static uint8_t s_filter_count = 0U;
 /* -------------------------------------------------------------------------
  * Low-Level I2C Bit-Bang Implementation
  * Uses open-drain behavior:
- *   HIGH: Set GPIO as input with pull-up (line floats high)
+ *   HIGH: Release the GPIO as input. The bus pull-ups bring it high.
  *   LOW : Set GPIO as output driving logic 0
  * ------------------------------------------------------------------------- */
 
@@ -40,25 +39,26 @@ static void i2c_sda_high(void)
 
 static void i2c_sda_low(void)
 {
-    (void)gpio_set_pin(GY511_PIN_SDA, GPIO_MODE_OUT);
     (void)gpio_set_val(GY511_PIN_SDA, 0U);
+    (void)gpio_set_pin(GY511_PIN_SDA, GPIO_MODE_OUT);
 }
 
-static void i2c_scl_high(void)
+static ER i2c_scl_high(void)
 {
     uint32_t timeout = 1000U;
     (void)gpio_set_pin(GY511_PIN_SCL, GPIO_MODE_IN);
-    /* Clock stretching check */
-    while ((gpio_get_val(GY511_PIN_SCL) == 0U) && (timeout > 0U)) {
+    while (gpio_get_val(GY511_PIN_SCL) == 0U) {
+        if (timeout == 0U) return E_IO;
         WaitUsec(1U);
         timeout--;
     }
+    return E_OK;
 }
 
 static void i2c_scl_low(void)
 {
-    (void)gpio_set_pin(GY511_PIN_SCL, GPIO_MODE_OUT);
     (void)gpio_set_val(GY511_PIN_SCL, 0U);
+    (void)gpio_set_pin(GY511_PIN_SCL, GPIO_MODE_OUT);
 }
 
 static uint8_t i2c_sda_read(void)
@@ -66,26 +66,31 @@ static uint8_t i2c_sda_read(void)
     return (uint8_t)(gpio_get_val(GY511_PIN_SDA) != 0U ? 1U : 0U);
 }
 
-static void i2c_start(void)
+static ER i2c_start(void)
 {
     i2c_sda_high();
     i2c_delay();
-    i2c_scl_high();
+    if (i2c_scl_high() != E_OK) return E_IO;
     i2c_delay();
+    if (i2c_sda_read() == 0U) return E_IO;
     i2c_sda_low();
     i2c_delay();
     i2c_scl_low();
     i2c_delay();
+    return E_OK;
 }
 
-static void i2c_stop(void)
+static ER i2c_finish(ER transfer)
 {
+    ER clock;
     i2c_sda_low();
     i2c_delay();
-    i2c_scl_high();
+    clock = i2c_scl_high();
     i2c_delay();
     i2c_sda_high();
     i2c_delay();
+    if (transfer != E_OK) return transfer;
+    return clock == E_OK && i2c_sda_read() != 0U ? E_OK : E_IO;
 }
 
 static ER i2c_write_byte(uint8_t byte)
@@ -101,7 +106,7 @@ static ER i2c_write_byte(uint8_t byte)
         }
         byte <<= 1;
         i2c_delay();
-        i2c_scl_high();
+        if (i2c_scl_high() != E_OK) return E_IO;
         i2c_delay();
         i2c_scl_low();
     }
@@ -109,7 +114,7 @@ static ER i2c_write_byte(uint8_t byte)
     /* Release SDA for ACK */
     i2c_sda_high();
     i2c_delay();
-    i2c_scl_high();
+    if (i2c_scl_high() != E_OK) return E_IO;
     i2c_delay();
     ack = i2c_sda_read();
     i2c_scl_low();
@@ -118,7 +123,7 @@ static ER i2c_write_byte(uint8_t byte)
     return (ack == 0U) ? E_OK : E_IO;
 }
 
-static uint8_t i2c_read_byte(uint8_t ack)
+static ER i2c_read_byte(uint8_t *out, BOOL ack)
 {
     uint8_t i;
     uint8_t byte = 0U;
@@ -127,7 +132,7 @@ static uint8_t i2c_read_byte(uint8_t ack)
     for (i = 0U; i < 8U; i++) {
         byte <<= 1;
         i2c_delay();
-        i2c_scl_high();
+        if (i2c_scl_high() != E_OK) return E_IO;
         i2c_delay();
         if (i2c_sda_read() != 0U) {
             byte |= 0x01U;
@@ -142,13 +147,14 @@ static uint8_t i2c_read_byte(uint8_t ack)
         i2c_sda_high();  /* NACK */
     }
     i2c_delay();
-    i2c_scl_high();
+    if (i2c_scl_high() != E_OK) return E_IO;
     i2c_delay();
     i2c_scl_low();
     i2c_sda_high();
     i2c_delay();
 
-    return byte;
+    *out = byte;
+    return E_OK;
 }
 
 /* -------------------------------------------------------------------------
@@ -157,19 +163,15 @@ static uint8_t i2c_read_byte(uint8_t ack)
 
 static ER lsm303_write_reg(uint8_t reg, uint8_t val)
 {
-    ER er;
-
-    i2c_start();
-    er = i2c_write_byte((uint8_t)(GY511_I2C_ADDR_ACCEL << 1));
+    ER er = i2c_start();
+    if (er == E_OK) er = i2c_write_byte((uint8_t)(GY511_I2C_ADDR_ACCEL << 1));
     if (er == E_OK) {
         er = i2c_write_byte(reg);
     }
     if (er == E_OK) {
         er = i2c_write_byte(val);
     }
-    i2c_stop();
-
-    return er;
+    return i2c_finish(er);
 }
 
 static ER lsm303_read_bytes(uint8_t reg, uint8_t *p_buf, uint8_t len)
@@ -181,34 +183,20 @@ static ER lsm303_read_bytes(uint8_t reg, uint8_t *p_buf, uint8_t len)
         return E_PAR;
     }
 
-    i2c_start();
-    er = i2c_write_byte((uint8_t)(GY511_I2C_ADDR_ACCEL << 1));
-    if (er != E_OK) {
-        i2c_stop();
-        return er;
-    }
+    er = i2c_start();
+    if (er == E_OK) er = i2c_write_byte((uint8_t)(GY511_I2C_ADDR_ACCEL << 1));
 
     /* Sub-address: set MSB for multi-byte auto-increment if len > 1 */
-    er = i2c_write_byte((uint8_t)(len > 1U ? (reg | LSM303_AUTO_INCREMENT) : reg));
-    if (er != E_OK) {
-        i2c_stop();
-        return er;
-    }
+    if (er == E_OK)
+        er = i2c_write_byte((uint8_t)(len > 1U ? (reg | LSM303_AUTO_INCREMENT) : reg));
 
     /* Repeated start */
-    i2c_start();
-    er = i2c_write_byte((uint8_t)((GY511_I2C_ADDR_ACCEL << 1) | 0x01U));
-    if (er != E_OK) {
-        i2c_stop();
-        return er;
-    }
+    if (er == E_OK) er = i2c_start();
+    if (er == E_OK) er = i2c_write_byte((uint8_t)((GY511_I2C_ADDR_ACCEL << 1) | 0x01U));
 
-    for (i = 0U; i < len; i++) {
-        p_buf[i] = i2c_read_byte((uint8_t)(i < (len - 1U) ? 1U : 0U));
-    }
-    i2c_stop();
-
-    return E_OK;
+    for (i = 0U; i < len && er == E_OK; i++)
+        er = i2c_read_byte(&p_buf[i], i < (len - 1U));
+    return i2c_finish(er);
 }
 
 /* -------------------------------------------------------------------------
@@ -245,7 +233,7 @@ EXPORT ER drv_gy511_init(void)
 
     /* Set up SDA and SCL as high-impedance inputs initially */
     i2c_sda_high();
-    i2c_scl_high();
+    if (i2c_scl_high() != E_OK) return E_IO;
     WaitUsec(1000U);
 
     /* Verify sensor presence */
@@ -260,8 +248,8 @@ EXPORT ER drv_gy511_init(void)
         return er;
     }
 
-    /* Configure CTRL_REG4_A: +/- 2g scale, High Resolution (HR = 1, 1 mg/LSB) */
-    er = lsm303_write_reg(LSM303_CTRL_REG4_A, LSM303_SCALE_2G_HR);
+    /* Hold both bytes of each axis stable through the read. */
+    er = lsm303_write_reg(LSM303_CTRL_REG4_A, LSM303_SCALE_2G_HR | LSM303_BLOCK_DATA_UPDATE);
     if (er != E_OK) {
         return er;
     }
@@ -275,51 +263,45 @@ EXPORT ER drv_gy511_init(void)
 
 EXPORT ER drv_gy511_probe(void)
 {
-    ER er;
-
-    i2c_start();
+    ER er = i2c_start();
     /* Accelerometer write address */
-    er = i2c_write_byte((uint8_t)(GY511_I2C_ADDR_ACCEL << 1));
-    i2c_stop();
-
-    return er;
+    if (er == E_OK) er = i2c_write_byte((uint8_t)(GY511_I2C_ADDR_ACCEL << 1));
+    return i2c_finish(er);
 }
 
-EXPORT ER drv_gy511_read_accel(GY511_ACCEL_DATA_T *p_accel)
+/* The device returns a signed 12-bit number left-aligned in two bytes. */
+static int16_t decode_axis(const uint8_t *bytes)
 {
-    uint8_t raw_buf[6];
-    int16_t raw_x;
-    int16_t raw_y;
-    int16_t raw_z;
+    unsigned raw = ((unsigned)bytes[1] << 4) | (bytes[0] >> 4);
+    return (int16_t)((int)raw - ((raw & 0x800U) ? 4096 : 0));
+}
+
+EXPORT ER drv_gy511_read_accel(GY511_SAMPLE_T *sample)
+{
+    uint8_t raw_buf[7];
     int32_t sum_x = 0;
     int32_t sum_y = 0;
     int32_t sum_z = 0;
     uint8_t i;
     ER er;
 
-    if (p_accel == NULL) {
+    if (sample == NULL) {
         return E_PAR;
     }
 
-    /* Burst read 6 acceleration registers starting at OUT_X_L_A */
-    er = lsm303_read_bytes(LSM303_OUT_X_L_A, raw_buf, 6U);
+    /* Read data-ready followed by the six acceleration bytes. */
+    er = lsm303_read_bytes(LSM303_STATUS_REG_A, raw_buf, sizeof(raw_buf));
     if (er != E_OK) {
         return er;
     }
 
-    /*
-     * LSM303DLHC output format: 12-bit left-aligned within 16-bit word.
-     * Shift right by 4 bits to get 12-bit signed acceleration.
-     * In +/- 2g HR mode, sensitivity is 1 mg/LSB.
-     */
-    raw_x = (int16_t)(((uint16_t)raw_buf[1] << 8) | (uint16_t)raw_buf[0]);
-    raw_y = (int16_t)(((uint16_t)raw_buf[3] << 8) | (uint16_t)raw_buf[2]);
-    raw_z = (int16_t)(((uint16_t)raw_buf[5] << 8) | (uint16_t)raw_buf[4]);
+    if ((raw_buf[0] & LSM303_ACCEL_DATA_READY) == 0U) return E_BUSY;
 
     /* Update moving average window */
-    s_filter_buf[s_filter_idx].x_mg = (int16_t)(raw_x >> 4);
-    s_filter_buf[s_filter_idx].y_mg = (int16_t)(raw_y >> 4);
-    s_filter_buf[s_filter_idx].z_mg = (int16_t)(raw_z >> 4);
+    sample->raw = (GY511_ACCEL_DATA_T){
+        decode_axis(&raw_buf[1]), decode_axis(&raw_buf[3]), decode_axis(&raw_buf[5])
+    };
+    s_filter_buf[s_filter_idx] = sample->raw;
 
     s_filter_idx = (uint8_t)((s_filter_idx + 1U) % GY511_FILTER_WINDOW_SIZE);
     if (s_filter_count < GY511_FILTER_WINDOW_SIZE) {
@@ -333,9 +315,9 @@ EXPORT ER drv_gy511_read_accel(GY511_ACCEL_DATA_T *p_accel)
         sum_z += s_filter_buf[i].z_mg;
     }
 
-    p_accel->x_mg = (int16_t)(sum_x / (int32_t)s_filter_count);
-    p_accel->y_mg = (int16_t)(sum_y / (int32_t)s_filter_count);
-    p_accel->z_mg = (int16_t)(sum_z / (int32_t)s_filter_count);
+    sample->filtered.x_mg = (int16_t)(sum_x / (int32_t)s_filter_count);
+    sample->filtered.y_mg = (int16_t)(sum_y / (int32_t)s_filter_count);
+    sample->filtered.z_mg = (int16_t)(sum_z / (int32_t)s_filter_count);
 
     return E_OK;
 }
@@ -382,28 +364,4 @@ EXPORT int16_t drv_gy511_calc_pitch_x10(const GY511_ACCEL_DATA_T *p_accel)
     pitch_x10 = ((573 * r_x1000) - ((122 * r3_x1000) / 1000)) / 1000;
 
     return (int16_t)pitch_x10;
-}
-
-EXPORT ER drv_gy511_calibrate_baseline(int16_t *p_baseline_x10, uint16_t sample_count)
-{
-    uint16_t i;
-    int32_t sum_pitch = 0;
-    GY511_ACCEL_DATA_T sample;
-    ER er;
-
-    if ((p_baseline_x10 == NULL) || (sample_count == 0U)) {
-        return E_PAR;
-    }
-
-    for (i = 0U; i < sample_count; i++) {
-        er = drv_gy511_read_accel(&sample);
-        if (er != E_OK) {
-            return er;
-        }
-        sum_pitch += (int32_t)drv_gy511_calc_pitch_x10(&sample);
-        WaitUsec(10000U); /* 10 ms delay between calibration samples */
-    }
-
-    *p_baseline_x10 = (int16_t)(sum_pitch / (int32_t)sample_count);
-    return E_OK;
 }

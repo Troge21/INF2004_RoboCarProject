@@ -60,6 +60,7 @@ in the dashboard, with zero additional transmitted bits.
 | Heartbeat `80` | Full uint32 wrapping counter, 32 bits plus marker, 5 bytes total |
 | Scan `b5` | Session, scan ID and source operating time are 32 bits each. Profile total 1..181 and start 0..180 use 8 bits each. Chunk count 1..16 uses a byte containing a direct 5-bit count. Its upper three bits are zero. A biased count could use four bits, but the existing byte header stores the direct count. Each point uses angle 0..180 degrees (8 bits) and range/invalid code (12 bits). 1..16 points per chunk, 19..56 bytes. Three-point S5 profile is 24 bytes |
 | Diagnostics `b6` | 32-bit session and uptime. Six 19-bit byte counts for static RAM, free heap, largest free block, sampled minimum free heap, reserved application task stacks and measured stack usage if available. Range 0..270336, 0x7ffff unavailable. Four 32-bit wrapping counters for publish errors, rejected commands, MQTT connections and snapshot contention. 40 bytes including marker and six zero bits after the size fields |
+| S4 terrain `b7` | On the 19 November S4 bench image, one marker byte and 32-bit session and operating time. The six-byte body has roll -900..900 in tenths of a degree, biased by +901 (11 bits), turn -255..255 degrees/s, biased by +256 (9), motion class 0..11 (4), last hump kind 0..3 (2) and wrapping hump sequence (16). Zero means unavailable for roll, turn and motion. Six reserved bits are zero. 15 bytes total |
 | STATUS `a0` / `a1` | Nonzero request ID is 32 bits. Reply includes ID, boot time and session (32 each), age 0..2000 ms or 2047 unknown (11), and controller word (6) with seven reserved zero bits. Age identifies whether the snapshot is attached. Request 5 bytes, reply 16 or 62 bytes |
 | STOP `a2` / `a4` | Request ID, session and boot deadline are 32 bits each. Reply combines controller word (6) and one of six results (3) in two bytes with seven reserved zero bits. Request 13 bytes, result 11 bytes |
 | Resume arm `a5` / `a6` | Arm request uses the 13-byte ID/session/deadline shape. Authorization is the STATUS header plus a 32-bit nonzero one-use ticket and optional frame, 20 or 66 bytes |
@@ -74,7 +75,7 @@ bytes, reserved bits and final byte rounding are protocol framing. See the
 
 | Record | Packed representation and measured/requested storage |
 | --- | --- |
-| Main S1 snapshot | 264-bit body + 9 source timestamps x 32 bits + 32-bit sequence = **73 B**. Separate 32-bit publication time makes **77 B** on the shared side |
+| Main S1 snapshot | 264-bit body + 9 source timestamps x 32 bits + 32-bit sequence = **73 B** in the 18 November evidence image. The S4 bench image appends a six-byte terrain record, bringing the snapshot to **79 B**. The shared publication has a further four-byte timestamp |
 | Completed scan cache | 181 points x 20 bits rounded to 453 B, plus ID/time (32 bits each) and point count 0..181 (8 bits) = **462 B** |
 | Resource cache | Six 19-bit values rounded to 15 B, with 32-bit publication time = **19 B**. Collector sample minimum and requested stack count each use 19 bits in a 3 B array |
 | Controller publication | 32-bit boot time and 6-bit state/latch/TEST in one byte = **5 B** |

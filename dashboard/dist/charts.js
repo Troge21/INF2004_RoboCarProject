@@ -50,11 +50,73 @@ export function sparkline(container,values,color='#8b78df'){
   data.forEach((v,i)=>{if(!Number.isFinite(v)){open=false;return;}path+=`${open?'L':'M'}${i/Math.max(1,data.length-1)*80},${24-(v-min)/span*20} `;open=true;});
   const svg=node('svg',{viewBox:'0 0 80 28','aria-hidden':'true'});svg.append(node('path',{d:path,fill:'none',stroke:color,'stroke-width':1.4}));container.replaceChildren(svg);
 }
-export function scanChart(container,scan){
-  if(!container)return;const svg=node('svg',{viewBox:'0 0 600 214',role:'img','aria-label':scan?'Latest servo scan: angle and obstacle range':'Servo scan unavailable'});
-  for(const r of [40,80,120,160])svg.append(node('path',{d:`M ${300-r} 185 A ${r} ${r} 0 0 1 ${300+r} 185`,fill:'none',stroke:'#e9edf3','stroke-dasharray':'3 4'}));
-  for(const angle of [0,30,60,90,120,150,180]){const rad=angle*Math.PI/180;svg.append(node('line',{x1:300,y1:185,x2:300+160*Math.cos(rad),y2:185-160*Math.sin(rad),stroke:'#eef1f5'}));svg.append(node('text',{x:300+180*Math.cos(rad),y:187-180*Math.sin(rad),'text-anchor':'middle'},`${180-angle}°`));}
-  if(scan){let path='',open=false;for(const p of [...scan].sort((a,b)=>a.angle-b.angle)){if(p.distance_mm===null){open=false;continue;}const rad=(180-p.angle)*Math.PI/180,r=Math.min(160,p.distance_mm/4000*160);path+=`${open?'L':'M'}${300+r*Math.cos(rad)},${185-r*Math.sin(rad)} `;open=true;}svg.append(node('path',{d:path,fill:'none',stroke:'#208f85','stroke-width':2}));}
-  svg.append(node('circle',{cx:300,cy:185,r:5,fill:'#8ba764'}));container.replaceChildren(svg);
-  if(!scan){const empty=document.createElement('div');empty.className='chart-empty';empty.textContent='Waiting for servo scan integration';container.append(empty);}
+const scanSummaryAngles=[150,90,30];
+const radarGuideAngles=[150,120,90,60,30];
+const closeRangeMm=250; // Matches S5_OBSTACLE_MM on the Pico.
+const radarRangesMm=[250,500,1000,2000,4000];
+const renderedRadarProfiles=new WeakMap();
+
+export function renderObstacleRadar(container,points){
+  if(!container)return;
+  const profile=points??null;
+  if(renderedRadarProfiles.get(container)===profile)return;
+
+  const echoes=(profile??[]).filter(point=>Number.isFinite(point.distance_mm));
+  const furthest=Math.max(closeRangeMm,...echoes.map(point=>point.distance_mm));
+  const range=radarRangesMm.find(max=>max>=furthest)??furthest;
+  const originX=200,originY=174,radius=146;
+  const at=(angle,r)=>{
+    const radians=angle*Math.PI/180;
+    return {x:originX+r*Math.cos(radians),y:originY-r*Math.sin(radians)};
+  };
+  const arc=r=>`M ${originX-r} ${originY} A ${r} ${r} 0 0 1 ${originX+r} ${originY}`;
+  const svg=node('svg',{viewBox:'0 0 400 211',role:'img',class:'obstacle-radar',
+    'aria-label':`Ultrasonic scan viewed from behind the car. ${echoes.length} measured echoes. Range up to ${range} millimetres.`});
+  svg.append(node('path',{class:'radar-field',d:`${arc(radius)} Z`}));
+  for(const fraction of [.25,.5,.75,1]){
+    svg.append(node('path',{class:'radar-ring',d:arc(radius*fraction)}));
+  }
+  for(const angle of radarGuideAngles){
+    const edge=at(angle,radius),caption=at(angle,radius+16);
+    svg.append(node('line',{class:'radar-ray',x1:originX,y1:originY,x2:edge.x,y2:edge.y}));
+    svg.append(node('text',{class:'radar-label',x:caption.x,y:caption.y+4,'text-anchor':'middle'},`${angle}°`));
+  }
+  for(const fraction of [.5,1]){
+    svg.append(node('text',{class:'radar-scale',x:originX+8,y:originY-radius*fraction+13},`${range*fraction} mm`));
+  }
+  svg.append(node('path',{class:'radar-car',d:`M ${originX} ${originY+2} l 6 10 h -12 Z`}));
+  svg.append(node('text',{class:'radar-label',x:originX,y:originY+29,'text-anchor':'middle'},'Car'));
+
+  for(const {angle,distance_mm:mm} of echoes){
+    // Use the measured bearing directly, independently of the guides above.
+    const {x,y}=at(angle,radius*mm/range);
+    const dot=node('circle',{class:`radar-dot ${mm<=closeRangeMm?'near':'far'}`,cx:x,cy:y,r:4.6});
+    dot.append(node('title',{},`${angle}° · ${mm} mm`));
+    svg.append(dot);
+  }
+  container.replaceChildren(svg);
+  renderedRadarProfiles.set(container,profile);
+}
+
+export function renderScanReadings(panel,points){
+  if(!panel)return;
+  const readings=new Map(points?.map(({angle,distance_mm})=>[angle,distance_mm]));
+  panel.querySelector('.scan-directions').innerHTML=scanSummaryAngles.map(angle=>{
+    const mm=readings.get(angle),measured=Number.isFinite(mm);
+    readings.delete(angle);
+    const tone=measured?(mm<=closeRangeMm?'near':'far'):'unknown';
+    const status=measured?(tone==='near'?'Close obstacle':`Beyond ${closeRangeMm} mm`):
+      (mm===null?'No echo':points?'Not scanned':'');
+    return `<div class="scan-reading ${tone}">
+      <dt>${angle}°</dt>
+      <dd class="scan-distance">${measured?`${mm} <small>mm</small>`:'—'}</dd>
+      <dd class="scan-status">${status}</dd>
+    </div>`;
+  }).join('');
+
+  const more=panel.querySelector('.scan-more');
+  more.hidden=readings.size===0;
+  more.querySelector('dl').innerHTML=[...readings].sort((a,b)=>b[0]-a[0])
+    .map(([angle,mm])=>`<div><dt>${angle}°</dt><dd>${mm===null?'No echo':`${mm} mm`}</dd></div>`).join('');
+  panel.querySelector('[data-export="scan"]').disabled=!points;
 }

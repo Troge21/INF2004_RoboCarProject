@@ -95,6 +95,12 @@ endif
 APP_MODE ?= integrated
 ifeq ($(APP_MODE),integrated)
 APP_BENCH_VALUE := 0
+else ifeq ($(APP_MODE),bypass)
+APP_BENCH_VALUE := 0
+APP_BENCH_SUFFIX := _s2_bypass
+ifneq ($(TEST),0)
+$(error APP_MODE=bypass requires TEST=0)
+endif
 else ifeq ($(APP_MODE),ir)
 APP_BENCH_VALUE := 1
 else ifeq ($(APP_MODE),encoder)
@@ -102,8 +108,30 @@ APP_BENCH_VALUE := 2
 ifneq ($(TEST),1)
 $(error APP_MODE=encoder requires TEST=1)
 endif
+else ifneq ($(filter $(APP_MODE),distance reverse turn),)
+APP_BENCH_VALUE := 2
+APP_BENCH_SUFFIX := _s2_$(APP_MODE)
+ifneq ($(TEST),1)
+$(error APP_MODE=$(APP_MODE) requires TEST=1)
+endif
+ifeq ($(APP_MODE),turn)
+ifeq ($(strip $(S2_TURN_TRACK_MM)),)
+$(error APP_MODE=turn requires S2_TURN_TRACK_MM in millimetres)
+endif
+S2_TURN_ANGLE_DEG ?= 90
+APP_BENCH_CONFIG := -track$(S2_TURN_TRACK_MM)-angle$(S2_TURN_ANGLE_DEG)
+endif
 else
-$(error Unknown APP_MODE '$(APP_MODE)'; use integrated, ir or encoder)
+$(error Unknown APP_MODE '$(APP_MODE)'; use integrated, bypass, ir, encoder, distance, reverse or turn)
+endif
+
+# Explicit USB diagnostics for powered S4 trials.
+S4_MOTOR_TRACE ?= 0
+ifneq ($(filter $(S4_MOTOR_TRACE),0 1),$(S4_MOTOR_TRACE))
+$(error Unknown S4_MOTOR_TRACE '$(S4_MOTOR_TRACE)'; use 0 or 1)
+endif
+ifeq ($(S4_MOTOR_TRACE),1)
+S4_TRACE_SUFFIX := _s4_motor_trace
 endif
 
 # CRASH_REPORT=1 also copies every console line to UART0 on GP0 (TX) /
@@ -131,7 +159,7 @@ endif
 # a live hazard: an SMP=1 build was once flashed in place of an SMP=0 one and
 # only the banner in the log revealed it.
 #
-EXE_FILE := mtk3pico_smp$(SMP)_$(CONSOLE)$(WIFI_SUFFIX)$(NET_SUFFIX)$(MQTT_SUFFIX)$(CRASH_SUFFIX)$(TEST_SUFFIX)
+EXE_FILE := mtk3pico_smp$(SMP)_$(CONSOLE)$(WIFI_SUFFIX)$(NET_SUFFIX)$(MQTT_SUFFIX)$(CRASH_SUFFIX)$(TEST_SUFFIX)$(APP_BENCH_SUFFIX)$(S4_TRACE_SUFFIX)
 
 GCC := arm-none-eabi-gcc
 AS := arm-none-eabi-gcc
@@ -192,7 +220,17 @@ CFLAGS  += -DCNF_SMP=1
 ASFLAGS += -DCNF_SMP=1
 endif
 CFLAGS  += -DAPP_TEST=$(TEST)
+CFLAGS  += -DAPP_S4_MOTOR_TRACE=$(S4_MOTOR_TRACE)
 CFLAGS  += -DAPP_BENCH_MODE=$(APP_BENCH_VALUE)
+ifeq ($(APP_MODE),bypass)
+CFLAGS  += -DAPP_OBSTACLE_BYPASS=1
+else ifeq ($(APP_MODE),distance)
+CFLAGS  += -DS2_BENCH_DISTANCE_MM=300
+else ifeq ($(APP_MODE),reverse)
+CFLAGS  += -DS2_BENCH_DISTANCE_MM=-300
+else ifeq ($(APP_MODE),turn)
+CFLAGS  += -DS2_BENCH_TURN_DEG=$(S2_TURN_ANGLE_DEG) -DS2_BENCH_TRACK_MM=$(S2_TURN_TRACK_MM)
+endif
 CFLAGS  += -DTM_CONSOLE_UART=$(CRASH_REPORT)
 ifeq ($(CRASH_REPORT),0)
 CFLAGS  += -DBOARD_UART0_FREE=1
@@ -225,7 +263,7 @@ endif
 # before any recipe executes.
 ################################################################################
 
-PROFILE_ID := smp$(SMP)-$(CONSOLE)-wifi$(WIFI)-net$(NET)-mqtt$(MQTT)-crash$(CRASH_REPORT)-test$(TEST)-app$(APP_MODE)
+PROFILE_ID := smp$(SMP)-$(CONSOLE)-wifi$(WIFI)-net$(NET)-mqtt$(MQTT)-crash$(CRASH_REPORT)-test$(TEST)-app$(APP_MODE)$(APP_BENCH_CONFIG)$(S4_TRACE_SUFFIX)
 PROFILE_FILE := .build_profile
 
 ifneq ($(strip $(shell cat $(PROFILE_FILE) 2>/dev/null)),$(PROFILE_ID))

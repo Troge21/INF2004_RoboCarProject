@@ -46,6 +46,7 @@ typedef UW  uint32_t;
 #define LSM303_CTRL_REG6_A          (0x25U)
 #define LSM303_REFERENCE_A          (0x26U)
 #define LSM303_STATUS_REG_A         (0x27U)
+#define LSM303_ACCEL_DATA_READY     (0x08U)  /* XYZ data available */
 #define LSM303_OUT_X_L_A            (0x28U)
 #define LSM303_OUT_X_H_A            (0x29U)
 #define LSM303_OUT_Y_L_A            (0x2AU)
@@ -61,6 +62,7 @@ typedef UW  uint32_t;
 
 /* CTRL_REG4_A configuration: +/- 2g scale, High-Resolution mode (1 mg/LSB) */
 #define LSM303_SCALE_2G_HR          (0x08U)
+#define LSM303_BLOCK_DATA_UPDATE    (0x80U)
 
 /* Moving average window size for chassis vibration filtering */
 #define GY511_FILTER_WINDOW_SIZE    (5U)
@@ -69,10 +71,15 @@ typedef UW  uint32_t;
  * Data Types
  * ------------------------------------------------------------------------- */
 typedef struct {
-    int16_t x_mg;   /* Longitudinal acceleration (forward/backward) in mg */
-    int16_t y_mg;   /* Lateral acceleration (left/right) in mg */
-    int16_t z_mg;   /* Normal acceleration (vertical) in mg */
+    int16_t x_mg;   /* Sensor X in mg, lateral on the current mounting */
+    int16_t y_mg;   /* Sensor Y in mg, longitudinal on the current mounting */
+    int16_t z_mg;   /* Sensor Z in mg */
 } GY511_ACCEL_DATA_T;
+
+typedef struct {
+    GY511_ACCEL_DATA_T raw;
+    GY511_ACCEL_DATA_T filtered;
+} GY511_SAMPLE_T;
 
 /* -------------------------------------------------------------------------
  * Driver API Declarations
@@ -85,22 +92,18 @@ typedef struct {
 EXPORT ER drv_gy511_init(void);
 
 /*
- * Read calibrated raw acceleration vectors in milli-g (mg).
- * Returns E_OK on success, or E_IO on communication error.
+ * Read one new acceleration sample and its smoothed value in milli-g.
+ * E_BUSY means no new sample yet. E_IO means the transaction failed.
+ * The output and filter are updated only on E_OK.
  */
-EXPORT ER drv_gy511_read_accel(GY511_ACCEL_DATA_T *p_accel);
+EXPORT ER drv_gy511_read_accel(GY511_SAMPLE_T *sample);
 
 /*
  * Compute pitch angle in tenths of a degree (e.g., +54 = +5.4 degrees tilt).
- * Positive pitch indicates front of vehicle tilted upwards (climbing).
+ * Positive denotes sensor X tilted in the positive direction.
+ * The vehicle mounting transform is applied by S4.
  */
 EXPORT int16_t drv_gy511_calc_pitch_x10(const GY511_ACCEL_DATA_T *p_accel);
-
-/*
- * Perform stationary zero-pitch offset calibration over a number of samples.
- * baseline_offset_x10 is populated with the resting pitch angle.
- */
-EXPORT ER drv_gy511_calibrate_baseline(int16_t *p_baseline_x10, uint16_t sample_count);
 
 /*
  * Probe the physical sensor on the I2C bus to confirm presence.

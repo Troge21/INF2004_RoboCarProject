@@ -1,12 +1,30 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {decodeTelemetry,decodeHeartbeat,decodeScan,decodeDiagnostics,TelemetryStore,packetText} from '../dist/protocol.js';
+import {decodeTelemetry,decodeHeartbeat,decodeScan,decodeDiagnostics,decodeTerrain,TelemetryStore,packetText} from '../dist/protocol.js';
 import {telemetry,heartbeat,statusReply,scanChunk,diagnostics,putBits,syncStore} from './fixtures.mjs';
 test('v4 real motion preserves signed counts/net distance and separates path length',()=>{
   const s=decodeTelemetry(telemetry({left:1191,right:-1191,leftCount:2147483647,rightCount:-2147483647,net:-1234,travel:0})).sample;
   assert.equal(s.left_mps,.1191);assert.equal(s.right_mps,-.1191);
   assert.equal(s.left_encoder_count,2147483647);assert.equal(s.right_encoder_count,-2147483647);
   assert.equal(s.net_distance_m,-.1234);assert.equal(s.distance_m,0);
+});
+test('S4 terrain checks freshness, reports events once and preserves main-frame cadence',()=>{
+  const store=syncStore(new TelemetryStore());
+  const b=new Uint8Array(15),v=new DataView(b.buffer),body=b.subarray(9);
+  b[0]=0xb7;v.setUint32(1,0x12345678,true);v.setUint32(5,1000,true);
+  for(const [offset,width,n] of [[0,11,849],[11,9,256],[20,4,10],[24,2,3],[26,16,65535]])
+    putBits(body,offset,width,n);
+  assert.equal(decodeTerrain(b).roll_deg,-5.2);
+  assert.equal(store.ingest(b,'telemetry',1000),true);
+  assert.equal(store.currentTerrain(1000).turn_deg_s,0);
+  assert.equal(store.currentTerrain(1000).motion_class,'Pickup');
+  assert.equal(store.ingest(b,'telemetry',1200),true);
+  assert.equal(store.events.filter(e=>e.title==='Pickup').length,1);
+  assert.equal(store.events.filter(e=>e.title==='Hump measured').length,1);
+  assert.equal(store.telemetryCount,0);
+  assert.equal(store.currentTerrain(3001),null);
+  putBits(body,42,1,1);
+  assert.throws(()=>decodeTerrain(b),/terrain packet/);
 });
 test('zero measurements differ from unavailable sentinels',()=>{
   const missing=decodeTelemetry(telemetry()).sample;

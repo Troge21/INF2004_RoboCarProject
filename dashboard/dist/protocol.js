@@ -76,6 +76,18 @@ export function decodeDiagnostics(payload){
   ['publish_errors','rejected_commands','mqtt_connections','snapshot_contention'].forEach((key,i)=>result[key]=v.getUint32(24+4*i,true));
   return result;
 }
+const MOTION_CLASSES=[null,'Stationary','Forward','Reverse','Accelerating','Slowing',
+  'Turning left','Turning right','Climbing hump','Descending hump','Pickup','Sudden impact'];
+const HUMP_KINDS=[null,'Full-width hump','Left-wheel hump','Right-wheel hump'];
+export function decodeTerrain(payload){
+  const b=bytesOf(payload),v=viewOf(b);
+  if(b.length!==15||b[0]!==0xb7||!v.getUint32(1,true)||(b[14]&252))throw new Error('Invalid S4 terrain packet');
+  const body=b.subarray(9),roll=bits(body,0,11),turn=bits(body,11,9),motion=bits(body,20,4);
+  if(roll>1801||motion>=MOTION_CLASSES.length||(!roll&&(turn||motion)))throw new Error('Invalid S4 terrain values');
+  return {session_token:v.getUint32(1,true),uptime_ms:v.getUint32(5,true),
+    roll_deg:roll?(roll-901)/10:null,turn_deg_s:turn?turn-256:null,
+    motion_class:MOTION_CLASSES[motion],hump_kind:HUMP_KINDS[bits(body,24,2)],hump_event_sequence:bits(body,26,16)};
+}
 export function decodeHeartbeat(payload){const b=bytesOf(payload);if(b.length!==5||b[0]!==0x80)throw new Error('Expected 5-byte binary heartbeat');return viewOf(b).getUint32(1,true);}
 export function encodeStatusRequest(id){
   if(!Number.isInteger(id)||id<1||id>0xffffffff)throw new Error('Invalid STATUS request ID');
@@ -147,12 +159,31 @@ export class TelemetryStore {
   currentDiagnostics(at=Date.now(),connected=true) {
     return connected&&this.clockAnchor&&this.diagnostics?.session_token===this.clockAnchor.session&&at>=this.diagnostics.at&&at-this.diagnostics.at<=7000?this.diagnostics:null;
   }
+  currentTerrain(at=Date.now(),connected=true) {
+    const terrain=this.terrain;
+    return connected&&terrain&&terrain.session_token===this.clockAnchor?.session&&
+      at>=terrain.at&&at-terrain.at+terrain.age<=2000?terrain:null;
+  }
   ingestAux(bytes,at,packet) {
-    const value=bytes[0]===0xb5?decodeScan(bytes):decodeDiagnostics(bytes);
+    const marker=bytes[0];
+    const value=marker===0xb5?decodeScan(bytes):marker===0xb6?decodeDiagnostics(bytes):decodeTerrain(bytes);
     this.seenSession=value.session_token;
-    const age=this.packetAge(value,at,bytes[0]===0xb5?10000:7000);
+    const age=this.packetAge(value,at,marker===0xb5?10000:marker===0xb6?7000:2000);
     packet.accepted=true;packet.decoded=value;
     if(age===null){packet.detail='Waiting for fresh Pico STATUS clock sync';return true;}
+    if(marker===0xb7){
+      packet.detail='S4 motion and terrain';
+      const before=this.terrain?.session_token===value.session_token?this.terrain:null;
+      if(before&&((value.uptime_ms-before.uptime_ms)>>>0)>0x7fffffff){packet.detail='Older terrain sample ignored';return true;}
+      if(value.motion_class&&value.motion_class!==before?.motion_class){
+        const urgent=['Pickup','Sudden impact'].includes(value.motion_class);
+        this.event(value.motion_class,'S4 motion classification',urgent?'warning':'neutral',at);
+      }
+      const humpKey=value.hump_kind?value.session_token+'/'+value.hump_event_sequence:null;
+      if(humpKey&&humpKey!==this.lastHumpEvent){this.lastHumpEvent=humpKey;this.event('Hump measured',value.hump_kind,'success',at);}
+      this.terrain={...value,at,age};
+      return true;
+    }
     if(bytes[0]===0xb6){this.diagnostics={...value,at};this.diagnosticHistory.push(this.diagnostics);if(this.diagnosticHistory.length>120)this.diagnosticHistory.shift();packet.detail='Runtime diagnostics';return true;}
     if(this.scanProfile?.session_token===value.session_token&&this.scanProfile.sequence===value.scan_sequence){packet.detail='Completed scan duplicate ignored';return true;}
     let p=this.scanPending;
@@ -184,6 +215,7 @@ export class TelemetryStore {
     this.messageCount=0; this.telemetryCount=0; this.rejected=0; this.sequenceGaps=0;
     this.totalBytes=0; this.lastPayloadBytes=0; this.lastInterval=null; this.format='â€”';
     this.clockAnchor=null;this.seenSession=null;this.scanProfile=null;this.scanPending=null;this.diagnostics=null;this.diagnosticHistory=[];this.heartbeatIntervals=[];this.lastBarcodeEvent=null;
+    this.terrain=null;this.lastHumpEvent=null;
     this.pendingStatus=null;this.statusReply=null;this.lastStatusId=0;this.statusLastSentAt=null;
     this.pendingResume=null;this.resumeReply=null;this.lastResumeId=0;this.resumeNotice='Resume releases STOP only after fresh controller checks.';
     this.statusNotice='Controller status is read-only. Resume may restart autonomous movement.';
@@ -204,7 +236,7 @@ export class TelemetryStore {
     if(this.pendingResume){this.pendingResume=null;this.resumeNotice=reason;}
   }
   clearController(reason='Connection changed; pending commands cancelled.') {
-    this.cancelStatus(reason);this.controller=null;this.clockAnchor=null;this.seenSession=null;this.scanPending=null;this.lastSequence=null;this.lastHeartbeatCounter=null;this.lastHeartbeat=null;
+    this.cancelStatus(reason);this.controller=null;this.clockAnchor=null;this.seenSession=null;this.scanPending=null;this.lastSequence=null;this.lastHeartbeatCounter=null;this.lastHeartbeat=null;this.terrain=null;
   }
   currentController(now=Date.now(),connected=true) {
     return connected&&this.controller?.controller_valid&&now>=this.controller.at&&now-this.controller.at<=2000?this.controller:null;
@@ -305,7 +337,7 @@ export class TelemetryStore {
     this.packets.unshift(packet); this.packets.length=Math.min(this.packets.length,30);
     try {
       if (retained) throw new Error('Retained message ignored; waiting for a fresh sample');
-      if(kind==='telemetry'&&(bytes[0]===0xb5||bytes[0]===0xb6))return this.ingestAux(bytes,at,packet);
+      if(kind==='telemetry'&&[0xb5,0xb6,0xb7].includes(bytes[0]))return this.ingestAux(bytes,at,packet);
       if(kind==='status') {
         if(bytes[0]===0xa6){
           const reply=decodeResumeArmReply(bytes),p=this.pendingResume;this.expireCommands(at);
@@ -386,7 +418,7 @@ export class TelemetryStore {
       const barcodeKey=sample.barcode?sample.session_token+'/'+sample.barcode_event_sequence+'/'+sample.barcode:null;
       if(barcodeKey&&barcodeKey!==this.lastBarcodeEvent){this.lastBarcodeEvent=barcodeKey;this.event('Barcode decoded',sample.barcode,'success',at);}
       if(sample.imu_state && sample.imu_state!==this.sample?.imu_state)
-        this.event(`IMU Â· ${sample.imu_state}`,sample.imu_speed_source==='nominal'?'Height uses nominal speed; accuracy not verified':'External speed supplied; validate height on the course',sample.imu_state==='Sensor fault'?'warning':'neutral',at);
+        this.event(`IMU Â· ${sample.imu_state}`,'S4 sensor state changed',sample.imu_state==='Sensor fault'?'warning':'neutral',at);
       if (!sample.obstacle_valid && this.sample?.obstacle_valid!==false) this.event('Range unavailable','No valid ultrasonic measurement','warning',at);
       this.sample=sample; this.lastTelemetry=at; this.telemetryCount++; this.lastPayloadBytes=bytes.length; this.format=decoded.format;
       this.history.push({...sample,at,interval:this.lastInterval,bytes:bytes.length});

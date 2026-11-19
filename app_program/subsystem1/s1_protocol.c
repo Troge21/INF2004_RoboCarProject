@@ -159,6 +159,16 @@ int s1_pack_heartbeat(uint32_t counter,uint8_t *out,unsigned capacity) {
     if(!out||capacity<5)return -1;
     out[0]=0x80;s1_write_u32(out+1,counter);return 5;
 }
+int s1_pack_terrain(uint32_t session, uint32_t uptime, const uint8_t terrain[S1_TERRAIN_BODY_BYTES],
+                    uint8_t *out, unsigned capacity) {
+    if(!session||!terrain||!out||capacity<S1_TERRAIN_BYTES)return -1;
+    const unsigned roll=s1_get_bits(terrain,0,11);
+    if(roll>1801||s1_get_bits(terrain,20,4)>11||(terrain[5]&0xfcU)||
+       (!roll&&s1_get_bits(terrain,11,13)))return -1;
+    out[0]=0xb7U;s1_write_u32(out+1,session);s1_write_u32(out+5,uptime);
+    memcpy(out+9,terrain,S1_TERRAIN_BODY_BYTES);
+    return S1_TERRAIN_BYTES;
+}
 int s1_parse_status_request(const uint8_t *b,unsigned n,uint32_t *id) {
     if(!b||!id||n!=5||b[0]!=0xa0||!s1_read_u32(b+1))return -1;
     *id=s1_read_u32(b+1);return 0;

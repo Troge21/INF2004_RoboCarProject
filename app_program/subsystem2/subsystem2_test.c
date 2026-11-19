@@ -4,6 +4,7 @@
  * The bench uses normal S2 feedback/control; no second encoder ISR. */
 #include "subsystem2.h"
 #include "encoder_capture.h"
+#include "encoder_move.h"
 #include "motion_control.h"
 #include <sys/sysdef.h>
 #include <tk/syslib.h>
@@ -14,7 +15,115 @@ static const char * volatile bench_result = "not started";
 static volatile ER bench_error;
 static volatile BOOL bench_running;
 
-#if S2_ENCODER_POWERED_TEST
+#if defined(S2_BENCH_DISTANCE_MM) || defined(S2_BENCH_TURN_DEG)
+#define S2_BENCH_COUNTDOWN_S 10U
+#if defined(S2_BENCH_TURN_DEG)
+#define S2_BENCH_TAG "[S2-TURN]"
+_Static_assert(S2_BENCH_TRACK_MM > 0 && S2_BENCH_TRACK_MM <= S2_TURN_MAX_TRACK_MM,
+               "Set a valid driven-track spacing in millimetres");
+_Static_assert(S2_BENCH_TURN_DEG != 0 && S2_BENCH_TURN_DEG >= -S2_TURN_MAX_DEG &&
+               S2_BENCH_TURN_DEG <= S2_TURN_MAX_DEG, "Set a valid signed angle");
+
+static INT estimate_turn_x10(int64_t left, int64_t right)
+{
+    return (INT)((right - left) * 180LL * 113LL / (355LL * S2_BENCH_TRACK_MM));
+}
+#else
+#define S2_BENCH_TAG "[S2-DIST]"
+#endif
+
+static void __attribute__((noreturn)) finish_move(
+    const char *reason, const S2_ENCODER_MOVE *move, const S2_MOTION_DATA *cutoff, INT peak_trim)
+{
+    const ER stop = subsystem2_set_rpm_x10(0, 0);
+    S2_MOTION_DATA final;
+    SYSTIM now;
+    (void)tk_dly_tsk(600);
+    ER er = subsystem2_get_motion(&final);
+    (void)tk_get_tim(&now);
+    BOOL settled = er == E_OK && final.encoder_valid && final.speed_valid &&
+        (UW)(now.lo - final.timestamp_ms) <= S2_FEEDBACK_MAX_AGE_MS &&
+        (UW)(now.lo - final.speed_timestamp_ms) <= S2_FEEDBACK_MAX_AGE_MS &&
+        !final.duty_left_x100 && !final.duty_right_x100 &&
+        !final.actual_left_rpm_x10 && !final.actual_right_rpm_x10;
+
+    for (;;) {
+        if (move && stop == E_OK && settled && !final.faults) {
+            int64_t left = final.distance_left_mm_x10 - move->origin_left_mm_x10;
+            int64_t right = final.distance_right_mm_x10 - move->origin_right_mm_x10;
+#if defined(S2_BENCH_TURN_DEG)
+            INT cutoff_angle = estimate_turn_x10(cutoff->distance_left_mm_x10 - move->origin_left_mm_x10,
+                cutoff->distance_right_mm_x10 - move->origin_right_mm_x10);
+            tm_printf((UB *)S2_BENCH_TAG " DONE target_deg=%d track_mm=%u cutoff_deg_x10=%d settled_deg_x10=%d left_mm=%d right_mm=%d peak_trim_rpm_x10=%d PWM=0\n",
+                S2_BENCH_TURN_DEG, (UINT)S2_BENCH_TRACK_MM, cutoff_angle,
+                estimate_turn_x10(left, right), (INT)(left / 10), (INT)(right / 10), peak_trim);
+#else
+            tm_printf((UB *)S2_BENCH_TAG " DONE target_mm=%d cutoff_mm=%d settled_mm=%d left_mm=%d right_mm=%d peak_trim_rpm_x10=%d PWM=0\n",
+                S2_BENCH_DISTANCE_MM, (INT)((cutoff->distance_centre_mm_x10 - move->origin_mm_x10) / 10),
+                (INT)((final.distance_centre_mm_x10 - move->origin_mm_x10) / 10),
+                (INT)(left / 10), (INT)(right / 10), peak_trim);
+#endif
+        } else {
+            tm_printf((UB *)S2_BENCH_TAG " ABORT %s stop=%d settled=%u faults=0x%x\n",
+                reason, stop, (UINT)settled, er == E_OK ? (UINT)final.faults : 0U);
+        }
+        (void)tk_dly_tsk(3000);
+    }
+}
+
+static void __attribute__((noreturn)) move_trial(void)
+{
+    S2_ENCODER_MOVE move = {0};
+    S2_MOTION_DATA motion;
+    SYSTIM now;
+    INT peak_trim = 0;
+    bench_running = TRUE;
+    ER er = subsystem2_init();
+    if (er == E_OK) er = subsystem2_start();
+    if (er != E_OK) finish_move("motor setup", NULL, NULL, 0);
+
+    for (UINT remaining = S2_BENCH_COUNTDOWN_S; remaining > 0U; --remaining) {
+#if defined(S2_BENCH_TURN_DEG)
+        tm_printf((UB *)S2_BENCH_TAG " One %d deg in-place turn starts in %u s\n",
+                  S2_BENCH_TURN_DEG, remaining);
+#else
+        tm_printf((UB *)S2_BENCH_TAG " One %d mm move starts in %u s\n",
+                  S2_BENCH_DISTANCE_MM, remaining);
+#endif
+        (void)tk_dly_tsk(1000);
+    }
+    er = subsystem2_get_motion(&motion);
+    (void)tk_get_tim(&now);
+    if (er == E_OK) {
+#if defined(S2_BENCH_TURN_DEG)
+        er = s2_turn_begin(&move, S2_BENCH_TURN_DEG, S2_BENCH_TRACK_MM, &motion, now.lo);
+#else
+        er = s2_linear_begin(&move, S2_BENCH_DISTANCE_MM, &motion, now.lo);
+#endif
+    }
+    if (er != E_OK) finish_move("initial feedback", NULL, NULL, 0);
+
+    for (;;) {
+        S2_MOVE_TARGETS targets;
+        er = subsystem2_get_motion(&motion);
+        (void)tk_get_tim(&now);
+        S2_MOVE_RESULT result = s2_encoder_move_step(&move,
+            er == E_OK ? &motion : NULL, now.lo, TRUE, &targets);
+        if (result == S2_MOVE_REACHED)
+            finish_move("target reached; stop or settling check failed", &move, &motion, peak_trim);
+        if (result != S2_MOVE_RUNNING) {
+            const char *reason = result == S2_MOVE_TIMEOUT ? "travel timed out" :
+                (result == S2_MOVE_FAULT ? "motor fault" : "invalid feedback");
+            finish_move(reason, NULL, NULL, 0);
+        }
+        INT trim = move.trim_rpm_x10 < 0 ? -move.trim_rpm_x10 : move.trim_rpm_x10;
+        if (trim > peak_trim) peak_trim = trim;
+        if (subsystem2_set_signed_rpm_x10(targets.left_rpm_x10, targets.right_rpm_x10) != E_OK)
+            finish_move("motor command rejected", NULL, NULL, 0);
+        (void)tk_dly_tsk(S2_PERIOD_MS);
+    }
+}
+#elif S2_ENCODER_POWERED_TEST
 /* Retain the late samples too when the test duration is increased. */
 static S2_MOTION_DATA records[S2_ENCODER_TEST_RUN_MS / 1000U + 1U], baseline;
 static UINT record_count;
@@ -136,7 +245,9 @@ static void powered_trial(void)
 static void calibration_task(INT stacd, void *exinf)
 {
     (void)stacd; (void)exinf;
-#if S2_ENCODER_POWERED_TEST
+#if defined(S2_BENCH_DISTANCE_MM) || defined(S2_BENCH_TURN_DEG)
+    move_trial();
+#elif S2_ENCODER_POWERED_TEST
     powered_trial();
 #else
     S2_ENCODER_COUNTS counts;
@@ -166,7 +277,11 @@ static void calibration_task(INT stacd, void *exinf)
 EXPORT void subsystem2_test(void)
 {
     ID tid;
+#if defined(S2_BENCH_DISTANCE_MM) || defined(S2_BENCH_TURN_DEG)
+    tm_printf((UB *)S2_BENCH_TAG " BOOT: isolated encoder-motion bench.\n");
+#else
     tm_printf((UB *)"[S2-PID] BOOT: reusable motor feedback/PID bench.\n");
+#endif
     tid = app_start_task((FP)calibration_task, S2_PRI_MOTOR + 1, TP_PRC1, "encoder_bench");
     if (tid < E_OK) { bench_error = tid; bench_stage = "FAILED"; }
 }
