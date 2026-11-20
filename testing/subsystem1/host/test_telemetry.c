@@ -133,17 +133,19 @@ int main(void){
         "stale motion expires even while the network continues publishing");
     s1_resource_add_stack(4096);
     expect(s1_resource_stack_capacity()==6144,"requested application stack accounting includes successful task starts");
-    scan_ready=1;scan_source.count=181;scan_source.sequence=7;scan_source.timestamp_ms=calendar_ms;
+    scan_ready=1;scan_source.count=181;scan_source.width_mm=126;scan_source.sequence=7;scan_source.timestamp_ms=calendar_ms;
     for(unsigned i=0;i<181;++i){scan_source.points[i].angle=i;scan_source.points[i].distance_mm=451;}
     collect();n=s1_network_aux(b,sizeof(b),17,counters);
-    expect(n==56&&b[0]==0xb5&&b[14]==0&&b[15]==16,"future scan getter automatically activates bounded packets");
+    expect(n==58&&b[0]==0xb5&&b[14]==0&&b[15]==(16|S1_SCAN_WIDTH_FLAG)&&b[56]==126&&b[57]==0,
+        "obstacle width follows the first chunk of its scan");
     s1_network_aux_result(0xb5,0);advance(99);
     expect(s1_network_aux(b,sizeof(b),17,counters)==E_TMOUT,"scan retry has a bounded backoff");
     advance(1);n=s1_network_aux(b,sizeof(b),17,counters);
-    expect(n==56&&b[14]==0,"rejected scan chunk retries the same indices");
+    expect(n==58&&b[14]==0&&b[56]==126,"rejected scan chunk retries the same indices and width");
     {uint32_t source_boot=s1_read_u32(b+9);unsigned packets=1;
         while(scan_cursor<scan_count){advance(100);n=s1_network_aux(b,sizeof(b),17,counters);
-            expect(n>0&&b[0]==0xb5&&s1_read_u32(b+9)==source_boot,"completed scan has stable source metadata across chunks");++packets;}
+            expect(n>0&&n<=56&&b[0]==0xb5&&!(b[15]&S1_SCAN_WIDTH_FLAG)&&s1_read_u32(b+9)==source_boot,
+                "later scan chunks retain the source time and omit the width trailer");++packets;}
         expect(packets==12&&b[15]==5,"all 181 scan points fit twelve bounded packets");
     }
     scan_count=0;scan_source.sequence=8;scan_source.count=2;

@@ -4,7 +4,7 @@
  * S3: AO line sensing; GP28 reserved for future barcode decoding.
  * S4: IMU/hump sensing.
  * Analog steering is controller-owned; diagnostic benches are explicit modes.
- * S5: HC-SR04/servo snapshots; only the bypass build uses them for driving.
+ * S5: HC-SR04/servo snapshots and confirmed obstacle stops.
  * Former producer/consumer/monitor sample tasks and interfaces are retired.
  * Returning from usermain shuts down the kernel; leave it sleeping instead.
  */
@@ -13,8 +13,8 @@
 #include "controller.h"
 #ifdef APP_OBSTACLE_BYPASS
 #include "obstacle_bypass.h"
-#include "subsystem5/subsystem5.h"
 #endif
+#include "subsystem5/subsystem5.h"
 #include "subsystem1/subsystem1.h"
 #include "subsystem2/subsystem2.h"
 #include "subsystem3/subsystem3.h"
@@ -179,6 +179,11 @@ static void app_controller_step(UW started_ms)
         (UW)(now.lo - motion.speed_timestamp_ms) + motion.speed_period_ms <= (UW)(now.lo - last_drive_ms);
     BOOL turn_requested = navigation_fresh && navigation.turn_id != 0U &&
         (navigation.phase == S5_NAV_LEFT || navigation.phase == S5_NAV_RIGHT);
+#else
+    if (subsystem5_obstacle_stop_required()) {
+        app_controller_latch_obstacle_stop();
+        resume_ready = FALSE;
+    }
 #endif
     unsigned inhibit = app_controller_poll_ready(resume_ready);
     BOOL ready = fresh && motion_fresh && (!S2_LINE_USE_RPM_CONTROL || motion.speed_valid);
@@ -347,6 +352,8 @@ EXPORT INT usermain(void)
     }
 #elif APP_BENCH_MODE == APP_BENCH_IR
     ir_adc_test();
+#elif APP_BENCH_MODE == APP_BENCH_SERVO
+    subsystem5_calibrate_servo();
 #endif
 
 	/* tk_ref_ver: ask the kernel who it is */

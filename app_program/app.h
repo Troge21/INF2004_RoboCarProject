@@ -28,10 +28,11 @@
 #define TASK_STACK_SIZE		2048	/* bytes; tm_printf needs ~1 KB */
 
 /* Integrated startup is the default. Standalone hardware benches are explicit
- * APP_MODE=ir / APP_MODE=encoder builds; they never run alongside S1/S3/S5. */
+ * build modes and run only the hardware they exercise. */
 #define APP_BENCH_INTEGRATED 0
 #define APP_BENCH_IR         1
 #define APP_BENCH_ENCODER    2
+#define APP_BENCH_SERVO      3
 #ifndef APP_BENCH_MODE
 #define APP_BENCH_MODE APP_BENCH_INTEGRATED
 #endif

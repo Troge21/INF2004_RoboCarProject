@@ -103,6 +103,12 @@ $(error APP_MODE=bypass requires TEST=0)
 endif
 else ifeq ($(APP_MODE),ir)
 APP_BENCH_VALUE := 1
+else ifeq ($(APP_MODE),servo)
+APP_BENCH_VALUE := 3
+APP_BENCH_SUFFIX := _s5_servo_calibration
+ifneq ($(TEST),1)
+$(error APP_MODE=servo requires TEST=1)
+endif
 else ifeq ($(APP_MODE),encoder)
 APP_BENCH_VALUE := 2
 ifneq ($(TEST),1)
@@ -122,7 +128,7 @@ S2_TURN_ANGLE_DEG ?= 90
 APP_BENCH_CONFIG := -track$(S2_TURN_TRACK_MM)-angle$(S2_TURN_ANGLE_DEG)
 endif
 else
-$(error Unknown APP_MODE '$(APP_MODE)'; use integrated, bypass, ir, encoder, distance, reverse or turn)
+$(error Unknown APP_MODE '$(APP_MODE)'; use integrated, bypass, ir, servo, encoder, distance, reverse or turn)
 endif
 
 # Explicit USB diagnostics for powered S4 trials.

@@ -4,7 +4,7 @@ Local real-MQTT dashboard for Buddy/Subsystem 1: Overview, Sensors & motion,
 Communications, charts and exports. No cloud hosting, demo feed, npm packages
 or website build step.
 
-## Current integrated firmware - 20 November 2026
+## Current integrated firmware - 21 November 2026
 
 One current **Packed v4** contract covers distance, IR, IMU, measured wheel
 velocity/counts/net travel, controller state, faults, encoder path and future barcode
@@ -15,8 +15,8 @@ Current normal operating image (motor control enabled):
 **build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt.uf2** (NO _test suffix)
 
 Profile **NET=lwip MQTT=1 TEST=0 APP_MODE=integrated CONSOLE=usb_cdc CRASH_REPORT=0**.
-Size **733184 bytes**. SHA-256
-`72c2f984475bc59e351595e043fc6000b11fd9690c20d501bc0065388054ffcb`.
+Size **738304 bytes**. SHA-256
+`b137ca70a5de98878d28b39131c8c59834ad6aa3b080c4f0345d79213e68469b`.
 The integrated build includes MQTT, encoder motor control, the S3 line
 sampling fixes and GP27 cutoff of 455, sensor-guided left-curve recovery,
 obstacle scans, S4 hump estimates, motion reporting and pickup STOP. Flash
@@ -26,10 +26,10 @@ right-wheel hump detection and pickup STOP on the earlier S4 trace image
 `c396fa80`.
 The demo layout places the barcode on the left and the hump under the right wheel.
 
-The normal image uses IR and wheel feedback for line following. Ultrasonic
-distance and scans are telemetry only. Use a clear track because the normal
-image drives through missing readings and does not stop for obstacles. The
-separate `_s2_bypass.uf2` is for obstacle course testing.
+The normal image uses the checkpoint's line-following logic and reports
+forward range while driving. A confirmed obstacle at **240 mm or closer**
+automatically latches STOP for a width scan. The separate `_s2_bypass.uf2`
+is for obstacle course testing.
 
 The controller starts with **STOP latched** on every power-up. **Resume** in
 Overview or Communications releases the inhibit without rebooting or resetting
@@ -127,7 +127,7 @@ automatic actuator retry. Credentials stay in tab memory and are not exported.
 | Faults | Fresh known/active reports; incomplete coverage is not global all-clear |
 | Barcode / navigation intent | Transport/display ready; S3 passive snapshot getter pending |
 | Total distance travelled | S2 protected encoder odometer; reverse adds path, reset on Pico restart |
-| Completed servo scan | S5 protected three-angle profile; 30/right, 90/centre, 150/left degrees |
+| Completed servo scan | S5 protected 37-angle profile and estimated width when both edges resolve |
 | Heap / resources | Read-only allocator snapshot, sampled minimum, requested app stacks |
 | Stack high-water | Unavailable until actual platform instrumentation supplies it |
 
@@ -179,33 +179,41 @@ is not a motor-stop condition. The old digital barcode sampler is inactive.
 
 ## Servo scan and obstacle integration
 
-Bring a target to **250 mm or closer in front** to trigger a scan. S5 samples
-left/right, returns the head to centre and publishes a completed three-point
-profile. The Obstacle radar in Sensors & motion shows degree guides at
-30°, 60°, 90°, 120° and 150°. The view is from behind the car, with higher
-angles on the left. Each measured echo uses its reported bearing, including
-bearings between the guides. The scale fits the sweep, and distances are in
-millimetres. The card flags readings within 250 mm and labels a missing
-return **No echo**. The current firmware samples 30°, 90° and 150°. The CSV
-includes the bearing and distance of each sample.
+While driving, the robot confirms an obstacle using two consecutive centred
+echoes at **240 mm or closer** and within 25 mm of each other. A single
+close reading or a missing echo leaves line following active. For a manual
+width check, click **Stop** and place a flat target within 250 mm. The scanner
+waits for a complete stopped encoder window, samples 37 servo positions and
+returns the head to centre. The Pico interpolates
+between the five bearings estimated from overhead photos of this car
+(48°, 70°, 90°, 110° and 130° at servo commands 0°, 45°, 90°, 135° and 180°).
+The radar shows those calibrated bearings. The width estimate uses the
+central return and two bracketed edges, with a nominal 7.5° correction per
+edge for the ultrasonic beam. Once triggered, the scan accepts
+a settled centre range up to 280 mm. A farther echo can corroborate an edge
+across one intervening face echo. The scanner retries once if the first sweep
+is unclear. In
+**Sensors & motion → Obstacle radar**, read the estimate in
+millimetres for the last completed scan. An ambiguous scan shows **Edges
+unclear**. Scan CSV includes each measured bearing, distance and the estimate
+if available. Use a measured, flat box to check physical accuracy.
 
-In normal mode, a fresh centre distance above 250 mm permits line following.
-A measured target within 250 mm triggers a stop and scan, and a measured
-clear side permits a brief controller-owned turn. Missing or invalid echoes
-inhibit motion, as do missing, busy or stale navigation and STOP. The
-restored sensing loop waits 300 ms at centre before each measurement.
-S5 never calls the motor API. The front-distance tile uses centre samples,
-not the left/right echoes. Servo sensing can continue while STOP is latched.
+After an automatic stop, move the obstacle away and wait for two centred
+polls to show a clear path (above 280 mm or no return). The car stays stopped
+until you click **Resume**. Two far readings also rearm a manual scan for a
+new target. Front-distance telemetry uses centre echoes. The bypass test
+profile uses its existing three-angle scans and separate turn/rejoin policy.
 
 See [the integration and evidence](../testing/subsystem1/SENSOR_INTEGRATION.md)
 and [the physical checklist](../testing/subsystem1/FINAL_ACCEPTANCE.md).
-This uses the existing v4 decoder, topics and scan fields.
+The first v4 scan chunk can carry a two-byte width trailer. The dashboard
+continues to accept earlier scan chunks on the same MQTT topic.
 
 ## Resume after STOP
 
 With BOTH wheels raised, leave power connected and click Stop. Once
-both wheels stop and Stop latched is confirmed, present a valid clear-front
-target above 250 mm, keep the line sensors valid and click **Resume**. Expect
+both wheels stop and Stop latched is confirmed, keep the line sensors valid
+and click **Resume**. Expect
 **STOP latch released; autonomous control may move the car.** The button is
 disabled in stationary TEST=1 and until a fresh normal latch is received.
 
@@ -222,7 +230,7 @@ See [the controller contract](../testing/subsystem1/CONTROLLER_COMMANDS.md) and
 | Message | Bytes |
 | --- | ---: |
 | Main telemetry, b4 | 46 |
-| Completed scan chunk, b5 | 19..56 |
+| Completed scan chunk, b5 | 19..58 |
 | Diagnostics, b6 | 40 |
 | S4 motion and terrain, b7 | 15 |
 | Heartbeat, 80 | 5 |

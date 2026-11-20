@@ -8,6 +8,7 @@
 #define TELEMETRY_SOURCES_H
 #include <stdint.h>
 #define TELEMETRY_SCAN_POINTS 181U
+#define TELEMETRY_SCAN_WIDTH_MAX_MM 1023U
 #define TELEMETRY_UNKNOWN_U32 UINT32_MAX
 typedef struct {
     uint32_t timestamp_ms;
@@ -26,6 +27,7 @@ typedef struct {
 typedef struct { uint16_t distance_mm; uint8_t angle; } TELEMETRY_SCAN_POINT;
 typedef struct {
     uint32_t timestamp_ms, sequence;
+    uint16_t width_mm; /* 0 when the sweep did not resolve both edges */
     uint8_t count;
     TELEMETRY_SCAN_POINT points[TELEMETRY_SCAN_POINTS];
 } TELEMETRY_SCAN;

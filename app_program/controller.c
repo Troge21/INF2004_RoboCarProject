@@ -9,6 +9,7 @@ static uint8_t reply_slot[10],published[5];
 static uint8_t owner_word; /* state:4/latch:1/TEST:1/Resume in-flight:1/failed:1 */
 /* Monotonic end-of-run event, independent of contention on the MQTT mailbox. */
 static uint8_t pickup_stop;
+static uint8_t scan_stop_ready;
 #define OWNER_RESUMING 64U /* release awaiting the controller's motor handoff */
 #define OWNER_RESUME_FAILED 128U
 /* Protected authorization, not motor state: ticket:32/expiry:32. */
@@ -37,6 +38,12 @@ static int pickup_stop_active(void) {
 void app_controller_report_pickup(void) {
     __atomic_store_n(&pickup_stop,1U,__ATOMIC_RELEASE);
 }
+void app_controller_latch_obstacle_stop(void) {
+    owner_word|=APP_CTRL_LATCH;
+}
+int app_controller_scan_stop_ready(void) {
+    return __atomic_load_n(&scan_stop_ready,__ATOMIC_ACQUIRE)!=0U && !pickup_stop_active();
+}
 static unsigned motor_inhibit(void) {
     if(pickup_stop_active())owner_word|=APP_CTRL_LATCH;
     return owner_word&APP_CTRL_LATCH;
@@ -59,6 +66,7 @@ int app_controller_init(void) {
     zero_bytes(request_slot,sizeof(request_slot));zero_bytes(reply_slot,sizeof(reply_slot));
     zero_bytes(published,sizeof(published));zero_bytes(resume_ticket,sizeof(resume_ticket));
     __atomic_store_n(&pickup_stop,0U,__ATOMIC_RELEASE);
+    __atomic_store_n(&scan_stop_ready,0U,__ATOMIC_RELEASE);
     ticket_counter=0;
     /* Normal runs require a fresh Resume after every boot. */
     owner_word=APP_TEST?APP_CTRL_TEST:APP_CTRL_LATCH;
@@ -144,7 +152,11 @@ static unsigned poll_command(int resume_ready) {
                 } else if((owner_word&APP_CTRL_STATE_MASK)==APP_CTRL_FAULT)result=APP_RESUME_FAULT;
                 else if(!(owner_word&APP_CTRL_LATCH))result=APP_RESUME_AUTH_CHANGED;
                 else if(APP_TEST||!resume_ready)result=APP_RESUME_NOT_READY;
-                else {owner_word=(uint8_t)((owner_word&~APP_CTRL_LATCH)|OWNER_RESUMING);result=APP_RESUME_RELEASED;}
+                else {
+                    __atomic_store_n(&scan_stop_ready,0U,__ATOMIC_RELEASE);
+                    owner_word=(uint8_t)((owner_word&~APP_CTRL_LATCH)|OWNER_RESUMING);
+                    result=APP_RESUME_RELEASED;
+                }
             }
             request_slot[12]=(uint8_t)(resume|(result<<1));
         }
@@ -173,6 +185,9 @@ void app_controller_publish(unsigned state,int motor_result) {
     if((owner_word&APP_CTRL_LATCH)&&state!=APP_CTRL_DISABLED&&state!=APP_CTRL_FAULT&&state!=APP_CTRL_UNAVAILABLE)
         state=APP_CTRL_STOP_LATCHED;
     owner_word=(uint8_t)((owner_word&~APP_CTRL_STATE_MASK)|state);
+    const uint8_t ready=state==APP_CTRL_STOP_LATCHED && !picked_up;
+    if(__atomic_load_n(&scan_stop_ready,__ATOMIC_RELAXED)!=ready)
+        __atomic_store_n(&scan_stop_ready,ready,__ATOMIC_RELEASE);
     if(!locked)return;
     if(picked_up||state==APP_CTRL_FAULT)write32(resume_ticket,0);
     result=request_result();resume=request_slot[12]&REQUEST_RESUME;

@@ -47,6 +47,10 @@ int app_controller_submit_stop(uint32_t id,uint32_t session,uint32_t deadline_ms
 /* S4 calls this after controller init when pickup is confirmed. Nonblocking
  * and idempotent. The controller applies zero wheel targets until reboot. */
 void app_controller_report_pickup(void);
+/* Controller task only: require an explicit Resume after an obstacle stop. */
+void app_controller_latch_obstacle_stop(void);
+/* Passive servo scan permission after the controller accepts a latched STOP. */
+int app_controller_scan_stop_ready(void);
 /* A fresh arm creates a one-use server ticket, invalidated by STOP. */
 int app_controller_arm_resume(uint32_t deadline_ms,uint32_t *ticket);
 int app_controller_submit_resume(uint32_t ticket,uint32_t session,uint32_t deadline_ms);

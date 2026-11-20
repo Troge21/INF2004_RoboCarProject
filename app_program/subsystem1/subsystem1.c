@@ -12,7 +12,7 @@ static ID publication_sem,telemetry_tid;
 static S1_SNAPSHOT publication;
 static UB publication_ms[4];
 /* Packed completed scan and metadata; one bounded latest profile, not a queue. */
-static UB scan_data[S1_SCAN_PACKED_BYTES],scan_time[4],scan_sequence[4],scan_count;
+static UB scan_data[S1_SCAN_PACKED_BYTES],scan_time[4],scan_sequence[4],scan_width_mm[2],scan_count;
 /* Collector-owned workspace. A native 181-point view plus a second packed
  * scratch array consumed most of this task's stack before any kernel/IRQ
  * frames. Validate here, then pack directly into the protected cache. */
@@ -129,7 +129,7 @@ EXPORT int s1_network_aux(unsigned char *out,unsigned capacity,uint32_t session,
                            const uint32_t counters[3])
 {
     uint32_t boot,now=source_now(),seq,t,values[6],counts[4];
-    UB packed[S1_SCAN_PACKED_BYTES],count;unsigned i;int n;
+    UB packed[S1_SCAN_PACKED_BYTES],count;unsigned i,width_mm;int n;
     if(!out||!session||!counters||capacity<S1_SCAN_PACKET_BYTES)return E_PAR;
     if(s1_network_uptime(&boot)!=E_OK)return E_OBJ;
     if(session!=last_session){last_session=session;scan_cursor=0;last_aux=boot-5000U;last_terrain=boot-500U;}
@@ -164,14 +164,15 @@ EXPORT int s1_network_aux(unsigned char *out,unsigned capacity,uint32_t session,
     if((UW)(boot-last_chunk)<100U)return E_TMOUT;
     if(tk_wai_sem(publication_sem,1,TMO_POL)!=E_OK){++network_busy;return E_TMOUT;}
     count=scan_count;t=s1_read_u32(scan_time);seq=s1_read_u32(scan_sequence);
+    width_mm=scan_width_mm[0]|((unsigned)scan_width_mm[1]<<8);
     if(count)copy_bytes(packed,scan_data,sizeof(packed));
     (void)tk_sig_sem(publication_sem,1);
     if(!count||(UW)(now-t)>S1_SCAN_MAX_AGE_MS)return E_TMOUT;
     if(seq!=last_scan){last_scan=seq;scan_cursor=0;}
     if(scan_cursor>=count)return E_TMOUT;
     if(scan_cursor==0)scan_boot=boot-(UW)(now-t);
-    n=s1_pack_scan(session,seq,scan_boot,packed,count,scan_cursor,out,capacity);
-    if(n>0){last_chunk_count=out[15];scan_cursor=(UB)(scan_cursor+last_chunk_count);last_chunk=boot;}
+    n=s1_pack_scan(session,seq,scan_boot,packed,count,scan_cursor,width_mm,out,capacity);
+    if(n>0){last_chunk_count=out[15]&S1_SCAN_COUNT_MASK;scan_cursor=(UB)(scan_cursor+last_chunk_count);last_chunk=boot;}
     return n;
 }
 EXPORT void s1_network_aux_result(unsigned marker,int accepted)
@@ -184,7 +185,7 @@ EXPORT void s1_network_aux_result(unsigned marker,int accepted)
 static void gather_scan(void)
 {
     TELEMETRY_SCAN *s=&scan_workspace;unsigned i,previous=0;
-    if(telemetry_get_scan(s)!=E_OK||!s->count||s->count>181)return;
+    if(telemetry_get_scan(s)!=E_OK||!s->count||s->count>181||s->width_mm>TELEMETRY_SCAN_WIDTH_MAX_MM)return;
     if((UW)(source_now()-s->timestamp_ms)>S1_SCAN_MAX_AGE_MS)return;
     /* An ID denotes one immutable completed profile. Never consume a scan queue. */
     if(scan_count&&s->sequence==s1_read_u32(scan_sequence))return;
@@ -199,6 +200,7 @@ static void gather_scan(void)
         s1_set_bits(scan_data,20*i+8,12,s->points[i].distance_mm);
     }
     scan_count=s->count;
+    scan_width_mm[0]=(UB)s->width_mm;scan_width_mm[1]=(UB)(s->width_mm>>8);
     s1_write_u32(scan_time,s->timestamp_ms);s1_write_u32(scan_sequence,s->sequence);
     (void)tk_sig_sem(publication_sem,1);
 }

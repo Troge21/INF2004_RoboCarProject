@@ -20,7 +20,9 @@
 #define S1_COMMAND_MAX_BYTES S1_STOP_REQUEST_BYTES
 #define S1_SCAN_HEADER_BYTES 16U
 #define S1_SCAN_CHUNK_POINTS 16U
-#define S1_SCAN_PACKET_BYTES 56U
+#define S1_SCAN_PACKET_BYTES 58U
+#define S1_SCAN_COUNT_MASK 0x1fU
+#define S1_SCAN_WIDTH_FLAG 0x80U
 #define S1_DIAGNOSTIC_BYTES 40U
 #define S1_TERRAIN_BYTES 15U
 #define S1_TERRAIN_BODY_BYTES 6U
@@ -81,9 +83,10 @@ int s1_pack_resume_arm_reply(uint32_t id,uint32_t uptime,unsigned age,unsigned c
                            uint32_t session,uint32_t ticket,const uint8_t *frame,uint8_t *out,unsigned capacity);
 int s1_pack_resume_reply(uint32_t ticket,uint32_t session,unsigned result,unsigned control,
                          uint8_t *out,unsigned capacity);
-/* scan is 181 * (angle:8,distance:12) packed bits, count 1..181. */
+/* scan is 181 * (angle:8,distance:12) packed bits, count 1..181.
+ * A nonzero width adds a 10-bit value in a two-byte trailer on chunk zero. */
 int s1_pack_scan(uint32_t session,uint32_t sequence,uint32_t source_boot_ms,
-                  const uint8_t *scan,unsigned total,unsigned start,
+                  const uint8_t *scan,unsigned total,unsigned start,unsigned width_mm,
                   uint8_t *out,unsigned capacity);
 /* Six 19-bit resource values; UINT32_MAX/unknown encode sentinel 0x7ffff.
  * Counters: MQTT publish failures, command rejections, MQTT connections,

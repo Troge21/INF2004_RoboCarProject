@@ -77,7 +77,7 @@ int main(void){
     }
     for(i=0;i<181;++i){s1_set_bits(scan,20*i,8,i);s1_set_bits(scan,20*i+8,12,i%7?451:0);}
     for(i=0;i<181;i+=16){
-        n=s1_pack_scan(17,99,900,scan,181,i,out,sizeof(out));if(n>56||n<19)return 9;
+        n=s1_pack_scan(17,99,900,scan,181,i,0U,out,sizeof(out));if(n>56||n<19)return 9;
         snprintf(fields,sizeof(fields),",\"start\":%u",i);emit("scan",out,n,fields);
     }
     {uint32_t values[6]={82596,0,0,0,12288,UINT32_MAX},counters[4]={0,UINT32_MAX,3,4};

@@ -100,7 +100,7 @@ int s1_network_aux(unsigned char *out,unsigned capacity,uint32_t session,const u
     if(!aux_available)return -50;
     aux_available=0;
     s1_set_bits(scan,0,8,90);s1_set_bits(scan,8,12,451);
-    return s1_pack_scan(session,1,boot_ms,scan,1,0,out,capacity);
+    return s1_pack_scan(session,1,boot_ms,scan,1,0,0U,out,capacity);
 }
 void s1_network_aux_result(unsigned marker,int accepted){if(marker==0xb5)aux_accepted=accepted;}
 int s1_network_status(const unsigned char *request,unsigned length,unsigned char *out,unsigned capacity,uint32_t session) {

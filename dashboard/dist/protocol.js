@@ -54,17 +54,21 @@ export function decodeTelemetry(payload){
 }
 export function decodeScan(payload){
   const b=bytesOf(payload),v=viewOf(b);
-  if(b.length<19||b.length>56||b[0]!==0xb5)throw new Error('Invalid scan chunk');
-  const session=v.getUint32(1,true),total=b[13],start=b[14],count=b[15];
-  if(!session||!total||total>181||!count||count>16||start+count>total||b.length!==16+Math.ceil(count*20/8))throw new Error('Invalid scan framing');
-  if(count*20%8&&b.at(-1)>>>(count*20%8))throw new Error('Reserved scan bits must be zero');
+  if(b.length<19||b.length>58||b[0]!==0xb5)throw new Error('Invalid scan chunk');
+  const session=v.getUint32(1,true),total=b[13],start=b[14],count=b[15]&31;
+  const hasWidth=Boolean(b[15]&128),pointEnd=16+Math.ceil(count*20/8);
+  if(!session||!total||total>181||!count||count>16||start+count>total||(b[15]&96)||
+     (hasWidth&&start!==0)||b.length!==pointEnd+(hasWidth?2:0))throw new Error('Invalid scan framing');
+  if(count*20%8&&b[pointEnd-1]>>>(count*20%8))throw new Error('Reserved scan bits must be zero');
+  const width=hasWidth?v.getUint16(pointEnd,true):null;
+  if(hasWidth&&(!width||width>1023))throw new Error('Invalid scan width');
   const points=[];
   for(let i=0;i<count;i++){
     const angle=bits(b.subarray(16),20*i,8),distance=bits(b.subarray(16),20*i+8,12);
     if(angle>180||(i&&angle<=points[i-1].angle)||(distance&&(distance<20||distance>4000)))throw new Error('Invalid scan point');
     points.push({angle,distance_mm:distance||null});
   }
-  return {session_token:session,scan_sequence:v.getUint32(5,true),uptime_ms:v.getUint32(9,true),total,start,points};
+  return {session_token:session,scan_sequence:v.getUint32(5,true),uptime_ms:v.getUint32(9,true),total,start,points,width_mm:width};
 }
 export function decodeDiagnostics(payload){
   const b=bytesOf(payload),v=viewOf(b);
@@ -190,9 +194,9 @@ export class TelemetryStore {
     const key=value.session_token+'/'+value.scan_sequence;
     if(!p||p.key!==key||at-p.at>10000){
       if(value.start!==0){packet.detail='Waiting for scan start chunk';return true;}
-      p=this.scanPending={key,total:value.total,source:value.uptime_ms,points:new Array(value.total),received:0,at};
+      p=this.scanPending={key,total:value.total,source:value.uptime_ms,width_mm:value.width_mm,points:new Array(value.total),received:0,at};
     }
-    if(p.total!==value.total||p.source!==value.uptime_ms)throw new Error('Scan metadata changed mid-profile');
+    if(p.total!==value.total||p.source!==value.uptime_ms||(value.start===0&&p.width_mm!==value.width_mm))throw new Error('Scan metadata changed mid-profile');
     value.points.forEach((point,i)=>{
       const old=p.points[value.start+i];
       if(old&&(old.angle!==point.angle||old.distance_mm!==point.distance_mm))throw new Error('Conflicting scan chunk');
@@ -200,7 +204,7 @@ export class TelemetryStore {
     value.points.forEach((point,i)=>{const index=value.start+i;if(!p.points[index]){p.points[index]=point;p.received++;}});
     if(p.received===p.total){
       if(p.points.some((point,i)=>i&&point.angle<=p.points[i-1].angle))throw new Error('Scan angles are not increasing');
-      this.scanProfile={sequence:value.scan_sequence,session_token:value.session_token,uptime_ms:value.uptime_ms,points:p.points,at};this.scanPending=null;
+      this.scanProfile={sequence:value.scan_sequence,session_token:value.session_token,uptime_ms:value.uptime_ms,width_mm:p.width_mm,points:p.points,at};this.scanPending=null;
       this.event('Scan profile received',p.total+' measured angles','neutral',at);
     }
     packet.detail='Scan chunk '+(value.start+1)+'?'+(value.start+value.points.length)+' / '+value.total;return true;

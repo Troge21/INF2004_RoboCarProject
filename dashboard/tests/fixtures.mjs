@@ -41,11 +41,13 @@ export function syncStore(store,{at=1000,uptime=1000,session=0x12345678,state=1,
   return store;
 }
 export function scanChunk({session=0x12345678,sequence=1,uptime=900,total=181,start=0,
-  points=Array.from({length:Math.min(16,total-start)},(_,i)=>({angle:start+i,distance_mm:451}))}={}){
-  const b=new Uint8Array(16+Math.ceil(points.length*20/8)),v=new DataView(b.buffer);
+  points=Array.from({length:Math.min(16,total-start)},(_,i)=>({angle:start+i,distance_mm:451})),width=null}={}){
+  const pointEnd=16+Math.ceil(points.length*20/8);
+  const b=new Uint8Array(pointEnd+(width===null?0:2)),v=new DataView(b.buffer);
   b[0]=0xb5;v.setUint32(1,session,true);v.setUint32(5,sequence,true);v.setUint32(9,uptime,true);
   b[13]=total;b[14]=start;b[15]=points.length;
   points.forEach((p,i)=>{putBits(b.subarray(16),20*i,8,p.angle);putBits(b.subarray(16),20*i+8,12,p.distance_mm??0);});
+  if(width!==null){b[15]|=128;v.setUint16(pointEnd,width,true);}
   return b;
 }
 export function diagnostics({session=0x12345678,uptime=1000,values=[82596,5000,4000,4500,12288,null],counters=[1,2,3,4]}={}){

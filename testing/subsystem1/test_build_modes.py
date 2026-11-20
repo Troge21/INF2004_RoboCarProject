@@ -24,7 +24,7 @@ def compile_source(source,test,mode,path):
     return subprocess.check_output(['arm-none-eabi-nm',str(path)],text=True)
 with tempfile.TemporaryDirectory(prefix='robocar-profile-') as tmp:
     tmp=Path(tmp)
-    for test,mode,name in [(0,0,'integrated normal'),(1,0,'integrated stationary'),(0,1,'explicit IR bench'),(1,2,'explicit encoder bench')]:
+    for test,mode,name in [(0,0,'integrated normal'),(1,0,'integrated stationary'),(0,1,'explicit IR bench'),(1,2,'explicit encoder bench'),(1,3,'explicit servo bench')]:
         app_symbols=compile_source('../app_program/app_main.c',test,mode,tmp/'app.o')
         frames={}
         for row in (tmp/'app.su').read_text().splitlines():
@@ -48,5 +48,9 @@ with tempfile.TemporaryDirectory(prefix='robocar-profile-') as tmp:
         assert s1_present == (mode==0),name
         if mode==1:assert any(s.split()[-1:] == ['ir_adc_test'] for s in app_symbols.splitlines())
         if mode==2:assert any(s.split()[-1:] == ['subsystem2_test'] for s in app_symbols.splitlines())
+        if mode==3:
+            assert 'subsystem5_calibrate_servo' in app_symbols and 'subsystem5_calibrate_servo' in ultra_symbols
+            assert 'subsystem2_init' not in app_symbols and 'subsystem2_start' not in app_symbols
+            assert not motor_present and not passive
         print('PASS: '+name+' actual ARM compilation and startup/motor symbols')
 print('PASS: stationary integrated TEST=1 collects encoders without PWM; hardware benches require explicit APP_MODE.')

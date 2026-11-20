@@ -64,6 +64,9 @@ static UW nav_turn_id,ended_turn_id;
 #ifdef APP_OBSTACLE_BYPASS
 static UW range_hold_ms;
 static BOOL front_blocked,front_missing;
+#else
+static BOOL obstacle_stop_required;
+BOOL subsystem5_obstacle_stop_required(void){return obstacle_stop_required;}
 #endif
 static int created,held[4];
 static S2_ENCODER_COUNTS counts;
@@ -433,6 +436,32 @@ static ER tk_dly_tsk(INT ms){
                 longjmp(done,1);
             }
         }
+    }else if(scenario==18){
+        if(phase==0 && moving()){
+            obstacle_stop_required=TRUE;
+            phase=1;
+        }else if(phase==1){
+            stopped();assert(app_controller_scan_stop_ready());
+            assert(app_controller_snapshot(snapshot)==E_OK && (snapshot[4]&APP_CTRL_LATCH));
+            assert(app_controller_arm_resume(operating_ms+1000U,&resume_ticket_id)==0);
+            assert(app_controller_submit_resume(resume_ticket_id,99,operating_ms+1000U)==0);
+            phase=2;
+        }else if(phase==2){
+            stopped();assert(app_controller_take_reply(reply)==E_OK && (reply[9]&2U) &&
+                (((reply[8]|((unsigned)reply[9]<<8))>>6)&7U)==APP_RESUME_NOT_READY);
+            pass("confirmed obstacle zeros actual PWM, permits a scan and prevents Resume while blocked");
+            obstacle_stop_required=FALSE;
+            phase=3;
+        }else if(phase==3 && motion.actual_left_rpm_x10==0 && motion.actual_right_rpm_x10==0){
+            stopped();assert(app_controller_poll()&APP_CTRL_LATCH);
+            assert(app_controller_arm_resume(operating_ms+1000U,&resume_ticket_id)==0);
+            assert(app_controller_submit_resume(resume_ticket_id,99,operating_ms+1000U)==0);
+            phase=4;
+        }else if(phase==4 && moving()){
+            assert(app_controller_take_reply(reply)==E_OK && (reply[9]&2U) && !(reply[8]&APP_CTRL_LATCH));
+            pass("clearance keeps the car stopped until explicit Resume restores line following");
+            longjmp(done,1);
+        }
     }else if(scenario==17){
         const S2_COMMAND command=read_command();
         switch(ticks){
@@ -574,6 +603,7 @@ static void run(unsigned which){
     bypass=(OBSTACLE_BYPASS){0};range_hold_ms=0;front_blocked=front_missing=FALSE;
 #else
     left_bend=(APP_LEFT_BEND){0};
+    obstacle_stop_required=FALSE;
     if(which==4){nav_phase=S5_NAV_UNAVAILABLE;nav_busy=1;}
 #endif
     for(unsigned i=0;i<4;++i){held[i]=0;compare[i]=0;}
@@ -716,7 +746,7 @@ int main(void){
 #ifdef APP_OBSTACLE_BYPASS
     run(7);run(8);run(9);run(10);run(11);run(12);run(13);run(14);run(16);
 #else
-    run(4);run(17);
+    run(4);run(17);run(18);
 #endif
     printf("SUMMARY: %u actual controller/PID/motor checks passed; no hardware or sockets.\n",checks);return 0;
 }

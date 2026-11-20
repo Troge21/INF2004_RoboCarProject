@@ -74,7 +74,7 @@ EXPORT void subsystem1_test(void)
     TEST_CHECK("S1-V4-18",s1_valid_control_word(APP_CTRL_SCANNING)&&
         !s1_valid_control_word(APP_CTRL_READY|APP_CTRL_LATCH),"future controller vocabulary retains latch invariants");
     for(i=0;i<181;++i){s1_set_bits(scan,20*i,8,i);s1_set_bits(scan,20*i+8,12,200);}
-    TEST_CHECK("S1-V4-19",s1_pack_scan(17,1,301,scan,181,176,reply,sizeof(reply))==29&&reply[15]==5,
+    TEST_CHECK("S1-V4-19",s1_pack_scan(17,1,301,scan,181,176,0U,reply,sizeof(reply))==29&&reply[15]==5,
         "181 point profile is bounded into small exact chunks");
     TEST_CHECK("S1-V4-20",s1_pack_diagnostics(17,301,values,counters,reply,sizeof(reply))==40&&
         s1_get_bits(reply+9,95,19)==S1_RESOURCE_UNKNOWN,"unsupported high-water stays unavailable");

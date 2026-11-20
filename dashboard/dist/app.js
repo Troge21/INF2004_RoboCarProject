@@ -60,6 +60,7 @@ function overview(){
 function obstacleScanCard(){
   return card('Obstacle radar','View from behind the car',`<div class="scan-panel" id="scan-panel">
     <div class="scan-radar" id="scan-radar"></div>
+    <div class="vehicle-detail"><span>Estimated obstacle width</span><strong data-value="obstacle-width">Unavailable</strong></div>
     <dl class="scan-directions" aria-label="Latest scan distances"></dl>
     <details class="scan-more" hidden><summary>Other scan angles</summary><dl></dl></details>
     <div class="chart-foot scan-footer">
@@ -160,6 +161,8 @@ function update(force=false){
   value('runtime-after',resource(diag?.heap_free_bytes));
   value('network-errors',diag?diag.publish_errors+' / '+diag.rejected_commands:'Unavailable');value('network-rejoins',diag?.mqtt_connections??'Unavailable');
   value('scan-age',store.scanProfile?'Scan received '+age(store.scanProfile.at,now)+' ago':'No scan yet');
+  const scanWidth=store.scanProfile?.width_mm;
+  value('obstacle-width',scanWidth==null?(store.scanProfile?'Edges unclear':'Unavailable'):`${scanWidth} mm`);
   document.querySelector('.state-pill')?.classList.toggle('unavailable',!control);
   value('speed-pair',`${format(current?.left_mps,3)} / ${format(current?.right_mps,3)}`);
   value('range-valid',stale?'Stale / unavailable':sample?.obstacle_valid?'Latest measurement valid':'No valid measurement');
@@ -301,7 +304,7 @@ function csvCell(value){return '"'+String(value??'').replaceAll('"','""')+'"';}
 function downloadFile(content,type,name){const url=URL.createObjectURL(new Blob([content],{type})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 function exportScan(){
   const profile=store.scanProfile;if(!profile){toast('No completed scan to export');return;}
-  const lines=['received_at,source,session,scan_sequence,source_boot_ms,angle_deg,distance_mm',...profile.points.map(p=>[new Date(profile.at).toISOString(),'mqtt',profile.session_token,profile.sequence,profile.uptime_ms,p.angle,p.distance_mm??''].map(csvCell).join(','))];
+  const lines=['received_at,source,session,scan_sequence,source_boot_ms,angle_deg,distance_mm,obstacle_width_mm',...profile.points.map(p=>[new Date(profile.at).toISOString(),'mqtt',profile.session_token,profile.sequence,profile.uptime_ms,p.angle,p.distance_mm??'',profile.width_mm??''].map(csvCell).join(','))];
   downloadFile(lines.join('\r\n'),'text/csv;charset=utf-8','robocar-scan.csv');
 }
 function exportEvidence(){

@@ -50,6 +50,7 @@ static void latch(void){
 int main(void){
     uint8_t reply[10],state[5];
     boot();
+    check(!app_controller_scan_stop_ready(),"scanning waits for the initial motor-stop handoff");
     check(app_controller_poll()==(APP_TEST?0:APP_CTRL_LATCH),"normal boot inhibits motion before the first publication");
     app_controller_publish(APP_TEST?APP_CTRL_DISABLED:APP_CTRL_STARTING,E_OK);
     app_controller_cancel_resume();
@@ -61,7 +62,8 @@ int main(void){
     check(app_controller_submit_stop(12,99,2000)==E_OK&&app_controller_submit_stop(13,99,2000)==E_TMOUT,"one occupied request slot rejects another request");
     check(app_controller_poll()==APP_CTRL_LATCH&&app_controller_take_reply(reply)==E_TMOUT,"latch is held by controller, not acknowledged before motor submission");
     app_controller_publish(APP_CTRL_STOP_LATCHED,E_TMOUT);
-    check(app_controller_take_reply(reply)==E_TMOUT,"busy motor handoff does not produce a success reply");
+    check(app_controller_take_reply(reply)==E_TMOUT&&!app_controller_scan_stop_ready(),
+        "busy motor handoff authorizes neither a success reply nor a sweep");
     clock_ms+=20;app_controller_publish(APP_CTRL_STOP_LATCHED,E_OK);
     check(app_controller_take_reply(reply)==E_OK&&read32(reply)==12&&read32(reply+4)==99&&
         ((reply[8]|((unsigned)reply[9]<<8))>>6)==APP_STOP_LATCHED&&(reply[8]&APP_CTRL_LATCH),"matching applied result follows accepted zero-duty submission");
@@ -126,8 +128,9 @@ int main(void){
             "superseded authorization cannot resume");
         check(app_controller_submit_resume(ticket,99,clock_ms+1000)==0&&
               (app_controller_poll()&APP_CTRL_LATCH),"commit waits for current controller source checks");
-        check(app_controller_poll_ready(1)==0&&app_controller_take_reply(reply)==E_TMOUT,
-            "eligible explicit Resume releases latch but waits for motor handoff before reply");
+        check(app_controller_scan_stop_ready(),"an accepted STOP allows the width task to check standstill");
+        check(app_controller_poll_ready(1)==0&&app_controller_take_reply(reply)==E_TMOUT&&!app_controller_scan_stop_ready(),
+            "eligible Resume revokes sweep permission before the motor handoff and reply");
         app_controller_publish(APP_CTRL_FOLLOWING,E_OK);
         check(app_controller_take_reply(reply)==E_OK&&(reply[9]&2U)&&
               (((reply[8]|((unsigned)reply[9]<<8))>>6)&7U)==0&&!(reply[8]&APP_CTRL_LATCH),

@@ -1,4 +1,5 @@
 #include "s1_protocol.h"
+#include "../telemetry_sources.h"
 #include <string.h>
 #include <limits.h>
 #define SPEED_NULL 16383U
@@ -223,19 +224,25 @@ int s1_pack_resume_reply(uint32_t id,uint32_t session,unsigned result,unsigned c
     out[0]=0xa8;s1_write_u32(out+1,id);s1_write_u32(out+5,session);out[9]=word;out[10]=word>>8;return 11;
 }
 int s1_pack_scan(uint32_t session,uint32_t sequence,uint32_t boot,const uint8_t *scan,
-                  unsigned total,unsigned start,uint8_t *out,unsigned capacity) {
+                  unsigned total,unsigned start,unsigned width_mm,uint8_t *out,unsigned capacity) {
     uint8_t b[S1_SCAN_PACKET_BYTES]={0};unsigned i,count,n,previous=0;
-    if(!session||!scan||!out||!total||total>181||start>=total)return -1;
+    if(!session||!scan||!out||!total||total>181||start>=total||width_mm>TELEMETRY_SCAN_WIDTH_MAX_MM)return -1;
     for(i=0;i<total;++i) {
         unsigned a=s1_get_bits(scan,20*i,8),d=s1_get_bits(scan,20*i+8,12);
         if(a>180||(i&&a<=previous)||(d&&(d<20||d>4000)))return -1;
         previous=a;
     }
     count=total-start;if(count>S1_SCAN_CHUNK_POINTS)count=S1_SCAN_CHUNK_POINTS;
-    n=S1_SCAN_HEADER_BYTES+(count*20+7)/8;if(capacity<n)return -1;
+    n=S1_SCAN_HEADER_BYTES+(count*20+7)/8;
+    const unsigned include_width=start==0U&&width_mm!=0U;
+    if(capacity<n+2U*include_width)return -1;
     b[0]=0xb5;s1_write_u32(b+1,session);s1_write_u32(b+5,sequence);s1_write_u32(b+9,boot);
     b[13]=total;b[14]=start;b[15]=count;
     for(i=0;i<count;++i)s1_set_bits(b+16,20*i,20,s1_get_bits(scan,20*(start+i),20));
+    if(include_width){
+        b[15]|=S1_SCAN_WIDTH_FLAG;
+        b[n++]=(uint8_t)width_mm;b[n++]=(uint8_t)(width_mm>>8);
+    }
     memcpy(out,b,n);return n;
 }
 int s1_pack_diagnostics(uint32_t session,uint32_t uptime,const uint32_t values[6],

@@ -138,6 +138,23 @@ test('scan truncation, point ranges, order and reserved bits are rejected',()=>{
   assert.throws(()=>decodeScan(scanChunk({points:[{angle:1,distance_mm:451},{angle:0,distance_mm:451}]})));
   const b=scanChunk({total:1});b[b.length-1]|=128;assert.throws(()=>decodeScan(b));
 });
+test('width is accepted from the first chunk of its own complete scan only',()=>{
+  const s=syncStore(new TelemetryStore());
+  const first=scanChunk({total:25,width:126});
+  assert.equal(decodeScan(first).width_mm,126);
+  assert.equal(s.ingest(first,'telemetry',1001),true);
+  assert.equal(s.scanProfile,null);
+  assert.equal(s.ingest(scanChunk({total:25,width:200}),'telemetry',1002),false);
+  assert.equal(s.ingest(scanChunk({total:25,start:16}),'telemetry',1003),true);
+  assert.equal(s.scanProfile.width_mm,126);
+  assert.equal(s.ingest(scanChunk({sequence:2,total:3}),'telemetry',1004),true);
+  assert.equal(s.scanProfile.width_mm,null);
+  assert.throws(()=>decodeScan(scanChunk({total:25,start:16,width:126})));
+  assert.throws(()=>decodeScan(scanChunk({total:3,width:1024})));
+  assert.throws(()=>decodeScan(scanChunk({total:3,width:0})));
+  const invalid=scanChunk({total:3,width:80});invalid[23]|=128;
+  assert.throws(()=>decodeScan(invalid));
+});
 test('resource unknown is distinct from valid zero; capacities are not peaks',()=>{
   const d=decodeDiagnostics(diagnostics({values:[82596,0,0,0,12288,null]}));
   assert.equal(d.heap_free_bytes,0);assert.equal(d.stack_high_water_bytes,null);

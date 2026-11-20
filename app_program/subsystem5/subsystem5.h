@@ -28,6 +28,10 @@ typedef enum {
 typedef struct { UW timestamp_ms, turn_id; UINT phase; } S5_NAV_DATA;
 /* Nonconsuming publication; the controller checks age and its own STOP latch. */
 EXPORT ER subsystem5_get_navigation(S5_NAV_DATA *out);
+#ifndef APP_OBSTACLE_BYPASS
+/* True from a confirmed front obstacle until the centred readings clear. */
+EXPORT BOOL subsystem5_obstacle_stop_required(void);
+#endif
 /* End the matching turn attempt after the controller observes stopped wheels. */
 EXPORT ER subsystem5_end_turn(UW turn_id);
 EXPORT S5_MOTION s5_choose_motion(BOOL centre_valid, UW centre_mm,
@@ -41,5 +45,9 @@ EXPORT ER subsystem5_get_range(S5_RANGE_DATA *out);
 /* Internal conversion shared with subsystem5_test.c. Valid range 20–4000 mm.
  * Returns E_PAR for invalid widths and clears *mm on failure. */
 IMPORT ER s5_echo_to_mm(UW pulse_us, UW *mm);
+
+#if defined(APP_BENCH_SERVO) && APP_BENCH_MODE == APP_BENCH_SERVO
+EXPORT void subsystem5_calibrate_servo(void) __attribute__((noreturn));
+#endif
 
 #endif /* SUBSYSTEM5_H */
