@@ -150,6 +150,17 @@ class BarcodeTests(unittest.TestCase):
         for i in range(20, 29): corrupt[i] *= 2
         self.assertEqual(self.decode(corrupt), (2, 0))
 
+    def test_intercharacter_gap_is_symmetric_at_uneven_speed(self):
+        runs = widths('A', narrow=10000)
+        runs[10:19] = [width * 13 // 10 for width in runs[10:19]]
+        runs[9] = 6000
+        symbol = 0x80 | VECTORS['alphabet'].index('A')
+        self.assertEqual(self.decode(runs), (1, symbol))
+        self.assertEqual(self.decode(runs[::-1]), (1, symbol | 0x40))
+        runs[9] = 5000
+        self.assertEqual(self.decode(runs), (2, 0))
+        self.assertEqual(self.decode(runs[::-1]), (2, 0))
+
     def test_recorded_reverse_a_hand_scan(self):
         # Actual 9 November trace: rejected by the former +/-25% check.
         runs = [74016, 72523, 197040, 61543, 220537, 52507, 72008, 144521,
@@ -232,6 +243,51 @@ class BarcodeTests(unittest.TestCase):
                 self.assertEqual(status, 1)
                 self.assertEqual(self.lib.s3_barcode_character(code).decode(), char)
                 self.assertEqual(self.poll(decoder, now+100000), (0, 0))
+
+    def test_stream_alphabet_with_sample_quantization(self):
+        for char in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ':
+            for reverse in (False, True):
+                for narrow in (3150, 8350, 35400, 90600):
+                    with self.subTest(char=char, reverse=reverse, narrow=narrow):
+                        ideal_edge = 125
+                        sampled_edge = 250
+                        runs = []
+                        for width in widths(char, narrow, 2.5, reverse):
+                            ideal_edge += width
+                            next_edge = (ideal_edge + 249) // 250 * 250
+                            runs.append(next_edge - sampled_edge)
+                            sampled_edge = next_edge
+                        decoder, now, events = self.scan(runs)
+                        self.assertEqual(events, [])
+                        status, code = self.poll(decoder, now + 1000000)
+                        self.assertEqual(status, 1)
+                        self.assertEqual(self.lib.s3_barcode_character(code).decode(), char)
+                        self.assertEqual(bool(code & 64), reverse)
+                        self.assertEqual(self.poll(decoder, now + 1000250), (0, 0))
+
+    def test_stream_recovers_after_stray_ink(self):
+        for pulse in (500, 5000):
+            with self.subTest(pulse=pulse):
+                decoder, now, events = self.scan([pulse])
+                self.assertEqual(events, [])
+                decoder, now, events = self.scan(widths('F', reverse=True),
+                    start=now, quiet=150000, decoder=decoder)
+                self.assertEqual(events, [(2, 0)])
+                status, code = self.poll(decoder, now + 50000)
+                self.assertEqual(status, 1)
+                self.assertEqual(self.lib.s3_barcode_character(code), b'F')
+                self.assertTrue(code & 64)
+
+    def test_stream_restarts_when_white_only_fits_the_smaller_label(self):
+        decoder, now, events = self.scan(widths('A', narrow=20000))
+        self.assertEqual(events, [])
+        self.assertEqual(decoder.quiet, 200000)
+        decoder, now, events = self.scan(widths('Z'), start=now,
+            quiet=100000, decoder=decoder)
+        self.assertEqual(events, [(2, 0)])
+        status, code = self.poll(decoder, now + 50000)
+        self.assertEqual(status, 1)
+        self.assertEqual(self.lib.s3_barcode_character(code), b'Z')
 
     def test_timer_wrap_and_long_idle(self):
         decoder, now, events = self.scan(widths('Z', reverse=True), start=MASK-1100000)

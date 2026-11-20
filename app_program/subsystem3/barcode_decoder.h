@@ -30,7 +30,7 @@ typedef struct {
     uint32_t last_edge_us;
     uint32_t frame_start_us;
     uint32_t leading_white_us;
-    uint32_t quiet_needed_us;
+    uint32_t quiet_needed_us; /* Capture restart bound or pending trailing quiet. */
     uint8_t count;
     uint8_t black;
     uint8_t capturing;

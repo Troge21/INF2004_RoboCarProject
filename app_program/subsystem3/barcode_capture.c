@@ -1,5 +1,5 @@
-/* Barcode capture: sample GP26 using a timer interrupt and queue timestamped
- * black/white transitions. Decoding is performed later by the S3 task. */
+/* Legacy digital capture: sample S3_BARCODE_PIN using a timer interrupt and
+ * queue timestamped transitions. This path is inactive with analog AO wiring. */
 #include "barcode_capture.h"
 #include "subsystem3.h"
 #include <sys/sysdef.h>

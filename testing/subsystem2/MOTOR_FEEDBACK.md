@@ -133,7 +133,12 @@ integral anti-windup, slew limiting and derivative on measurement. Initial
 gains are Kp=0.100, Ki=0.200 and Kd=0.000 in duty-percent and RPM units;
 the D implementation is available but starts disabled to avoid amplifying
 encoder quantization. These are **provisional gains requiring hardware tuning**.
-PID duty is limited to 40%, with a 20 percentage-point/second slew limit.
+PID duty is limited to 40%. The motor normally changes duty by up to 20
+percentage points per second. When both wheel targets are forward and differ
+by at least 7 RPM, the inside wheel can reduce duty by up to 80 percentage
+points per second. Its recovery uses the normal rate. Encoder samples update
+the integral, which stays in effect across same-direction steering changes.
+STOP and direction changes reset the wheel's PID state.
 Duty-mode commands retain the earlier 0..100% range and manual power scales.
 The PID feed-forward already includes wheel balance, so those scales are
 not applied a second time in RPM mode.
@@ -145,8 +150,9 @@ not applied a second time in RPM mode.
 | `0x04` / `0x08` | Left/right wheel produced no edges for 1.5 s while driven at at least 10% duty (and at least 5 RPM requested in RPM mode). |
 | `0x10` / `0x20` | Left/right measured direction stayed opposite the positive RPM request for 400 ms, below -3 RPM. |
 
-Any fault stops both outputs and latches until reboot. Command expiry or
-command-lock contention also stops outputs, but a fresh command can resume
+Any fault stops both outputs and latches until reboot. The drive loop uses a
+10 ms timeout to read the command mailbox. If the read times out or the
+command expires, the loop stops both outputs. A fresh command can resume
 once no latched fault exists. `stop_reason` distinguishes requested stop,
 normal motion, expired command, command contention, fault and waiting for
 the initial feedback window. A zero target on one wheel stops that wheel

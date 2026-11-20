@@ -250,7 +250,10 @@ static void motion_loop(void)
 #endif
     for (;;) {
         S2_COMMAND command = {0};
-        BOOL available = tk_wai_sem(s_command_sem, 1, TMO_POL) == E_OK;
+        /* Let a writer finish instead of braking for a brief lock overlap.
+         * A timeout still cuts drive and the original command lease applies. */
+        const INT command_wait = S2_DRIVE_ENABLED ? S2_COMMAND_READ_WAIT_MS : TMO_POL;
+        BOOL available = tk_wai_sem(s_command_sem, 1, command_wait) == E_OK;
         if (available) {
             command = read_command();
             (void)tk_sig_sem(s_command_sem, 1);

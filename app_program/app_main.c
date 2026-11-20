@@ -4,7 +4,7 @@
  * S3: AO line sensing; GP28 reserved for future barcode decoding.
  * S4: IMU/hump sensing.
  * Analog steering is controller-owned; diagnostic benches are explicit modes.
- * S5: HC-SR04/servo snapshots; controller arbitrates obstacle and line requests.
+ * S5: HC-SR04/servo snapshots; only the bypass build uses them for driving.
  * Former producer/consumer/monitor sample tasks and interfaces are retired.
  * Returning from usermain shuts down the kernel; leave it sleeping instead.
  */
@@ -13,30 +13,52 @@
 #include "controller.h"
 #ifdef APP_OBSTACLE_BYPASS
 #include "obstacle_bypass.h"
+#include "subsystem5/subsystem5.h"
 #endif
 #include "subsystem1/subsystem1.h"
-#include "subsystem2/encoder_move.h"
 #include "subsystem2/subsystem2.h"
 #include "subsystem3/subsystem3.h"
-#include "subsystem5/subsystem5.h"
 
 /* Standalone analog IR/steering test; other normal subsystem tasks stay off. */
 extern void ir_adc_test(void) __attribute__((noreturn));
 
 #if APP_LINE_FOLLOW_ENABLED && !APP_TEST
-/* Preserve the teammate's AO policy. Both white is centered/forward;
- * both black crosses a junction. Pattern: centre/left=2, right=1. */
-static void app_line_targets(UINT pattern, INT *left, INT *right)
+/* Scale each AO channel separately. GP26 has a much larger black response. */
+static INT app_tape_level(UINT adc, UINT edge, UINT dark)
+{
+    if (adc <= edge) return 0;
+    if (adc >= dark) return 100;
+    return (INT)((adc - edge) * 100U / (dark - edge));
+}
+
+static void app_line_targets(const S3_LINE_DATA *line, INT *left, INT *right)
 {
 #if S2_LINE_USE_RPM_CONTROL
-    const INT forward = S2_LINE_FORWARD_RPM_X10, inner = S2_LINE_INNER_RPM_X10;
+    const INT forward = 260, edge_trim = 70, bend_trim = 70; /* tenths of RPM */
 #else
-    const INT forward = APP_FORWARD_DUTY, inner = APP_INNER_DUTY;
+    const INT forward = APP_FORWARD_DUTY, edge_trim = APP_FORWARD_DUTY - APP_INNER_DUTY;
+    const INT bend_trim = 0;
 #endif
-    *left = *right = 0;
-    if (pattern > 3U) return;
-    *left = pattern == 2U ? inner : forward;
-    *right = pattern == 1U ? inner : forward;
+    if (!line->valid || line->pattern > 3U) {
+        *left = *right = 0;
+        return;
+    }
+    *left = *right = forward;
+    if (line->pattern == 3U) return; /* cross-junction */
+
+    /* Start above the measured white ranges. Full scale uses the weaker
+     * observed GP27 black and the GP26 normal-height black readings. */
+    const INT error = app_tape_level(line->centre_adc, 250U, 750U) -
+                      app_tape_level(line->right_adc, 450U, 2650U);
+    const INT strength = error < 0 ? -error : error;
+    const INT bend_start = 60;
+    INT trim = strength * edge_trim / 100;
+    /* Leave the weak-edge response alone. Tighten only with strong contrast
+     * on one side, using this sample so the correction fades off the tape. */
+    if (strength > bend_start)
+        trim += (strength - bend_start) * bend_trim / (100 - bend_start);
+    if (error > 0) *left -= trim;
+    else *right -= trim;
 }
 static ER app_motor_request(INT left, INT right)
 {
@@ -47,22 +69,72 @@ static ER app_motor_request(INT left, INT right)
 #endif
 }
 
-static UW last_drive_ms;
-#ifdef APP_OBSTACLE_BYPASS
-static OBSTACLE_BYPASS bypass;
-#else
-#define APP_OBSTACLE_TURN_DEG 20
-#define APP_EFFECTIVE_TRACK_MM 120U /* Calibrated with the S2 U-turn bench. */
+#if S2_LINE_USE_RPM_CONTROL && !defined(APP_OBSTACLE_BYPASS)
+#define APP_LEFT_BEND_CONFIRM_MS 300U
+#define APP_LEFT_EXIT_GAP_MS      60U
+#define APP_LEFT_SEARCH_ARM_MS   220U
+#define APP_LEFT_SEARCH_LIMIT_MS 1100U
 
-static S2_ENCODER_MOVE avoidance_turn;
-static UW avoidance_turn_id;
-static BOOL avoidance_settling;
+typedef enum {
+    APP_LEFT_TRACKING, APP_LEFT_SEARCHING, APP_LEFT_WAITING
+} APP_LEFT_PHASE;
 
-static void app_cancel_turn(void)
+typedef struct {
+    UW first_seen_ms, last_seen_ms, search_started_ms;
+    INT peak_trim;
+    APP_LEFT_PHASE phase;
+} APP_LEFT_BEND;
+
+static APP_LEFT_BEND left_bend;
+
+/* Search only after a confirmed left bend. Tape ends the search; elapsed
+ * time limits it even if no sensor sees the outgoing line. */
+static unsigned app_left_exit(UINT pattern, UW now_ms, INT *left, INT *right)
 {
-    if (avoidance_turn.result == S2_MOVE_IDLE || avoidance_turn.result == S2_MOVE_RUNNING)
-        avoidance_turn.result = S2_MOVE_CANCELLED;
+    const INT trim = *right - *left;
+    if (pattern != 0U || trim < 0) {
+        if (pattern == 2U && trim > 0) {
+            if (left_bend.phase != APP_LEFT_TRACKING || left_bend.peak_trim == 0 ||
+                now_ms - left_bend.last_seen_ms >= APP_IR_MAX_AGE_MS)
+                left_bend = (APP_LEFT_BEND){.first_seen_ms = now_ms};
+            if (trim > left_bend.peak_trim) left_bend.peak_trim = trim;
+            left_bend.last_seen_ms = now_ms;
+        } else {
+            left_bend = (APP_LEFT_BEND){0};
+        }
+        return APP_CTRL_FOLLOWING;
+    }
+
+    if (left_bend.phase == APP_LEFT_TRACKING) {
+        const UW gap = now_ms - left_bend.last_seen_ms;
+        if (gap >= APP_LEFT_SEARCH_ARM_MS || left_bend.peak_trim < S2_TURN_MIN_SPLIT_RPM_X10 ||
+            left_bend.last_seen_ms - left_bend.first_seen_ms < APP_LEFT_BEND_CONFIRM_MS) {
+            left_bend = (APP_LEFT_BEND){0};
+            return APP_CTRL_FOLLOWING;
+        }
+        if (trim > 0) return APP_CTRL_FOLLOWING; /* the left edge still has a live correction */
+        if (gap < APP_LEFT_EXIT_GAP_MS) {
+            *left = *right - left_bend.peak_trim;
+            return APP_CTRL_FOLLOWING;
+        }
+        left_bend.phase = APP_LEFT_SEARCHING;
+        left_bend.search_started_ms = now_ms;
+    }
+
+    *left = 0; /* bring the chassis left with the outside wheel only */
+    if (left_bend.phase == APP_LEFT_SEARCHING &&
+        now_ms - left_bend.search_started_ms < APP_LEFT_SEARCH_LIMIT_MS)
+        return APP_CTRL_RECOVERING;
+
+    left_bend.phase = APP_LEFT_WAITING;
+    *right = 0;
+    return APP_CTRL_WAITING_LINE;
 }
+#endif
+
+#ifdef APP_OBSTACLE_BYPASS
+static UW last_drive_ms;
+static OBSTACLE_BYPASS bypass;
 #endif
 
 /* Sole integrated steering owner; S2 retains PWM/encoder/PID ownership. */
@@ -70,16 +142,16 @@ static void app_controller_step(UW started_ms)
 {
     S3_LINE_DATA line = {0};
     S2_MOTION_DATA motion = {0};
-    S5_NAV_DATA navigation = {0};
     SYSTIM now = {0}, operating = {0};
     INT left = 0, right = 0;
     unsigned state = APP_CTRL_STARTING;
     (void)app_controller_poll();
     ER line_er = subsystem3_get_line(&line);
     ER motion_er = subsystem2_get_motion(&motion);
-    ER navigation_er = subsystem5_get_navigation(&navigation);
 #ifdef APP_OBSTACLE_BYPASS
+    S5_NAV_DATA navigation = {0};
     S5_RANGE_DATA range = {0};
+    ER navigation_er = subsystem5_get_navigation(&navigation);
     ER range_er = bypass.phase != BYPASS_IDLE ? subsystem5_get_range(&range) : E_OBJ;
 #endif
     (void)tk_get_tim(&now);
@@ -89,13 +161,16 @@ static void app_controller_step(UW started_ms)
         (UW)(now.lo - line.timestamp_ms) <= APP_IR_MAX_AGE_MS;
     BOOL motion_fresh = motion_er == E_OK &&
         (UW)(now.lo - motion.timestamp_ms) <= S2_FEEDBACK_MAX_AGE_MS;
-    BOOL navigation_fresh = navigation_er == E_OK &&
-        (UW)(now.lo - navigation.timestamp_ms) <= S5_NAV_MAX_AGE_MS;
     BOOL stopped = motion_fresh && motion.encoder_valid && motion.speed_valid && !motion.faults &&
         (UW)(now.lo - motion.speed_timestamp_ms) <= S2_FEEDBACK_MAX_AGE_MS &&
         motion.mode == S2_MODE_STOP && !motion.command_active &&
         motion.duty_left_x100 == 0 && motion.duty_right_x100 == 0 &&
         motion.actual_left_rpm_x10 == 0 && motion.actual_right_rpm_x10 == 0;
+    BOOL resume_ready = startup_done && fresh && stopped;
+#ifdef APP_OBSTACLE_BYPASS
+    BOOL navigation_fresh = navigation_er == E_OK &&
+        (UW)(now.lo - navigation.timestamp_ms) <= S5_NAV_MAX_AGE_MS;
+    resume_ready = resume_ready && navigation_fresh && navigation.phase == S5_NAV_CLEAR;
     if (motion_fresh && (motion.command_active || motion.duty_left_x100 || motion.duty_right_x100))
         last_drive_ms = now.lo;
     /* Wait for a full stopped speed window so neither wheel is held back
@@ -104,25 +179,18 @@ static void app_controller_step(UW started_ms)
         (UW)(now.lo - motion.speed_timestamp_ms) + motion.speed_period_ms <= (UW)(now.lo - last_drive_ms);
     BOOL turn_requested = navigation_fresh && navigation.turn_id != 0U &&
         (navigation.phase == S5_NAV_LEFT || navigation.phase == S5_NAV_RIGHT);
-    unsigned inhibit = app_controller_poll_ready(startup_done && fresh && stopped &&
-        navigation_fresh && navigation.phase == S5_NAV_CLEAR);
+#endif
+    unsigned inhibit = app_controller_poll_ready(resume_ready);
     BOOL ready = fresh && motion_fresh && (!S2_LINE_USE_RPM_CONTROL || motion.speed_valid);
     BOOL permitted = startup_done && !inhibit && ready && !motion.faults;
+    BOOL follow_line = permitted;
 
 #ifdef APP_OBSTACLE_BYPASS
+    follow_line = permitted && navigation_fresh && navigation.phase == S5_NAV_CLEAR;
     BOOL bypass_requested = turn_requested || bypass.phase != BYPASS_IDLE;
     if ((inhibit & APP_CTRL_LATCH) && bypass.phase != BYPASS_FAILED)
         bypass.phase = BYPASS_IDLE;
-#else
-    if (turn_requested && navigation.turn_id != avoidance_turn_id) {
-        avoidance_turn_id = navigation.turn_id;
-        avoidance_turn = (S2_ENCODER_MOVE){0};
-    }
-    if (avoidance_turn_id && (!turn_requested || !permitted)) app_cancel_turn();
-    if (turn_settled) avoidance_settling = FALSE;
-#endif
 
-#ifdef APP_OBSTACLE_BYPASS
     if (bypass.phase == BYPASS_FAILED) state = APP_CTRL_FAULT;
     else if (startup_done && !(inhibit & APP_CTRL_LATCH) && bypass_requested) {
         const BYPASS_INPUT inputs = {
@@ -135,41 +203,20 @@ static void app_controller_step(UW started_ms)
         state = app_bypass_step(&bypass, &inputs, &targets);
         left = targets.left_rpm_x10;
         right = targets.right_rpm_x10;
+    } else if (permitted && navigation_fresh && navigation.phase == S5_NAV_SCANNING) {
+        state = APP_CTRL_SCANNING;
     } else
 #endif
     if (inhibit & APP_CTRL_LATCH) state = APP_CTRL_STOP_LATCHED;
     else if (inhibit & APP_CTRL_POLL_BUSY) state = APP_CTRL_WAITING_LINE;
-    else if (startup_done) {
+    else if (follow_line) {
+        app_line_targets(&line, &left, &right);
+        state = APP_CTRL_FOLLOWING;
+#if S2_LINE_USE_RPM_CONTROL && !defined(APP_OBSTACLE_BYPASS)
+        state = app_left_exit(line.pattern, operating.lo, &left, &right);
+#endif
+    } else if (startup_done) {
         state = ready ? APP_CTRL_STOPPED : APP_CTRL_WAITING_LINE;
-        if (permitted && navigation_fresh) {
-#ifndef APP_OBSTACLE_BYPASS
-            if (turn_requested) {
-                S2_MOVE_TARGETS targets;
-                if (avoidance_turn.result == S2_MOVE_IDLE && turn_settled) {
-                    INT angle = navigation.phase == S5_NAV_LEFT ?
-                        APP_OBSTACLE_TURN_DEG : -APP_OBSTACLE_TURN_DEG;
-                    ER begin = s2_turn_begin(&avoidance_turn, angle, APP_EFFECTIVE_TRACK_MM, &motion, now.lo);
-                    if (begin != E_OK && begin != E_BUSY && begin != E_TMOUT) app_cancel_turn();
-                }
-                S2_MOVE_RESULT result = s2_encoder_move_step(&avoidance_turn,
-                    &motion, now.lo, TRUE, &targets);
-                left = targets.left_rpm_x10;
-                right = targets.right_rpm_x10;
-                if (result == S2_MOVE_RUNNING)
-                    state = navigation.phase == S5_NAV_LEFT ? APP_CTRL_TURNING_LEFT : APP_CTRL_TURNING_RIGHT;
-            } else
-#endif
-            if (navigation.phase == S5_NAV_CLEAR
-#ifndef APP_OBSTACLE_BYPASS
-                && !avoidance_settling
-#endif
-            ) {
-                app_line_targets(line.pattern, &left, &right);
-                state = APP_CTRL_FOLLOWING;
-            } else if (navigation.phase == S5_NAV_SCANNING) {
-                state = APP_CTRL_SCANNING;
-            }
-        }
     }
     if (motion_fresh && motion.faults != 0U) {
         left = right = 0;
@@ -182,39 +229,40 @@ static void app_controller_step(UW started_ms)
         if ((inhibit & APP_CTRL_LATCH) && bypass.phase != BYPASS_FAILED)
             bypass.phase = BYPASS_IDLE;
         if (bypass.phase == BYPASS_FAILED) state = APP_CTRL_FAULT;
-#else
-        if (avoidance_turn_id) app_cancel_turn();
 #endif
         left = right = 0;
         if (state != APP_CTRL_FAULT)
             state = (inhibit & APP_CTRL_LATCH) ? APP_CTRL_STOP_LATCHED : APP_CTRL_WAITING_LINE;
     }
+    ER er;
 #ifdef APP_OBSTACLE_BYPASS
-    BOOL encoder_move = bypass_requested && (left != 0 || right != 0);
-#else
-    BOOL encoder_move = turn_requested && (left != 0 || right != 0);
+    if (bypass_requested && (left != 0 || right != 0))
+        er = subsystem2_set_signed_rpm_x10(left, right);
+    else
 #endif
-    ER er = encoder_move ? subsystem2_set_signed_rpm_x10(left, right) : app_motor_request(left, right);
+        er = app_motor_request(left, right);
     if (er != E_OK) {
 #ifdef APP_OBSTACLE_BYPASS
         if (bypass_requested) bypass.phase = BYPASS_FAILED;
-#else
-        if (avoidance_turn_id) app_cancel_turn();
 #endif
         (void)app_motor_request(0, 0);
+#ifdef APP_OBSTACLE_BYPASS
     } else {
         if (left != 0 || right != 0) last_drive_ms = now.lo;
-#ifdef APP_OBSTACLE_BYPASS
         /* A latched STOP ends the scan request once the wheels settle, so
          * the sensor can update the front clearance needed for Resume. */
         if ((inhibit & APP_CTRL_LATCH) && turn_requested && turn_settled)
             (void)subsystem5_end_turn(navigation.turn_id);
-#else
-        if (encoder_move) avoidance_settling = TRUE;
-        if (turn_requested && turn_settled && avoidance_turn.result >= S2_MOVE_REACHED)
-            (void)subsystem5_end_turn(avoidance_turn_id);
 #endif
     }
+#if S2_LINE_USE_RPM_CONTROL && !defined(APP_OBSTACLE_BYPASS)
+    if (!follow_line || inhibit || er != E_OK) {
+        if ((inhibit & APP_CTRL_LATCH) || left_bend.phase == APP_LEFT_TRACKING)
+            left_bend = (APP_LEFT_BEND){0};
+        else
+            left_bend.phase = APP_LEFT_WAITING;
+    }
+#endif
     app_controller_publish(state, er);
 }
 static void vehicle_controller_task(INT stacd, void *exinf)

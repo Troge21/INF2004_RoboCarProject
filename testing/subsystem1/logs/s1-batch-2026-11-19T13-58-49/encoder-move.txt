@@ -1,0 +1,1 @@
+PASS: signed distance, left/right/U-turn geometry, per-wheel stopping, reverse faults, clock wrap and stale/timeout/cancel stops.

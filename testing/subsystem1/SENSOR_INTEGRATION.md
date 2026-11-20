@@ -7,14 +7,16 @@ branch switch or merge commit; later Git publication is recorded in history. The
 servo movement and the dashboard profile; only read-only STATUS/capture was
 sent by the diagnostic tool. No normal moving-wheel trial ran.
 
-## Current image and preserved baseline
+## Historical image and preserved baseline
 
-Single current UF2: **build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2**.
+The stationary test used **build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2**.
 NET=lwip MQTT=1 TEST=1 APP_MODE=integrated; **723456 bytes**, SHA-256
 **3a8b79c37a01cfa92615db69e62d2817795ab53ec9decae5e33c4faa19f3aaf6**.
 Wheel motors are disabled. **The servo centres at startup and sweeps when
 the front is blocked, including in TEST=1.** The user reports flashing this
 image and confirms the profile and existing readings update.
+See the [current normal build](../../dashboard/README.md#current-integrated-firmware---20-november-2026)
+for the firmware in use now.
 
 The preceding working 390c5893 image/source is preserved in a local rollback
 archive outside the repository; see [the backup record](logs/2026-11-13-before-sensor-integration-backup.json).
@@ -28,7 +30,7 @@ slices 4/5, encoders and PID. The existing shared GPIO IRQ13 stays in place.
 S5 no longer calls any S2 wheel API. It publishes time-stamped sensing and
 navigation intent; app_main's controller is the sole integrated wheel requester.
 
-| Fresh S5 intent | Normal controller behavior |
+| Fresh S5 intent | Controller behavior in the initial integration |
 | --- | --- |
 | Clear front, centre >250 mm | Existing IR line targets, unchanged |
 | Scanning | Zero wheel request; Scanning obstacle state |

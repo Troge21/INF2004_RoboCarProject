@@ -1,0 +1,1 @@
+{"snapshot_bytes":79,"publication_time_bytes":4,"scan_cache_and_metadata_bytes":462,"resources_bytes":19,"input_output_message_buffer_bytes":0,"main_packet_bytes":46}

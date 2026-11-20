@@ -9,8 +9,7 @@ typedef struct {
     BOOL valid;
 } S2_COMMAND;
 typedef struct {
-    INT integral_x100, output_x100, previous_rpm_x10, previous_target_x10;
-    UW last_update_ms;
+    INT integral_x100, desired_x100, output_x100, previous_rpm_x10, previous_target_x10;
     BOOL previous_valid;
 } S2_PID_STATE;
 typedef struct {

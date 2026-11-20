@@ -59,7 +59,9 @@ int app_controller_init(void) {
     zero_bytes(request_slot,sizeof(request_slot));zero_bytes(reply_slot,sizeof(reply_slot));
     zero_bytes(published,sizeof(published));zero_bytes(resume_ticket,sizeof(resume_ticket));
     __atomic_store_n(&pickup_stop,0U,__ATOMIC_RELEASE);
-    ticket_counter=0;owner_word=APP_TEST?APP_CTRL_TEST:0U;
+    ticket_counter=0;
+    /* Normal runs require a fresh Resume after every boot. */
+    owner_word=APP_TEST?APP_CTRL_TEST:APP_CTRL_LATCH;
     return E_OK;
 }
 int app_controller_submit_stop(uint32_t id,uint32_t session,uint32_t deadline_ms) {

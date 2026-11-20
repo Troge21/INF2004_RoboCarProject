@@ -1,4 +1,5 @@
 /* Actual controller handoff; deterministic semaphore/clock, no GPIO/SDK. */
+#include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -23,7 +24,23 @@ static int tk_sig_sem(ID id,int n){(void)id;(void)n;held=0;return E_OK;}
 static int tk_get_otm(SYSTIM *t){t->lo=clock_ms;t->hi=0;return E_OK;}
 #include "../../../app_program/controller.c"
 static void check(int ok,const char *name){checks++;if(!ok)failures++;printf("[controller] %s %s\n",ok?"PASS":"FAIL",name);}
-static void reset(void){controller_sem=0;held=blocked=0;clock_ms=1000;(void)app_controller_init();app_controller_publish(APP_CTRL_FOLLOWING,E_OK);}
+static void boot(void){
+    controller_sem=0;held=blocked=0;clock_ms=1000;
+    assert(app_controller_init()==E_OK);
+}
+static void reset(void){
+    boot();
+    app_controller_publish(APP_CTRL_FOLLOWING,E_OK);
+    if(!APP_TEST){
+        uint32_t ticket;
+        uint8_t reply[10];
+        assert(app_controller_arm_resume(clock_ms+1000U,&ticket)==0);
+        assert(app_controller_submit_resume(ticket,99,clock_ms+1000U)==0);
+        assert(app_controller_poll_ready(1)==0);
+        app_controller_publish(APP_CTRL_FOLLOWING,E_OK);
+        assert(app_controller_take_reply(reply)==E_OK);
+    }
+}
 static void latch(void){
     uint8_t b[10];
     (void)app_controller_submit_stop(91,99,clock_ms+1000U);
@@ -32,6 +49,13 @@ static void latch(void){
 }
 int main(void){
     uint8_t reply[10],state[5];
+    boot();
+    check(app_controller_poll()==(APP_TEST?0:APP_CTRL_LATCH),"normal boot inhibits motion before the first publication");
+    app_controller_publish(APP_TEST?APP_CTRL_DISABLED:APP_CTRL_STARTING,E_OK);
+    app_controller_cancel_resume();
+    check(app_controller_poll_ready(1)==(APP_TEST?0:APP_CTRL_LATCH)&&app_controller_snapshot(state)==E_OK&&
+          state[4]==(APP_TEST?(APP_CTRL_DISABLED|APP_CTRL_TEST):(APP_CTRL_STOP_LATCHED|APP_CTRL_LATCH)),
+          "ready inputs and reconnect cancellation cannot release the boot latch");
     reset();
     check(app_controller_submit_stop(0,1,1100)==E_PAR&&app_controller_submit_stop(1,0,1100)==E_PAR,"zero IDs/session are rejected");
     check(app_controller_submit_stop(12,99,2000)==E_OK&&app_controller_submit_stop(13,99,2000)==E_TMOUT,"one occupied request slot rejects another request");
@@ -83,8 +107,9 @@ int main(void){
         "pickup publishes a local latch without a fabricated command reply");
     check(app_controller_init()==E_OBJ&&(app_controller_poll_ready(1)&APP_CTRL_LATCH),
         "pickup stays latched through reinitialization attempts and ready input");
-    reset();
-    check(app_controller_poll()==0,"a fresh boot starts with the pickup latch clear");
+    boot();
+    check(!pickup_stop_active()&&app_controller_poll()==(APP_TEST?0:APP_CTRL_LATCH),
+        "reboot clears the pickup event and restores the boot stop policy");
 
     {
         uint32_t ticket=777;

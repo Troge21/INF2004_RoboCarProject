@@ -32,9 +32,9 @@ timings and agree the final acceptance criteria with the team.
 
 ## Prepare the car and laptop later
 
-1. Flash the single current file:
-   `build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2`.
-   This is the stationary `NET=lwip MQTT=1 TEST=1 APP_MODE=integrated` build. Laptop USB or a
+1. Build the stationary profile with `NET=lwip MQTT=1 TEST=1 APP_MODE=integrated`
+   using the [Pico build instructions](../../dashboard/README.md#build-and-final-validation).
+   Flash `build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2`. Laptop USB or a
    power bank is the sole car supply; there is no separate battery switch.
    Power the car normally by USB after flashing. Keep that power
    connected for the entire series; do not press BOOTSEL or reset during trials.

@@ -4,6 +4,8 @@
 #include <stddef.h>
 
 #define BC_STAR 0x094U
+#define BC_QUIET_MODULES 10U
+#define BC_MIN_QUIET_US (S3_BC_MIN_NARROW_US * BC_QUIET_MODULES)
 static const char s_alphabet[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-. $/+%";
 /* Nine width bits in scan order: 1=wide, 0=narrow, starting with black.
  * Reference: standard Code 39; cross-checked against ReportLab's encoder. */
@@ -90,11 +92,14 @@ int s3_barcode_decode(const uint32_t widths[S3_BC_RUNS],
     /* Reject severe acceleration/distortion; speed may vary between scans. */
     if (largest * 10U > smallest * 14U) return S3_BC_INVALID;
     for (i = 0; i < 2U; ++i) {
-        uint32_t gap = widths[9U + i * 10U];
-        if (gap * 2U < narrow[i] || gap > narrow[i] * 18U / 10U)
+        const uint32_t gap = widths[9U + i * 10U];
+        /* Use the neighboring characters symmetrically when speed changes. */
+        const uint32_t reference = (narrow[i] + narrow[i + 1U]) / 2U;
+        if (gap < (reference + 1U) / 2U || gap > reference * 18U / 10U)
             return S3_BC_INVALID;
     }
-    if (leading_white_us < narrow[0] * 10U || trailing_white_us < narrow[2] * 10U)
+    if (leading_white_us < narrow[0] * BC_QUIET_MODULES ||
+        trailing_white_us < narrow[2] * BC_QUIET_MODULES)
         return S3_BC_INVALID;
     if (patterns[0] == BC_STAR && patterns[2] == BC_STAR) reversed = 0;
     else if (reverse_nine(patterns[0]) == BC_STAR &&
@@ -165,21 +170,47 @@ int s3_barcode_edge(S3_BARCODE_DECODER *decoder, int black, uint32_t now_us,
         /* More ink before the required trailing white: not this frame. */
         decoder->pending = 0;
         result = S3_BC_INVALID;
-    } else if (decoder->capturing) {
+    }
+    if (decoder->capturing && black && duration >= BC_MIN_QUIET_US &&
+        duration >= decoder->quiet_needed_us) {
+        /* This white run is too long to belong to the partial label. The
+         * same edge may start another label after this quiet interval. */
+        decoder->capturing = 0;
+        result = S3_BC_INVALID;
+    }
+    if (decoder->capturing) {
         decoder->widths[decoder->count++] = duration;
-        if (decoder->count == S3_BC_RUNS) {
+        if (decoder->count == 1U) {
+            /* Both start-guard orientations start with a narrow black bar.
+             * Even at the accepted 4:1 ratio and +/-40% spread, a guard
+             * element is shorter than ten times that first bar. */
+            decoder->quiet_needed_us = duration * BC_QUIET_MODULES;
+        } else if (decoder->count == 9U) {
+            unsigned pattern;
+            uint32_t narrow;
+            if (!classify(decoder->widths, &pattern, &narrow) ||
+                (pattern != BC_STAR && reverse_nine(pattern) != BC_STAR) ||
+                decoder->leading_white_us < narrow * BC_QUIET_MODULES) {
+                decoder->capturing = 0;
+                result = S3_BC_INVALID;
+            } else {
+                /* Remaining character means may be at most 1.4x this
+                 * guard mean. Their widest accepted run is still <10x. */
+                decoder->quiet_needed_us = narrow * BC_QUIET_MODULES;
+            }
+        } else if (decoder->count == S3_BC_RUNS) {
             unsigned pattern;
             uint32_t narrow;
             decoder->capturing = 0;
             result = s3_barcode_decode(decoder->widths, decoder->leading_white_us,
                                        UINT32_MAX, &decoder->pending_code);
             if (result == S3_BC_OK && classify(decoder->widths + 20U, &pattern, &narrow)) {
-                decoder->quiet_needed_us = narrow * 10U;
+                decoder->quiet_needed_us = narrow * BC_QUIET_MODULES;
                 decoder->pending = 1;
                 result = S3_BC_NONE; /* wait for the real trailing white */
             }
         }
-    } else if (black && duration >= S3_BC_MIN_NARROW_US * 10U) {
+    } else if (black && duration >= BC_MIN_QUIET_US) {
         decoder->count = 0;
         decoder->capturing = 1;
         decoder->frame_start_us = now_us;

@@ -20,8 +20,6 @@
 /* A scan can finish during startup. Leave time for the full 90-degree
  * encoder move and stopped-speed confirmation after the controller starts. */
 #define S5_TURN_WAIT_MS (APP_START_DELAY_MS + 6000U)
-#else
-#define S5_TURN_WAIT_MS 4000U
 #endif
 #define S5_STATIONARY_TURN_MS 500U
 #define S5_NAV_PHASE_MASK 7U
@@ -170,9 +168,14 @@ static void phase_delay(UW delay_ms,S5_NAV_PHASE phase)
     }
     (void)navigation_write(phase,0U);
 }
+#if defined(APP_OBSTACLE_BYPASS) || APP_TEST
 static void wait_for_turn(S5_NAV_PHASE phase,UW turn_id)
 {
+#ifdef APP_OBSTACLE_BYPASS
     const UW limit=(APP_TEST||!APP_LINE_FOLLOW_ENABLED)?S5_STATIONARY_TURN_MS:S5_TURN_WAIT_MS;
+#else
+    const UW limit=S5_STATIONARY_TURN_MS;
+#endif
     SYSTIM started={0},now={0};
     (void)tk_get_otm(&started);
     do {
@@ -182,6 +185,7 @@ static void wait_for_turn(S5_NAV_PHASE phase,UW turn_id)
     } while((UW)(now.lo-started.lo)<limit);
     (void)navigation_write(S5_NAV_SCANNING,0U);
 }
+#endif
 static volatile UINT echo_state;
 static volatile UW rise_us, width_us;
 
@@ -263,8 +267,7 @@ static void ultrasonic_task(INT stacd, void *exinf)
         S5_NAV_PHASE current=S5_NAV_SCANNING;
         for(;;) {
             UW centre=0,left=0,right=0,pulse;
-            const char *centre_error,*left_error,*right_error;
-            S5_MOTION choice;
+            const char *centre_error;
             servo_point_to(S5_SCAN_CENTRE_DEG);
             phase_delay(S5_SERVO_SETTLE_MS,current);
             centre_error=measure(&centre,&pulse);
@@ -276,26 +279,29 @@ static void ultrasonic_task(INT stacd, void *exinf)
             if(centre>S5_OBSTACLE_MM) {
                 current=S5_NAV_CLEAR;phase_delay(SAMPLE_PAUSE_MS,current);continue;
             }
-            /* Stop through the controller before moving to a side view. */
             phase_delay(SAMPLE_PAUSE_MS,S5_NAV_SCANNING);
             servo_point_to(S5_SCAN_LEFT_DEG);
             phase_delay(S5_SERVO_SETTLE_MS,S5_NAV_SCANNING);
-            left_error=measure(&left,&pulse);
+            (void)measure(&left,&pulse);
             phase_delay(SAMPLE_PAUSE_MS,S5_NAV_SCANNING);
             servo_point_to(S5_SCAN_RIGHT_DEG);
             phase_delay(S5_SERVO_SETTLE_MS,S5_NAV_SCANNING);
-            right_error=measure(&right,&pulse);
+            (void)measure(&right,&pulse);
             servo_point_to(S5_SCAN_CENTRE_DEG);
             if(++profile==0U)++profile; /* Zero is reserved for no turn request. */
             scan_write(profile,right,centre,left);
-            choice=s5_choose_motion(TRUE,centre,left_error==NULL,left,
-                                    right_error==NULL,right);
+#if defined(APP_OBSTACLE_BYPASS) || APP_TEST
+            S5_MOTION choice=s5_choose_motion(TRUE,centre,left!=0U,left,right!=0U,right);
             if(choice==S5_MOTION_LEFT||choice==S5_MOTION_RIGHT) {
                 wait_for_turn(choice==S5_MOTION_LEFT?S5_NAV_LEFT:S5_NAV_RIGHT,profile);
                 current=S5_NAV_SCANNING; /* stop until a fresh centre check */
             } else {
                 current=S5_NAV_BLOCKED;phase_delay(SAMPLE_PAUSE_MS,current);
             }
+#else
+            /* The normal controller follows IR only. Scans still feed telemetry. */
+            current=S5_NAV_SCANNING;
+#endif
         }
     }
 }

@@ -97,7 +97,9 @@ Radio loss cancels unused/queued Resume when its nonblocking controller lock
 is available. It cannot undo a Resume already executed before the loss.
 A three-second missing result reports **unknown outcome**; check live state
 or issue STOP. Reconnect never automatically resends or releases anything.
-A browser-only reconnect preserves the latch; a full Pico restart clears it.
+A browser-only reconnect preserves the latch. A full Pico restart clears any
+pickup event and starts normal firmware with STOP latched. An explicit Resume
+is required for the new run.
 
 Stock lwIP's incoming callback does not expose the retained flag. Firmware
 therefore does not claim retained-command rejection. The browser rejects

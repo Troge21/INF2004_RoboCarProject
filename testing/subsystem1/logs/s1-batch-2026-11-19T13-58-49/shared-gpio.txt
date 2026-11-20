@@ -1,0 +1,1 @@
+PASS: actual shared IRQ13 dispatch, per-pin echo masking, encoder continuity, edge clearing and core ownership

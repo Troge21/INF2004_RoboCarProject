@@ -5,29 +5,38 @@ GP26 / ADC0; GP28 / ADC2 is barcode-reserved. GP16/17 and GP0/1 are wheel
 encoders. The old GP6/GP16 digital steering path and GPIO barcode sampler
 are inactive.
 
-Each channel discards one conversion and averages two. Centre/left black
-threshold is >=950 and right >=1420 on raw 0..4095; these are the teammate's
-existing thresholds and need physical validation. Failed, short, out-of-range
-or >100 ms ADC sampling is invalid. A nine-byte protected snapshot stores
-timestamp:32, three raw values:12 each, validity:1 and reserved:3. Readers
-derive pattern and check source age; only S3 accesses the ADC.
+Each steering channel discards one conversion and averages two. Black is
+>=455 at centre (GP27, from bench readings) and >=1420 at right (GP26) on
+raw 0..4095. Recheck the centre cutoff on the track. Failed, short, out-of-range
+or >100 ms ADC sampling is invalid. An eight-byte protected snapshot stores
+timestamp:32, two raw values:12 each, validity:1 and reserved:7. Readers
+derive pattern and check source age. GP28 is sampled by the standalone
+diagnostic for calibration. The integrated steering loop reads GP27 and GP26.
 
-The controller polls every 20 ms and uses the teammate's RPM API/PID without
+The controller uses the teammate's RPM API/PID without
 changing its gains, polarity, calibration or encoder driver:
 
-| GP27 black | GP26 black | Pattern | Left/right target |
-| --- | --- | ---: | --- |
-| No | No | 0 | 35 / 35 RPM, centered forward |
-| No | Yes | 1 | 35 / 26 RPM, correct right |
-| Yes | No | 2 | 26 / 35 RPM, correct left |
-| Yes | Yes | 3 | 35 / 35 RPM, cross junction |
+Both wheels normally target 26 RPM on white and when both sensors detect a junction.
+Steering scales the raw GP27 and GP26 readings separately, using the ranges
+250–750 and 450–2650 respectively. The difference reduces the wheel target
+on the tape side. The weak-edge response applies up to 60% contrast. Above
+that, the correction increases to 14 RPM at full contrast for a tighter arc.
+The correction follows the current sample and fades as it returns to white.
+In the normal RPM build, a left bend held for at least 300 ms with a peak
+correction of at least 7 RPM can arm recovery. When the left sensor has seen
+white for at least 60 ms and the live correction goes neutral, the car turns
+left with the outside wheel. Tape detection or a live right-edge correction
+ends the search immediately. After 1.1 seconds of searching it stops and
+waits for tape. Invalid input during a search also stops both wheels and
+waits for valid tape. STOP clears the search and latches the motors off.
 
 Missing/invalid/stale sensor or motor feedback requests zero. A known S2
 fault is reported as Controller fault. The controller checks its latched
 STOP before steering, repeatedly requests zero and never clears the inhibit
 because of new line input or reconnection. The S2 task alone writes PWM;
 its watchdog and faults remain active. Command acceptance does not establish
-physical wheel standstill. White/white is not a lost-line stop condition.
+physical wheel standstill. Outside an armed left recovery, white/white
+continues to mean forward.
 
 Default APP_MODE=integrated runs all subsystem lifecycles. TEST=1 integrated
 is stationary (no motor task); TEST=0 integrated enables driving after the

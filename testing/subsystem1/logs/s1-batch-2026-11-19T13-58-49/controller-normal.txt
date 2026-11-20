@@ -1,0 +1,51 @@
+[controller] PASS zero IDs/session are rejected
+[controller] PASS one occupied request slot rejects another request
+[controller] PASS latch is held by controller, not acknowledged before motor submission
+[controller] PASS busy motor handoff does not produce a success reply
+[controller] PASS matching applied result follows accepted zero-duty submission
+[controller] PASS subsequent steering state cannot override stop latch
+[controller] PASS reinitialization cannot clear an active latch
+[controller] PASS deadline expiry is checked again by the controller
+[controller] PASS unbounded future deadlines are rejected
+[controller] PASS motor errors retain inhibit and report fault, not successful stop
+[controller] PASS S2 feedback fault cannot report success even when zero request is accepted
+[controller] PASS permanent busy handoff expires without clearing inhibit
+[controller] PASS contended shared access never waits or invents a state
+[controller] PASS lease survives wrap and disabled build reports only logical inhibit
+[controller] PASS build mode is real compile-time mode
+[controller] PASS stale owner publication cannot admit commands
+[controller] PASS unavailable/calibration controller does not admit stop
+[controller] PASS pickup is retained even when the command mailbox is contended
+[controller] PASS pickup publishes a local latch without a fabricated command reply
+[controller] PASS pickup stays latched through reinitialization attempts and ready input
+[controller] PASS a fresh boot starts with the pickup latch clear
+[controller] PASS unlatched control cannot arm Resume or change output on refusal
+[controller] PASS only a normal latched controller offers Resume authorization
+[controller] PASS arming alone cannot release STOP
+[controller] PASS server issues a new one-use ticket instead of trusting a replayed client ID
+[controller] PASS superseded authorization cannot resume
+[controller] PASS commit waits for current controller source checks
+[controller] PASS eligible explicit Resume releases latch but waits for motor handoff before reply
+[controller] PASS successful Resume reply identifies its command kind and released controller state
+[controller] PASS consumed ticket is never usable again
+[controller] PASS invalid or blocked source checks retain STOP
+[controller] PASS not-ready is an explicit failure, not a fabricated successful resume
+[controller] PASS failed motor submission immediately restores inhibit and cannot report Resume success
+[controller] PASS failed Resume handoff restores the latch even when publication is contended
+[controller] PASS contended publication preserves the failed Resume outcome until its reply is delivered
+[controller] PASS STOP preempts a queued Resume in the one-slot controller mailbox
+[controller] PASS STOP invalidates the previous authorization even after its own reply is drained
+[controller] PASS a replayed old arm cannot recreate the old server token after STOP
+[controller] PASS unused authorization expires at its hard two-second boundary
+[controller] PASS queued Resume expiry is checked again immediately before release
+[controller] PASS connection cancellation discards unprocessed Resume and preserves the latch
+[controller] PASS fault publication invalidates tickets and cannot be cleared by Resume
+[controller] PASS Resume authorization and lease handle uint32 uptime wrap
+[controller] PASS Resume authorization never waits behind a controller lock
+[controller] PASS pickup wins over a queued Resume
+[controller] PASS queued Resume reports a refusal with the pickup latch held
+[controller] PASS pickup refuses both fresh Resume authorizations and existing tickets
+[controller] PASS fixture releases Resume before pickup arrives
+[controller] PASS pickup before motor submission cancels in-flight Resume
+[controller] PASS a pickup during Resume prevents a success reply
+[controller] SUMMARY 50 checks, 0 failures (TEST=0)

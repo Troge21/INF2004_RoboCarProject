@@ -6,11 +6,11 @@ checklist](FINAL_ACCEPTANCE.md#motion-and-stop-in-normal-firmware) and
 UF2 is the normal integrated operating profile:
 build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt.uf2 (no _test suffix).
 NET=lwip MQTT=1 TEST=0 APP_MODE=integrated CONSOLE=usb_cdc CRASH_REPORT=0.
-Prepared 17 November with explicit Resume: 721920 bytes, SHA-256
-2c5a4652c7c434fb1d27743a3579b6a9ff0dcf2f2f9a4ee79a813840ecd1bcbe.
-The motor task, measured encoder/path feedback, line following, S5 scans,
-controller-owned avoidance, STATUS and latched STOP remain enabled. Resume
-only releases the inhibit after fresh stopped-wheel/clear-front checks.
+The [dashboard README](../../dashboard/README.md#current-integrated-firmware---20-november-2026)
+records the current UF2 fingerprint.
+The normal build uses S5 distance and scans for telemetry. Use a clear test
+area because this build drives without obstacle avoidance. Resume releases
+the inhibit after fresh line and stopped-wheel checks with no motor fault.
 Sensor/PID/steering algorithms are unchanged. On 18 November the user reported
 the Resume test works after the requested Stop -> Resume -> Stop procedure.
 This basic functional pass is [user-reported](logs/2026-11-18-resume-user-bench-observation.md);
@@ -22,40 +22,37 @@ The older 9c0dbfd5 STOP pass below remains historical.
 
 The car has one USB/power-bank supply and no separate battery switch. Before
 flashing or powering normal TEST=0, securely raise both drive wheels.
-Normal driving can start after three seconds; unplugging clears the latch
-on the next boot. A browser reconnect does not clear it.
+Normal firmware starts with STOP latched on every boot. Dashboard reconnect
+preserves the latch. Resume is available after the startup and source checks.
 
 After flashing with both wheels raised and the servo free:
 
 1. Refresh/reconnect; Request status should report Normal (TEST=false).
-   The live state follows the controller: Starting, Following line, scanning
-   or turning as appropriate. It should no longer report Control disabled.
-2. Use a broad flat target about 0.5-1 m in front (a valid reading above 250 mm)
-   and hold a steady line target
-   giving line_bits 4 or 7. Observe both wheels rotating and actual encoder
+   Expect Stop latched and both wheels stationary after the startup delay.
+2. Hold a steady line target giving line_bits 4 or 7. Leave the space ahead
+   clear and click Resume while the dashboard's distance is unavailable.
+   Observe both wheels rotating and actual encoder
    speeds/counts/path changing. Do not bypass faults if they do not rotate.
 3. Keeping the same target, click Stop once. Both wheels must stop and
    the matching controller result must confirm Stop latched. If either wheel
    continues, unplug the USB/power-bank supply immediately.
 4. With power continuous, vary the line targets and reconnect only the
    dashboard. Both wheels must remain stopped; source telemetry may continue.
-5. Keep power connected and both wheels raised. Restore the valid clear-front
-   target above 250 mm and valid IR readings; wait for both measured velocities
+5. Keep power connected and both wheels raised. Restore valid IR readings
+   and wait for both measured velocities
    to be zero, then click Resume once. Expect the matching release result and
    both wheels rotating under the same original line policy. Counts/path must
    continue from the earlier run, not reset.
-6. Click Latch stop again and confirm both wheels stop. Vary line targets and
-   reconnect only the dashboard: they must remain stopped and latched. With a
-   blocked front, an explicit Resume must report not ready and retain the latch;
-   restoring a clear target must not automatically resume it. Use a new click.
-7. Finish by unplugging the whole-car supply. Keep wheels raised for every
-   later restart: restarting clears the latch and normal startup may drive.
+6. Click Stop again and confirm both wheels stop. Vary line targets, bring an
+   object near the sonar with the wheels raised, and reconnect the dashboard.
+   Both wheels must remain stopped and latched.
+7. Unplug and reconnect the whole-car supply with the wheels still raised.
+   Verify Stop latched and zero wheel movement after the startup delay with
+   valid line readings. Finish by unplugging the supply.
 
 The observer sends read-only STATUS only. Record physical wheel observations
 separately; a controller reply confirms accepted zero commands, not measured
-standstill. Do not put the car on the surface until the raised-wheel check
-passes. Normal operation retains the existing autonomous three-second startup;
-explicit Resume is available after STOP; no WiFi-dependent startup gate was added.
+standstill. Confirm the raised-wheel check before running on the surface.
 
 ## Current Resume observation and remaining checks
 
@@ -64,7 +61,7 @@ explicit Resume is available after STOP; no WiFi-dependent startup gate was adde
       Stop -> Resume -> Stop instructions (18 November); no independent capture.
 - [ ] Collect detailed wheel/command results and timing on the intended image.
 - [ ] Keep counts/path across Resume; preserve latch through browser reconnect.
-- [ ] Blocked/stale source or motor-fault admission must not release the latch.
+- [ ] Stale line or encoder data, or a motor fault, must retain the latch.
 - [ ] A delayed/failed request has no automatic retry or later reconnect release.
 - [ ] Repeat STOP while a Resume is pending; STOP must remain usable. Software
       checks cover expiry, replay, session changes and slot contention; record

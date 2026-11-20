@@ -7,13 +7,15 @@ the kernel ADC device. GP27 is the left/centre line input, GP26 is right and
 GP28 is barcode-reserved. GP16 is now an encoder; the old digital capture
 and line GPIO paths are inactive.
 
-The current host suite passes 16 groups. Its actual ADC/task harness checks
-channel selection, discarded conversions, averaging, threshold boundaries,
-all four line patterns, invalid reads, stale sampling, wrap, contention and
-the packed nine-byte snapshot. Barcode decoder/capture register models remain
+The 19 November host suite passes 17 groups. The ADC/task harness checks
+GP28 fault isolation, channel selection, discarded conversions, averaging,
+threshold boundaries, all four line patterns, invalid reads, stale sampling,
+wrap, contention, the eight-byte snapshot and tick-aware delay. The decoder
+suite checks gap validation under uneven speed in both scan directions.
+Barcode decoder/capture register models remain
 software-only checks of the retained decoder; no live AO barcode decoding
-or recognition accuracy is claimed. Both integrated normal and stationary
-ARM builds pass. See [the current integration evidence](../subsystem1/TEST_LOG.md)
+or recognition accuracy is claimed. The current fixes passed a stationary
+integrated ARM build. See [the current integration evidence](../subsystem1/TEST_LOG.md)
 and [the physical procedure](../subsystem1/MOTOR_STOP_TEST.md).
 
 The earlier GP26 barcode / GP6+GP16 line configuration and 200 ms recovery

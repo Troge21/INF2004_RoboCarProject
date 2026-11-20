@@ -29,35 +29,32 @@ static void pid_reset(S2_PID_STATE *pid)
 }
 
 static void pid_step(S2_PID_STATE *pid, INT target, INT measured,
-                     UW integral_dt, UW measurement_dt, UW output_dt, INT ff)
+                     UW measurement_dt, INT duty_floor, INT duty_ceiling, INT ff)
 {
-    INT error, p, d = 0, candidate_i, unsaturated, desired, max_step;
+    INT error, p, d = 0, candidate_i, unsaturated, desired;
     BOOL reject_i;
     const INT direction = target < 0 ? -1 : 1;
     const INT feedforward = (INT)((int64_t)target * direction * ff / S2_PID_FF_RPM_X10);
-    if (target != pid->previous_target_x10) pid->integral_x100 = 0;
     error = direction * (target - measured);
     p = (INT)((int64_t)error * S2_PID_KP_X1000 / 100);
     if (pid->previous_valid && measurement_dt != 0U)
         d = (INT)(-((int64_t)measured - pid->previous_rpm_x10) * direction *
                   S2_PID_KD_X1000 * 10 / measurement_dt);
     candidate_i = clamp(pid->integral_x100 +
-        (INT)((int64_t)error * S2_PID_KI_X1000 * integral_dt / 100000),
+        (INT)((int64_t)error * S2_PID_KI_X1000 * measurement_dt / 100000),
         -S2_PID_INTEGRAL_LIMIT_X100, S2_PID_INTEGRAL_LIMIT_X100);
     unsaturated = feedforward + p + candidate_i + d;
     desired = clamp(unsaturated, 0, S2_PID_MAX_DUTY_X100);
-    max_step = (INT)((int64_t)S2_PID_SLEW_X100_PER_S * output_dt / 1000);
     reject_i = (unsaturated > S2_PID_MAX_DUTY_X100 && error > 0) ||
                (unsaturated < 0 && error < 0) ||
-               (desired > pid->output_x100 + max_step && error > 0) ||
-               (desired < pid->output_x100 - max_step && error < 0);
+               (desired > duty_ceiling && error > 0) ||
+               (desired < duty_floor && error < 0);
     if (!reject_i) pid->integral_x100 = candidate_i;
     else {
         unsaturated = feedforward + p + pid->integral_x100 + d;
         desired = clamp(unsaturated, 0, S2_PID_MAX_DUTY_X100);
     }
-    pid->output_x100 = clamp(desired, pid->output_x100 - max_step,
-                            pid->output_x100 + max_step);
+    pid->desired_x100 = desired;
     pid->previous_rpm_x10 = measured;
     pid->previous_target_x10 = target;
     pid->previous_valid = TRUE;
@@ -138,6 +135,8 @@ void s2_control_step(S2_CONTROL_STATE *s, UW now, S2_ENCODER_COUNTS counts,
     rpms[0] = out->actual_left_rpm_x10; rpms[1] = out->actual_right_rpm_x10;
     if (active && out->faults == 0U) {
         if (cmd->mode == S2_MODE_RPM) {
+            const INT max_step = (INT)((int64_t)S2_PID_SLEW_X100_PER_S * loop_dt / 1000);
+            const INT turn_fall_step = (INT)((int64_t)S2_TURN_FALL_X100_PER_S * loop_dt / 1000);
             targets[0] = cmd->left; targets[1] = cmd->right;
             for (i = 0; i < 2U; ++i) {
                 S2_PID_STATE *pid = &s->pid[i];
@@ -148,16 +147,18 @@ void s2_control_step(S2_CONTROL_STATE *s, UW now, S2_ENCODER_COUNTS counts,
                 }
                 if (pid->previous_valid && (pid->previous_target_x10 < 0) != (direction < 0))
                     pid_reset(pid);
-                if (new_speed || targets[i] != pid->previous_target_x10) {
-                    /* A steering update can run between encoder samples. The
-                     * next sample only earns ramp time since that update. */
-                    UW output_dt = pid->previous_valid ? now - pid->last_update_ms : loop_dt;
-                    UW integral_dt = targets[i] == pid->previous_target_x10 ? output_dt : loop_dt;
-                    pid_step(pid, targets[i], rpms[i], integral_dt,
-                             new_speed ? speed_dt : 0U, output_dt,
+                const BOOL inside_turn = targets[i] > 0 &&
+                    targets[i ^ 1U] - targets[i] >= S2_TURN_MIN_SPLIT_RPM_X10;
+                const INT duty_floor = pid->output_x100 - (inside_turn ? turn_fall_step : max_step);
+                const INT duty_ceiling = pid->output_x100 + max_step;
+                if (new_speed || targets[i] != pid->previous_target_x10)
+                    /* Keep learned load compensation through same-direction
+                     * steering changes and integrate once per encoder sample. */
+                    pid_step(pid, targets[i], rpms[i], new_speed ? speed_dt : 0U,
+                             duty_floor, duty_ceiling,
                              i == 0U ? S2_PID_LEFT_FF_X100 : S2_PID_RIGHT_FF_X100);
-                    pid->last_update_ms = now;
-                }
+                /* Move toward the latest requested duty on every motor tick. */
+                pid->output_x100 = clamp(pid->desired_x100, duty_floor, duty_ceiling);
                 duties[i] = direction * pid->output_x100;
             }
         } else if (cmd->mode == S2_MODE_DUTY) {

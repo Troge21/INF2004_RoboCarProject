@@ -146,7 +146,11 @@ function update(force=false){
   value('imu-note',imuNote);value('height-source',imuNote);
   const control=store.currentController(now,status==='connected');
   value('state',control?`${control.controller_state}${control.stop_latched&&control.controller_state_code!==6?' · stop latched':''}`:'Controller unavailable');value('barcode',current?.barcode?(current.barcode_navigation?current.barcode+' ? '+current.barcode_navigation:current.barcode):'Unavailable');
-  value('faults',control?.controller_state_code===7?'Controller / motor fault':current?.faults===null||!current?'Unavailable':current.faults.length?current.faults.join(', '):'No active faults in '+current.fault_known_mask.toString(2).replaceAll('0','').length+' reported flags');
+  const faultNames=current?.faults;
+  if(faultNames?.length)value('faults',faultNames.join(', '));
+  else if(control?.controller_state_code===7)value('faults','Controller / motor fault');
+  else if(faultNames)value('faults','No active faults in '+current.fault_known_mask.toString(2).replaceAll('0','').length+' reported flags');
+  else value('faults','Unavailable');
   value('vehicle-source',control?'CONTROLLER LIVE':'CONTROLLER UNAVAILABLE');
   value('left-count',current?.left_encoder_count??'Unavailable');value('right-count',current?.right_encoder_count??'Unavailable');
   value('net-distance',current?.net_distance_m==null?'Unavailable':format(current.net_distance_m,3)+' m');

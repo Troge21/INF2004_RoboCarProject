@@ -1,0 +1,5 @@
+PASS: stuck SDA cannot appear as a responding sensor.
+PASS: new data decodes signed 12-bit boundaries and advances the filter.
+PASS: data not ready preserves the caller's sample and filter.
+PASS: SCL failure during a burst aborts the sample with bounded wait.
+PASS: subsequent valid samples resume filtering after the I/O failure.

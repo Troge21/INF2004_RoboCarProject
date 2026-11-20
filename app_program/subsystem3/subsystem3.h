@@ -13,8 +13,10 @@
 #define S3_BARCODE_ADC          2
 #define S3_IR_CENTRE_ADC        1
 #define S3_IR_RIGHT_ADC         0
-#define S3_BARCODE_THRESHOLD    1390U
-#define S3_IR_CENTRE_THRESHOLD  950U
+/* Midpoint of the nearest normal-height GP28 samples (white 133, black 179). */
+#define S3_BARCODE_THRESHOLD    156U
+/* Midpoint of the nearest GP27 bench samples (white 158, black 752). */
+#define S3_IR_CENTRE_THRESHOLD  455U
 #define S3_IR_RIGHT_THRESHOLD   1420U
 #define S3_IR_SAMPLES           2U
 #define S3_IR_PERIOD_MS         20

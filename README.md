@@ -1,21 +1,17 @@
 # micro T-Kernel 3.0 project for Raspberry Pi Pico W
 
-## Current RoboCar integration ? 13 November 2026
+## Current RoboCar firmware
 
-The current source integrates sensor branch c8a789b with S1 v4 and the
-existing controller. S5 publishes servo/range/scan snapshots; the shared
-controller arbitrates line following, obstacle turns and the STOP latch.
-S2/S3/S4 and the existing S1/decoder/latch sources are unchanged.
-Both integrated builds and 17 software check groups pass. Hardware checking
-of this sensor integration is recorded separately from earlier image passes.
+Flash **`build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt.uf2`** for normal
+operation. The integrated `NET=lwip MQTT=1 TEST=0 APP_MODE=integrated`
+profile includes line following, encoder motor control, MQTT telemetry,
+ultrasonic scans and IMU/hump sensing. It boots with STOP latched and
+requires Resume to drive. Raise both wheels for the first flash and test.
 
-Use the single current stationary image:
-**build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_test.uf2**,
-NET=lwip MQTT=1 TEST=1 APP_MODE=integrated. **Wheel motors are disabled;
-the servo centres and sweeps when front distance is <=250 mm.**
-See [the integration contract/evidence](testing/subsystem1/SENSOR_INTEGRATION.md).
-The car uses one USB/power-bank supply. Normal TEST=0 can move after three
-seconds; raise both wheels before flashing or connecting power in that mode.
+Keep the matching `.elf` for debugging and `.map` for memory and linker
+inspection. The separate `_s2_bypass` build is for pending obstacle-bypass
+tests. Build stationary and diagnostic images on demand. See the
+[dashboard setup and current build](dashboard/README.md#current-integrated-firmware---20-november-2026).
 
 [Dashboard, wiring and startup](dashboard/README.md),
 [producer handoff](testing/subsystem1/PRODUCER_HANDOFF.md),

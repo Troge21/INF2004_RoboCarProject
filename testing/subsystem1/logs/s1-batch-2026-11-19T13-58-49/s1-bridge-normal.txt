@@ -1,0 +1,35 @@
+[S1 bridge] PASS collector starts with one protected publication and no input queue
+[S1 bridge] PASS motion publishes when ultrasonic source is absent
+[S1 bridge] PASS S2 RPM is converted to actual speed with its tyre geometry
+[S1 bridge] PASS real zero path is serialized independently of net travel
+[S1 bridge] PASS telemetry rate is bounded independently of producer rates
+[S1 bridge] PASS STATUS reserializes snapshots without calling a producer/driver
+[S1 bridge] PASS actual resource inputs and unsupported high-water remain distinct
+[S1 bridge] PASS radio-owner snapshot contention never blocks or invents a measurement
+[S1 bridge] PASS stale motion expires even while the network continues publishing
+[S1 bridge] PASS requested application stack accounting includes successful task starts
+[S1 bridge] PASS future scan getter automatically activates bounded packets
+[S1 bridge] PASS scan retry has a bounded backoff
+[S1 bridge] PASS rejected scan chunk retries the same indices
+[S1 bridge] PASS completed scan has stable source metadata across chunks
+[S1 bridge] PASS completed scan has stable source metadata across chunks
+[S1 bridge] PASS completed scan has stable source metadata across chunks
+[S1 bridge] PASS completed scan has stable source metadata across chunks
+[S1 bridge] PASS completed scan has stable source metadata across chunks
+[S1 bridge] PASS completed scan has stable source metadata across chunks
+[S1 bridge] PASS completed scan has stable source metadata across chunks
+[S1 bridge] PASS completed scan has stable source metadata across chunks
+[S1 bridge] PASS completed scan has stable source metadata across chunks
+[S1 bridge] PASS completed scan has stable source metadata across chunks
+[S1 bridge] PASS completed scan has stable source metadata across chunks
+[S1 bridge] PASS all 181 scan points fit twelve bounded packets
+[S1 bridge] PASS malformed future scan does not corrupt the published cache
+[S1 bridge] PASS owner path snapshot reaches the existing 46-byte wire field
+[S1 bridge] PASS stale path expires instead of appearing current
+[S1 bridge] PASS S4 owner snapshot reaches the bounded terrain auxiliary path
+[S1 bridge] PASS old live S4 motion expires while the last measured hump remains
+[S1 bridge] PASS disabled/test controller returns an explicit Resume rejection
+[S1 bridge] PASS actual S1 packs server authorization with the current normal latched sensor snapshot
+[S1 bridge] PASS authorization with no recent publication is header-only, never invented sensor readings
+[S1 bridge] PASS wrong MQTT session cannot obtain a Resume ticket through S1
+[S1 bridge] SUMMARY 34 checks, 0 failures

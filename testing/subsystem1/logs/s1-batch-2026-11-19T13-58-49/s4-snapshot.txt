@@ -1,0 +1,51 @@
+[S4 SNAPSHOT] PASS getter rejects null and uninitialized access
+[S4 SNAPSHOT] PASS packed published snapshot starts explicitly initializing without a valid angle
+[S4 SNAPSHOT] PASS real owner loop publishes the live angle rather than the baseline
+[S4 SNAPSHOT] PASS publication and sensor timestamps are original source times
+[S4 SNAPSHOT] PASS sample delay compensates for the kernel's extra tick
+[S4 SNAPSHOT] PASS getter invalidates an aged pitch without making its timestamp fresh
+[S4 SNAPSHOT] PASS busy snapshot returns immediately and leaves caller data unchanged
+[S4 SNAPSHOT] PASS fault status clears live pitch but preserves accepted heights and run maximum
+[S4 SNAPSHOT] PASS explicit reset is immediately visible without cross-task estimator writes
+[S4 SNAPSHOT] PASS owner applies the pending run reset under snapshot synchronization
+[S4 SNAPSHOT] PASS packed snapshot retains signed boundaries and full-width timestamp/duration values
+[S4 SNAPSHOT] PASS pitch freshness survives 32-bit uptime wrap
+[S4 SNAPSHOT] PASS real read failure publishes fault in the same loop
+[S4 SNAPSHOT] PASS recovery enters calibration while retaining run maximum
+[S4 SNAPSHOT] PASS 50 successful calibration samples enable a real live pitch
+[S4 SNAPSHOT] PASS data-not-ready polls do not count as calibration samples
+[S4 SNAPSHOT] PASS the same transient data-not-ready polls allow calibration once 50 new samples arrive
+[S4 SNAPSHOT] PASS an acceleration change restarts the still calibration window
+[S4 SNAPSHOT] PASS fresh nonzero encoder speed prevents calibration
+[S4 SNAPSHOT] PASS one missed sample retains its original pitch timestamp
+[S4 SNAPSHOT] PASS 100 ms without new data invalidates pitch and enters recovery
+[S4 SNAPSHOT] PASS a sustained moderate one-side tilt does not end the run
+[S4 SNAPSHOT] PASS a large acceleration with an implausible gravity magnitude is not pickup evidence
+[S4 SNAPSHOT] PASS strong tilt for less than 160 ms does not end the run
+[S4 SNAPSHOT] PASS a stale sample cannot bridge two short candidates
+[S4 SNAPSHOT] PASS sustained front lift requests the controller latch once at the confirmation boundary
+[S4 SNAPSHOT] PASS pickup aborts the active hump and preserves the run maximum
+[S4 SNAPSHOT] PASS a sustained side pickup also requests STOP
+[S4 SNAPSHOT] PASS a sustained upward pulse arms the gentle route across uptime wrap
+[S4 SNAPSHOT] PASS a moderate tilt needs the full confirmation time after a rise
+[S4 SNAPSHOT] PASS a short upward pulse followed by moderate tilt leaves STOP clear
+[S4 SNAPSHOT] PASS a rise alone and a tilt outside the confirmation window leave STOP clear
+[S4 SNAPSHOT] PASS pitch plus 100 mm of measured travel records a 20 mm full-width hump across time wrap
+[S4 SNAPSHOT] PASS side tilt records the correct wheel and preserves the maximum
+[S4 SNAPSHOT] PASS side tilt records the correct wheel and preserves the maximum
+[S4 SNAPSHOT] PASS same-height crossings receive separate event sequences
+[S4 SNAPSHOT] PASS hand tilt at a fixed wheel position cannot produce a measured height
+[S4 SNAPSHOT] PASS loss of wheel feedback cancels a candidate and preserves accepted heights
+[S4 SNAPSHOT] PASS new-run reset immediately masks an active candidate
+[S4 SNAPSHOT] PASS the rest of a pre-reset hump cannot populate the new run
+[S4 SNAPSHOT] PASS a stop while still on the ramp cannot complete a crossing
+[S4 SNAPSHOT] PASS returning to level completes a right-wheel crossing even if encoder travel stops
+[S4 SNAPSHOT] PASS alternating vibration on the flat still allows one completed crossing
+[S4 SNAPSHOT] PASS valid stopped encoders report stationary and zero turn rate
+[S4 SNAPSHOT] PASS increasing speed reports acceleration
+[S4 SNAPSHOT] PASS opposed wheels report a 113 degree/s encoder estimate to the left
+[S4 SNAPSHOT] PASS stale speed removes yaw and motion
+[S4 SNAPSHOT] PASS a brief impact produces a bounded motion event
+[S4 SNAPSHOT] PASS the impact event expires
+[S4 SNAPSHOT] PASS confirmed pickup takes priority in the event report
+[S4 SNAPSHOT] SUMMARY 50 checks, 0 failures

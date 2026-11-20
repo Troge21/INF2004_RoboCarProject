@@ -5,35 +5,34 @@
 #include <tk/syslib.h>
 
 static ID s_line_sem, s_adc;
-/* timestamp:32 + ADCs:12 each + valid:1 + reserved:3 = nine shared bytes.
+/* timestamp:32 + two ADC values:12 each + valid:1 + reserved:7 = eight bytes.
  * Pattern derives from ADC values; no duplicate state or native padding. */
-static UB published[9];
+static UB published[8];
 static UW read32(const UB *b)
 {
     return (UW)b[0] | ((UW)b[1]<<8) | ((UW)b[2]<<16) | ((UW)b[3]<<24);
 }
 static void decode(const UB *b, S3_LINE_DATA *sample)
 {
-    uint64_t word=0;
-    UINT i;
-    for(i=0;i<5U;++i) word|=(uint64_t)b[4U+i]<<(8U*i);
     sample->timestamp_ms=read32(b);
-    sample->valid=(BOOL)((word>>36)&1U);
-    sample->centre_adc=(uint16_t)((word>>12)&4095U);
-    sample->right_adc=(uint16_t)((word>>24)&4095U);
+    sample->valid=(BOOL)(b[7]&1U);
+    sample->centre_adc=(uint16_t)(b[4]|((UINT)(b[5]&15U)<<8));
+    sample->right_adc=(uint16_t)((b[5]>>4)|((UINT)b[6]<<4));
     sample->pattern=sample->valid ?
         ((sample->centre_adc>=S3_IR_CENTRE_THRESHOLD ? 2U:0U) |
          (sample->right_adc>=S3_IR_RIGHT_THRESHOLD ? 1U:0U)):0U;
 }
 EXPORT ER subsystem3_get_line(S3_LINE_DATA *sample)
 {
+    UB bytes[sizeof(published)];
     ER er;
     if(sample==NULL) return E_PAR;
     if(s_line_sem<=0) return E_OBJ;
     er=tk_wai_sem(s_line_sem,1,TMO_POL);
     if(er!=E_OK) return er;
-    decode(published,sample);
+    for(UINT i=0;i<sizeof(published);++i) bytes[i]=published[i];
     (void)tk_sig_sem(s_line_sem,1);
+    decode(bytes,sample);
     return sample->valid ? E_OK:E_TMOUT;
 }
 ER s3_line_init(void)
@@ -65,16 +64,16 @@ static ER read_raw(INT channel,UW *out)
     if(er!=E_OK) return er;
     return count==1 && *out<=4095U ? E_OK:E_IO;
 }
-void s3_line_sample(S3_LINE_DATA *sample)
+void s3_line_sample(void)
 {
-    const INT channels[]={S3_BARCODE_ADC,S3_IR_CENTRE_ADC,S3_IR_RIGHT_ADC};
-    UB bytes[9]={0};
-    uint64_t word=0;
+    const INT channels[]={S3_IR_CENTRE_ADC,S3_IR_RIGHT_ADC};
+    UB bytes[sizeof(published)]={0};
+    UW word=0;
     SYSTIM started={0},now={0};
     BOOL valid=s_adc>0;
     UINT i,n;
     (void)tk_get_tim(&started);
-    for(i=0;i<3U && valid;++i){
+    for(i=0;i<sizeof(channels)/sizeof(channels[0]) && valid;++i){
         UW raw=0,sum=0;
         /* Discard after channel switch, then average two samples, exactly
          * as in the teammate's bench. UW is the hardware driver's API type. */
@@ -84,14 +83,15 @@ void s3_line_sample(S3_LINE_DATA *sample)
             if(er==E_OK) sum+=raw;
         }
         if(er!=E_OK) valid=FALSE;
-        else word|=(uint64_t)(sum/S3_IR_SAMPLES)<<(12U*i);
+        else word|=(sum/S3_IR_SAMPLES)<<(12U*i);
     }
     (void)tk_get_tim(&now);
     if((UW)(now.lo-started.lo)>APP_IR_MAX_AGE_MS) valid=FALSE;
-    if(valid) word|=(uint64_t)1U<<36;else word=0;
     for(i=0;i<4U;++i) bytes[i]=(UB)(started.lo>>(8U*i));
-    for(i=0;i<5U;++i) bytes[4U+i]=(UB)(word>>(8U*i));
-    decode(bytes,sample);
+    if(valid){
+        for(i=0;i<3U;++i) bytes[4U+i]=(UB)(word>>(8U*i));
+        bytes[7]=1U;
+    }
     if(tk_wai_sem(s_line_sem,1,TMO_POL)==E_OK){
         for(i=0;i<sizeof(published);++i) published[i]=bytes[i];
         (void)tk_sig_sem(s_line_sem,1);

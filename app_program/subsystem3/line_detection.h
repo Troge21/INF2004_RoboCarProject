@@ -6,8 +6,8 @@
 
 ER s3_line_init(void);
 ER s3_line_configure(void);
-/* S3 owner only: sample AO channels and publish the packed raw/validity
+/* S3 owner only: sample the two steering AO channels and publish raw/validity
  * record. Other tasks only use subsystem3_get_line(), without driver calls. */
-void s3_line_sample(S3_LINE_DATA *sample);
+void s3_line_sample(void);
 
 #endif /* LINE_DETECTION_H */

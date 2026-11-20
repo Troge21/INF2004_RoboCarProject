@@ -55,7 +55,9 @@ static BOOL turn_acknowledged;
 static jmp_buf done;
 static FP started;
 static ER tk_get_tim(SYSTIM *s){s->lo=source_ms;s->hi=0;return E_OK;}
+#if defined(APP_OBSTACLE_BYPASS) || APP_TEST
 static ER tk_get_otm(SYSTIM *s){return tk_get_tim(s);}
+#endif
 static ER tk_wai_sem(ID,INT,INT);
 static ER tk_sig_sem(ID,INT);
 static ER tk_dly_tsk(INT);
@@ -175,13 +177,19 @@ int main(void){
     pass("thresholds, missing echoes and clearance margin preserve a clear escape");
     reset(0);assert(telemetry_get_scan(&scan)==E_TMOUT);
     if(setjmp(done)==0)started(0,NULL);
-    assert(seen[S5_NAV_SCANNING]&&seen[S5_NAV_RIGHT]&&seen[S5_NAV_CLEAR]&&!seen[S5_NAV_LEFT]);
+    assert(seen[S5_NAV_SCANNING]&&seen[S5_NAV_CLEAR]&&!seen[S5_NAV_LEFT]);
     assert(servo_calls>=6&&subsystem5_get_range(&range)==E_OK&&range.distance_mm==600);
     assert(telemetry_get_scan(&scan)==E_OK&&scan.sequence==1);
-    pass("actual task scans while publishing intent; centre range never becomes a side echo");
+    pass("actual task publishes a completed scan without using a side echo as the centre range");
+#if defined(APP_OBSTACLE_BYPASS) || APP_TEST
     assert(seen[S5_NAV_RIGHT]==(APP_TEST?10U:2U));
     assert(subsystem5_end_turn(1U)==E_OBJ&&subsystem5_end_turn(0U)==E_PAR);
     pass("only the current turn ID can end a request; stationary scan dwell is preserved");
+#else
+    assert(!seen[S5_NAV_RIGHT]&&turn_started_ms==0U);
+    assert(scan.points[0].distance_mm==260&&scan.points[1].distance_mm==100&&scan.points[2].distance_mm==240);
+    pass("the normal scan preserves side ranges and returns to centre sampling without waiting for a turn");
+#endif
     {
         UB packed[S1_SCAN_PACKED_BYTES]={0},wire[S1_SCAN_PACKET_BYTES];
         for(UINT i=0;i<3;++i){
@@ -209,20 +217,26 @@ int main(void){
     assert(!seen[S5_NAV_LEFT]&&!seen[S5_NAV_RIGHT]);
     pass("missing side echoes remain gaps in a completed profile and never authorize a turn");
     reset(LEFT_ESCAPE);if(setjmp(done)==0)started(0,NULL);
-    assert(seen[S5_NAV_LEFT]==(APP_TEST?10U:2U)&&!seen[S5_NAV_RIGHT]&&seen[S5_NAV_CLEAR]);
+    assert(!seen[S5_NAV_RIGHT]&&seen[S5_NAV_CLEAR]);
+#if defined(APP_OBSTACLE_BYPASS) || APP_TEST
+    assert(seen[S5_NAV_LEFT]==(APP_TEST?10U:2U));
     pass("blocked right and measured clear left publish a left turn through the actual scan task");
+#else
+    assert(!seen[S5_NAV_LEFT]&&turn_started_ms==0U);
+    pass("a clear left scan also returns to centre sampling without a turn request");
+#endif
+#ifdef APP_OBSTACLE_BYPASS
     if(!APP_TEST){
         reset(3);if(setjmp(done)==0)started(0,NULL);
         assert(seen[S5_NAV_RIGHT]==S5_TURN_WAIT_MS/S5_NAV_REFRESH_MS);
         assert(source_ms-turn_started_ms>=S5_TURN_WAIT_MS&&seen[S5_NAV_CLEAR]);
         assert(subsystem5_end_turn(1U)==E_OBJ);
-        pass("normal sensing resumes after an unanswered turn request expires");
-#ifdef APP_OBSTACLE_BYPASS
+        pass("bypass sensing resumes after an unanswered turn request expires");
         reset(SLOW_BYPASS_TURN);if(setjmp(done)==0)started(0,NULL);
         assert(turn_acknowledged&&seen[S5_NAV_CLEAR]);
         pass("the 90-degree bypass still accepts a settled turn acknowledgement at 5500 ms");
-#endif
     }
+#endif
     printf("SUMMARY: %u actual S5 scan/publication checks passed, APP_TEST=%d; no motor API linked.\n",checks,APP_TEST);
     return 0;
 }

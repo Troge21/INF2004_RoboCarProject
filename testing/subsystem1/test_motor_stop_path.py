@@ -7,7 +7,7 @@ import tempfile
 root = Path(__file__).resolve().parents[2]
 app = (root/'app_program/app_main.c').read_text(encoding='utf-8')
 motor = (root/'app_program/subsystem2/subsystem2.c').read_text(encoding='utf-8')
-controller = app[app.index('static void app_line_targets'):app.index('static void vehicle_controller_task')]
+controller = app[app.index('static INT app_tape_level'):app.index('static void vehicle_controller_task')]
 api = motor[motor.index('static ID s_command_sem'):motor.index('#if S2_FEEDBACK_ENABLED')]
 loop = motor[motor.index('#if S2_FEEDBACK_ENABLED'):motor.index('EXPORT ER subsystem2_init')]
 assert 'app_controller_step(started.lo);' in app
@@ -47,7 +47,7 @@ typedef uint32_t UW;
 typedef uint8_t UB;
 typedef struct {UW lo,hi;} SYSTIM;
 typedef struct {unsigned sematr,isemcnt,maxsem;} T_CSEM;
-typedef struct {UINT pattern;UW timestamp_ms;BOOL valid;} S3_LINE_DATA;
+typedef struct {UINT pattern;UW timestamp_ms;BOOL valid;uint16_t centre_adc,right_adc;} S3_LINE_DATA;
 #define SUBSYSTEM3_H
 #include "subsystem2.h"
 #include "encoder_move.c"
@@ -57,8 +57,9 @@ typedef struct {UINT pattern;UW timestamp_ms;BOOL valid;} S3_LINE_DATA;
 #include "subsystem5/subsystem5.h"
 static UW operating_ms;
 static unsigned scenario,phase,ticks,checks,pattern,stale,invalid,compare[4];
-static unsigned motor_busy,controller_busy,encoder_fail;
-static unsigned nav_phase=S5_NAV_CLEAR,nav_stale,nav_busy;
+static unsigned right_edge_adc;
+static unsigned motor_busy,motor_brief_busy,controller_busy,encoder_fail;
+static unsigned nav_phase=S5_NAV_CLEAR,nav_stale,nav_busy,nav_reads;
 static UW nav_turn_id,ended_turn_id;
 #ifdef APP_OBSTACLE_BYPASS
 static UW range_hold_ms;
@@ -69,8 +70,13 @@ static S2_ENCODER_COUNTS counts;
 static jmp_buf done;
 static ID tk_cre_sem(T_CSEM *s){assert(s->isemcnt==1&&s->maxsem==1);return ++created;}
 static ER tk_wai_sem(ID id,INT n,INT timeout){
-    assert(id>=1&&id<=3&&n==1&&(timeout==TMO_POL||timeout==TMO_FEVR));
+    assert(id>=1&&id<=3&&n==1&&(timeout==TMO_POL||timeout==TMO_FEVR||
+        (id==2&&timeout==S2_COMMAND_READ_WAIT_MS)));
     if(held[id]||(id==1&&controller_busy)||(id==2&&motor_busy))return E_TMOUT;
+    if(id==2&&motor_brief_busy){
+        if(timeout==TMO_POL)return E_TMOUT;
+        motor_brief_busy=0;
+    }
     held[id]=1;return E_OK;
 }
 static ER tk_sig_sem(ID id,INT n){assert(n==1&&held[id]);held[id]=0;return E_OK;}
@@ -78,9 +84,12 @@ static ER tk_get_otm(SYSTIM *t){t->lo=operating_ms;t->hi=0;return E_OK;}
 static ER tk_get_tim(SYSTIM *t){t->lo=operating_ms+1000000U;t->hi=0;return E_OK;}
 static ER subsystem3_get_line(S3_LINE_DATA *s){
     s->pattern=pattern;s->valid=!invalid;
+    s->centre_adc=(pattern&2U)?750U:150U;
+    s->right_adc=(pattern&1U)?2650U:(right_edge_adc?right_edge_adc:160U);
     s->timestamp_ms=operating_ms+1000000U-(stale?101U:0U);return E_OK;
 }
 ER subsystem5_get_navigation(S5_NAV_DATA *out){
+    ++nav_reads;
     if(nav_busy)return E_TMOUT;
     out->phase=nav_phase;out->turn_id=nav_turn_id;
     out->timestamp_ms=operating_ms+1000000U-(nav_stale?201U:0U);
@@ -261,11 +270,30 @@ static ER tk_dly_tsk(INT ms){
     S2_MOTION_DATA motion;
     static uint32_t resume_ticket_id;
     static UW reverse_at;
-#ifndef APP_OBSTACLE_BYPASS
-    static unsigned replay_until;
-#endif
-    assert(ms==20);++ticks;
+    assert(ms==20);
     assert(subsystem2_get_motion(&motion)==E_OK);
+    const UW resume_at=APP_START_DELAY_MS+S2_SPEED_SAMPLE_MS;
+    if(scenario!=1&&scenario!=6&&operating_ms<=resume_at){
+        stopped();
+        if(operating_ms==resume_at){
+            assert(app_controller_arm_resume(operating_ms+1000U,&resume_ticket_id)==0);
+            assert(app_controller_submit_resume(resume_ticket_id,99,operating_ms+1000U)==0);
+        }
+        app_controller_step(0);
+        if(operating_ms<resume_at){
+            assert(read_command().mode==S2_MODE_STOP);
+            assert(app_controller_snapshot(snapshot)==E_OK&&
+                snapshot[4]==(APP_CTRL_STOP_LATCHED|APP_CTRL_LATCH));
+        }else{
+            assert(app_controller_take_reply(reply)==E_OK&&(reply[9]&2U)&&
+                !(reply[8]&APP_CTRL_LATCH)&&(((reply[8]|((unsigned)reply[9]<<8))>>6)&7U)==0);
+            assert(read_command().mode==S2_MODE_RPM);
+            if(scenario==0)pass("boot holds actual PWM at zero past startup until explicit Resume");
+        }
+        operating_ms+=(UW)ms;
+        return E_OK;
+    }
+    ++ticks;
     if(scenario==6){
         if(phase==0){
             assert(subsystem2_set_rpm_x10(-350,350)==E_PAR);
@@ -318,8 +346,12 @@ static ER tk_dly_tsk(INT ms){
         if(operating_ms<APP_START_DELAY_MS)stopped();
         else if(phase==0&&moving()){
             const S2_COMMAND command=read_command();
-            assert(command.mode==S2_MODE_RPM&&command.left==350&&command.right==350);
+            assert(command.mode==S2_MODE_RPM&&command.left==260&&command.right==260);
             pass("normal controller requests RPM and actual PID/motor loop produces nonzero output after startup");
+            phase=9;
+        }else if(phase==9){
+            assert(!motor_brief_busy&&moving()&&motion.stop_reason==S2_STOP_NONE);
+            pass("a command writer releasing within the motor wait budget does not cut PWM");
             assert(app_controller_submit_stop(101,99,operating_ms)==E_OK);phase=1;
         }else if(phase==1){
             assert(moving()&&app_controller_take_reply(reply)==E_OK&&((reply[8]|((unsigned)reply[9]<<8))>>6)==APP_STOP_EXPIRED);
@@ -366,55 +398,108 @@ static ER tk_dly_tsk(INT ms){
         }
 #ifndef APP_OBSTACLE_BYPASS
     }else if(scenario==4){
-        if(phase==0&&moving()){nav_phase=S5_NAV_SCANNING;phase=1;}
-        else if(phase==1){
-            stopped();assert(app_controller_snapshot(snapshot)==E_OK&&(snapshot[4]&15)==APP_CTRL_SCANNING);
-            pass("controller stops the actual motor loop during S5 scans");nav_phase=S5_NAV_LEFT;nav_turn_id=1;phase=2;
-        }else if(phase==2&&compare[1]&&compare[2]){
+        assert(nav_reads==0&&ended_turn_id==0);
+        if(ticks<=24U){
             const S2_COMMAND command=read_command();
-            assert(command.left<0&&command.right>0&&!compare[0]&&!compare[3]);
-            assert(app_controller_snapshot(snapshot)==E_OK&&(snapshot[4]&15)==APP_CTRL_TURNING_LEFT);
-            pass("left intent starts an encoder turn through signed PWM arbitration");phase=3;
-        }else if(phase==3&&ended_turn_id==1){
-            stopped();assert(avoidance_turn.result==S2_MOVE_REACHED);
-            assert(!motion.actual_left_rpm_x10&&!motion.actual_right_rpm_x10);
-            pass("both wheel targets are reached and settled before the scan is released");
-            replay_until=ticks+20;phase=4;
-        }else if(phase==4){
-            stopped();
-            if(ticks==replay_until){
-                pass("a refreshed request with the same ID cannot start another turn");
-                nav_phase=S5_NAV_RIGHT;nav_turn_id=2;phase=5;
+            assert(moving()&&!compare[1]&&!compare[3]);
+            assert(command.left==(pattern==2U?120:260)&&command.right==(pattern==1U?120:260));
+            assert(app_controller_snapshot(snapshot)==E_OK&&(snapshot[4]&15)==APP_CTRL_FOLLOWING);
+            pattern=ticks%4U;nav_phase=ticks%6U;nav_turn_id=ticks;
+            nav_stale=ticks%5U==0U;nav_busy=ticks%7U==0U;
+            if(ticks==24U){
+                pass("Resume without S5 succeeds and all line patterns drive through missing, stale and blocked S5 samples");
+                pattern=1;
             }
-        }else if(phase==5&&compare[0]&&compare[3]){
+        }else if(ticks<=32U){
             const S2_COMMAND command=read_command();
-            assert(command.left>0&&command.right<0&&!compare[1]&&!compare[2]);
-            pass("a new right intent turns the opposite way");nav_stale=1;phase=6;
-        }else if(phase==6){
-            stopped();pass("stale S5 navigation cancels a running turn");nav_stale=0;phase=7;
-        }else if(phase==7){
-            stopped();assert(avoidance_turn.result==S2_MOVE_CANCELLED);
-            if(ended_turn_id==2){
-                pass("freshness recovery does not restart a cancelled turn");
-                nav_busy=1;phase=8;
+            assert(command.left==260&&command.mode==S2_MODE_RPM);
+            if(ticks==25U){assert(command.right==120);pattern=0;right_edge_adc=1000;}
+            if(ticks==26U){assert(command.right==243);right_edge_adc=0;}
+            if(ticks==27U)assert(command.right==260);
+            if(ticks==31U)pattern=1;
+            if(ticks==32U){
+                assert(command.right==120);
+                pass("the live controller tapers correction at the edge and returns to equal targets on white");
+                assert(app_controller_submit_stop(105,99,operating_ms+1000U)==E_OK);
             }
-        }else if(phase==8){
-            stopped();pass("busy S5 snapshot cannot permit motion");nav_busy=0;nav_phase=S5_NAV_BLOCKED;nav_turn_id=0;phase=9;
-        }else if(phase==9){
-            stopped();pass("blocked or invalid range intent keeps the motor loop stopped");nav_phase=S5_NAV_CLEAR;phase=10;
-        }else if(phase==10&&moving()){
-            const S2_COMMAND command=read_command();
-            assert(command.left==350&&command.right==350);
-            pass("clear front returns to the unchanged line-following targets");nav_phase=S5_NAV_LEFT;nav_turn_id=3;phase=11;
-        }else if(phase==11&&compare[1]&&compare[2]){
-            assert(app_controller_submit_stop(105,99,operating_ms+1000U)==E_OK);phase=12;
-        }else if(phase==12){
-            stopped();assert(app_controller_take_reply(reply)==E_OK&&((reply[8]|((unsigned)reply[9]<<8))>>6)==0);
-            pass("STOP during avoidance is acknowledged after controller-owned zero request");
-            replay_until=ticks+30;phase=13;
-        }else if(phase==13){
-            stopped();nav_phase=ticks%6U;nav_turn_id=ticks+10U;pattern=ticks%4U;
-            if(ticks==replay_until){pass("STOP cannot be overwritten by later scans, turn intents or line readings");longjmp(done,1);}
+        }else{
+            stopped();assert(app_controller_poll()&APP_CTRL_LATCH);
+            if(ticks==33U){
+                assert(app_controller_take_reply(reply)==E_OK&&((reply[8]|((unsigned)reply[9]<<8))>>6)==0);
+                nav_phase=S5_NAV_CLEAR;nav_stale=nav_busy=0;
+            }
+            if(ticks==50U){
+                pass("STOP remains latched and actual PWM stays zero when S5 becomes clear");
+                longjmp(done,1);
+            }
+        }
+    }else if(scenario==17){
+        const S2_COMMAND command=read_command();
+        switch(ticks){
+        case 1: pattern=2;break;
+        case 2: pattern=0;break;
+        case 3:
+            assert(command.left==260&&command.right==260);
+            pattern=2;
+            break;
+        case 23: pattern=0;break;
+        case 24:
+            assert(command.left==120&&command.right==260);
+            break;
+        case 26:
+            assert(command.left==0&&command.right==260&&!compare[0]&&!compare[1]);
+            assert(app_controller_snapshot(snapshot)==E_OK&&(snapshot[4]&15)==APP_CTRL_RECOVERING);
+            pass("a sustained left bend starts a one-wheel search, a single hit does not");
+            break;
+        case 80:
+            assert(command.left==0&&command.right==260);
+            break;
+        case 81:
+            stopped();assert(command.mode==S2_MODE_STOP);
+            assert(app_controller_snapshot(snapshot)==E_OK&&(snapshot[4]&15)==APP_CTRL_WAITING_LINE);
+            stale=1;
+            break;
+        case 82:
+            stopped();stale=0;break;
+        case 83:
+            stopped();assert(command.mode==S2_MODE_STOP);
+            pass("an expired left search stops both wheels and stays stopped across an input gap");
+            pattern=2;
+            break;
+        case 84:
+            assert(command.left==120&&command.right==260);
+            assert(app_controller_snapshot(snapshot)==E_OK&&(snapshot[4]&15)==APP_CTRL_FOLLOWING);
+            pass("reacquired tape resumes live line following after the search expires");
+            break;
+        case 102: pattern=0;break;
+        case 105:
+            assert(command.left==0&&command.right==260);
+            pattern=1;
+            break;
+        case 106:
+            assert(command.left==260&&command.right==120&&left_bend.peak_trim==0);
+            pass("right-side tape ends an active left search and applies live right correction");
+            pattern=2;
+            break;
+        case 125: pattern=0;break;
+        case 128:
+            assert(command.left==0&&command.right==260);
+            pattern=2;
+            break;
+        case 129:
+            assert(command.left==120&&command.right==260);
+            assert(app_controller_snapshot(snapshot)==E_OK&&(snapshot[4]&15)==APP_CTRL_FOLLOWING);
+            pass("left tape ends an active search without waiting for the timeout");
+            break;
+        case 147: pattern=0;break;
+        case 150:
+            assert(command.left==0&&command.right==260);
+            assert(app_controller_submit_stop(106,99,operating_ms+1000U)==E_OK);
+            break;
+        case 151:
+            stopped();assert((app_controller_poll()&APP_CTRL_LATCH)&&left_bend.peak_trim==0);
+            pass("STOP cuts PWM and clears the left search state");
+            longjmp(done,1);
         }
 #else
     }else if(scenario>=7){
@@ -443,7 +528,7 @@ static ER tk_dly_tsk(INT ms){
             pass("actual normal controller releases the latch only after fresh stopped feedback and accepted motor handoff");phase=5;
         }else if(phase==5&&moving()){
             const S2_COMMAND command=read_command();
-            assert(command.left==350&&command.right==350);
+            assert(command.left==260&&command.right==260);
             pass("explicit Resume returns to the existing line targets and actual PID wheel outputs without a reboot");
             assert(app_controller_submit_stop(302,99,operating_ms+1000U)==0);phase=6;
         }else if(phase==6){
@@ -471,25 +556,25 @@ static ER tk_dly_tsk(INT ms){
         }
     }
     app_controller_step(0);
+    if(scenario==0&&phase==9)motor_brief_busy=1;
     operating_ms+=(UW)ms;
     const unsigned limit=scenario>=7?1800U:500U;
-#ifndef APP_OBSTACLE_BYPASS
     if(ticks>=limit)
-        fprintf(stderr,"Scenario %u phase %u timed out (turn %u, result %u, ack %u)\n",
-                scenario,phase,(unsigned)avoidance_turn_id,avoidance_turn.result,(unsigned)ended_turn_id);
-#endif
+        fprintf(stderr,"Scenario %u phase %u timed out\n",scenario,phase);
     assert(ticks<limit);
     return E_OK;
 }
 static void run(unsigned which){
-    scenario=which;phase=ticks=operating_ms=created=stale=invalid=encoder_fail=0;pattern=0;
-    motor_busy=controller_busy=nav_stale=nav_busy=0;nav_phase=S5_NAV_CLEAR;counts=(S2_ENCODER_COUNTS){0,0};
-    nav_turn_id=ended_turn_id=last_drive_ms=0;
+    scenario=which;phase=ticks=operating_ms=created=stale=invalid=encoder_fail=0;pattern=right_edge_adc=0;
+    motor_busy=motor_brief_busy=controller_busy=nav_stale=nav_busy=nav_reads=0;
+    nav_phase=S5_NAV_CLEAR;counts=(S2_ENCODER_COUNTS){0,0};
+    nav_turn_id=ended_turn_id=0;
 #ifdef APP_OBSTACLE_BYPASS
+    last_drive_ms=0;
     bypass=(OBSTACLE_BYPASS){0};range_hold_ms=0;front_blocked=front_missing=FALSE;
 #else
-    avoidance_turn_id=0;
-    avoidance_turn=(S2_ENCODER_MOVE){0};avoidance_settling=FALSE;
+    left_bend=(APP_LEFT_BEND){0};
+    if(which==4){nav_phase=S5_NAV_UNAVAILABLE;nav_busy=1;}
 #endif
     for(unsigned i=0;i<4;++i){held[i]=0;compare[i]=0;}
     controller_sem=0;assert(app_controller_init()==E_OK);
@@ -544,14 +629,14 @@ static void test_pid_ramp(UW start){
     for(UW tick=S2_PERIOD_MS;tick<=2000;tick+=S2_PERIOD_MS){
         if(tick>200){edges.left+=7;edges.right+=6;}
         cmd.timestamp_ms=start+tick;
-        if(tick==1980)cmd.left=260;
+        if(tick==1980)cmd.left=300;
         s2_control_step(&motor,start+tick,edges,&cmd,TRUE,TRUE);
         if(tick==1960)before_change=motor.data.duty_left_x100;
         if(tick==1980)after_change=motor.data.duty_left_x100;
     }
     INT sample_step=after_change-motor.data.duty_left_x100;
     assert(before_change>after_change);
-    assert(sample_step>0&&sample_step<=one_tick_step);
+    assert(sample_step>=-one_tick_step&&sample_step<=one_tick_step);
     assert(motor.data.speed_timestamp_ms==start+2000);
     assert(motor.data.speed_period_ms==S2_SPEED_SAMPLE_MS);
     assert(motor.data.faults==0);
@@ -563,22 +648,75 @@ static void test_pid_ramp(UW start){
     assert(motor.data.stop_reason==S2_STOP_COMMAND_TIMEOUT);
     assert(motor.data.duty_left_x100==0&&motor.data.duty_right_x100==0);
 }
-int main(void){
-    INT l,r;
-    for(unsigned p=0;p<4;++p){
-        app_line_targets(p,&l,&r);
-        assert(l==(p==2?260:350)&&r==(p==1?260:350));
+static void test_pid_between_samples(void){
+    S2_CONTROL_STATE motor;
+    const S2_ENCODER_COUNTS edges={0,0};
+    S2_COMMAND cmd={.valid=TRUE,.mode=S2_MODE_STOP};
+    const INT one_tick_step=S2_PID_SLEW_X100_PER_S*S2_PERIOD_MS/1000;
+    s2_control_init(&motor,0,edges);
+    for(UW tick=S2_PERIOD_MS;tick<=200;tick+=S2_PERIOD_MS){
+        cmd.timestamp_ms=tick;
+        s2_control_step(&motor,tick,edges,&cmd,TRUE,TRUE);
     }
-    pass("actual analog policy: white/white and black/black forward; individual corrections");
+    cmd.mode=S2_MODE_RPM;cmd.left=cmd.right=260;
+    for(UW tick=220;tick<=280;tick+=S2_PERIOD_MS){
+        const INT before=motor.data.duty_left_x100;
+        cmd.timestamp_ms=tick;
+        s2_control_step(&motor,tick,edges,&cmd,TRUE,TRUE);
+        assert(motor.data.speed_timestamp_ms==200);
+        assert(motor.data.duty_left_x100-before==one_tick_step);
+    }
+    motor.pid[0].integral_x100=200;
+    cmd.left=250;cmd.timestamp_ms=300;
+    s2_control_step(&motor,300,edges,&cmd,TRUE,TRUE);
+    assert(motor.pid[0].integral_x100==200);
+    cmd.mode=S2_MODE_STOP;cmd.timestamp_ms=320;
+    s2_control_step(&motor,320,edges,&cmd,TRUE,TRUE);
+    assert(motor.data.duty_left_x100==0&&motor.pid[0].integral_x100==0);
+    pass("duty ramps between encoder samples, steering retains compensation and STOP clears both");
+}
+static void test_pid_turn_slew(unsigned inside){
+    S2_CONTROL_STATE motor;
+    S2_ENCODER_COUNTS counts={0,0};
+    S2_COMMAND cmd={.mode=S2_MODE_RPM,.left=260,.right=260,.valid=TRUE};
+    const INT normal_step=S2_PID_SLEW_X100_PER_S*S2_PERIOD_MS/1000;
+    const INT turn_step=S2_TURN_FALL_X100_PER_S*S2_PERIOD_MS/1000;
+    s2_control_init(&motor,0,counts);
+    for(UW tick=S2_PERIOD_MS;tick<=2100;tick+=S2_PERIOD_MS){
+        const INT before=motor.pid[inside].output_x100;
+        const INT outside_before=motor.pid[inside^1U].output_x100;
+        counts.left=(uint64_t)tick*26U*S2_LEFT_COUNTS_PER_REV_X10/600000U;
+        counts.right=(uint64_t)tick*26U*S2_RIGHT_COUNTS_PER_REV_X10/600000U;
+        cmd.timestamp_ms=tick;
+        if(tick==2020){
+            if(inside==0)cmd.left=120;
+            else cmd.right=120;
+        }
+        if(tick==2100)cmd.left=cmd.right=260;
+        s2_control_step(&motor,tick,counts,&cmd,TRUE,TRUE);
+        if(tick>=2020&&tick<2100){
+            assert(before-motor.pid[inside].output_x100==turn_step);
+            const INT outside_delta=motor.pid[inside^1U].output_x100-outside_before;
+            assert(outside_delta>=-normal_step&&outside_delta<=normal_step);
+        }
+        if(tick==2100)assert(motor.pid[inside].output_x100-before==normal_step);
+        assert(motor.data.faults==0);
+    }
+}
+int main(void){
     test_command_mailbox();
     test_pid_ramp(0);
     test_pid_ramp(UINT32_MAX-1990U);
     pass("steering update before a speed sample respects the PID ramp across timer wrap; zero/expiry bypass it");
+    test_pid_between_samples();
+    test_pid_turn_slew(0);
+    test_pid_turn_slew(1);
+    pass("both turn directions reduce only inside duty faster and recover at the normal rate");
     run(0);run(1);run(2);run(3);run(5);run(6);run(15);
 #ifdef APP_OBSTACLE_BYPASS
     run(7);run(8);run(9);run(10);run(11);run(12);run(13);run(14);run(16);
 #else
-    run(4);
+    run(4);run(17);
 #endif
     printf("SUMMARY: %u actual controller/PID/motor checks passed; no hardware or sockets.\n",checks);return 0;
 }

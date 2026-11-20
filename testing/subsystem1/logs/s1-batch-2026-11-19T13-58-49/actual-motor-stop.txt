@@ -1,0 +1,83 @@
+PASS: actual analog policy: white/white and black/black forward; individual corrections
+PASS: seven-byte mailbox preserves all signed RPM and duty values, STOP, empty and rejected input
+PASS: packed timestamp wraps with the original watchdog boundary
+PASS: steering update before a speed sample respects the PID ramp across timer wrap; zero/expiry bypass it
+PASS: normal controller requests RPM and actual PID/motor loop produces nonzero output after startup
+PASS: expired STOP cannot inhibit the running controller
+PASS: controller contention submits zero through actual RPM motor channel
+PASS: busy motor channel cannot acknowledge a STOP before accepting zero
+PASS: normal STOP result follows accepted request and zero output in the actual PID/motor loop
+PASS: latched STOP persists through all line and S5 scan/turn phases, stale and busy snapshots
+PASS: STOP is serviced during startup
+PASS: startup STOP prevents later white/white forward motion
+PASS: S2 encoder fault propagates to controller and never becomes a fabricated successful STOP
+PASS: stale ADC snapshot stops actual motor output
+PASS: invalid ADC snapshot stops actual motor output
+PASS: unsupported line pattern cannot drive motors
+PASS: actual controller refuses Resume with stale line input and keeps motor outputs zero
+PASS: actual normal controller releases the latch only after fresh stopped feedback and accepted motor handoff
+PASS: explicit Resume returns to the existing line targets and actual PID wheel outputs without a reboot
+PASS: STOP supersedes queued Resume before it can reach actual PWM
+PASS: second STOP remains latched through later line and scan intents after a Resume cycle
+PASS: signed PWM waits for a complete stopped encoder sample before reversing either wheel
+PASS: reverse PWM uses the same command expiry and cuts both outputs
+PASS: local pickup cuts actual line-following PWM even with the command mailbox locked
+PASS: controller stops the actual motor loop during S5 scans
+PASS: left intent starts an encoder turn through signed PWM arbitration
+PASS: both wheel targets are reached and settled before the scan is released
+PASS: a refreshed request with the same ID cannot start another turn
+PASS: a new right intent turns the opposite way
+PASS: stale S5 navigation cancels a running turn
+PASS: freshness recovery does not restart a cancelled turn
+PASS: busy S5 snapshot cannot permit motion
+PASS: blocked or invalid range intent keeps the motor loop stopped
+PASS: clear front returns to the unchanged line-following targets
+PASS: STOP during avoidance is acknowledged after controller-owned zero request
+PASS: STOP cannot be overwritten by later scans, turn intents or line readings
+SUMMARY: 36 actual controller/PID/motor checks passed; no hardware or sockets.
+PASS: actual analog policy: white/white and black/black forward; individual corrections
+PASS: seven-byte mailbox preserves all signed RPM and duty values, STOP, empty and rejected input
+PASS: packed timestamp wraps with the original watchdog boundary
+PASS: steering update before a speed sample respects the PID ramp across timer wrap; zero/expiry bypass it
+PASS: normal controller requests RPM and actual PID/motor loop produces nonzero output after startup
+PASS: expired STOP cannot inhibit the running controller
+PASS: controller contention submits zero through actual RPM motor channel
+PASS: busy motor channel cannot acknowledge a STOP before accepting zero
+PASS: normal STOP result follows accepted request and zero output in the actual PID/motor loop
+PASS: latched STOP persists through all line and S5 scan/turn phases, stale and busy snapshots
+PASS: STOP is serviced during startup
+PASS: startup STOP prevents later white/white forward motion
+PASS: S2 encoder fault propagates to controller and never becomes a fabricated successful STOP
+PASS: stale ADC snapshot stops actual motor output
+PASS: invalid ADC snapshot stops actual motor output
+PASS: unsupported line pattern cannot drive motors
+PASS: actual controller refuses Resume with stale line input and keeps motor outputs zero
+PASS: actual normal controller releases the latch only after fresh stopped feedback and accepted motor handoff
+PASS: explicit Resume returns to the existing line targets and actual PID wheel outputs without a reboot
+PASS: STOP supersedes queued Resume before it can reach actual PWM
+PASS: second STOP remains latched through later line and scan intents after a Resume cycle
+PASS: signed PWM waits for a complete stopped encoder sample before reversing either wheel
+PASS: reverse PWM uses the same command expiry and cuts both outputs
+PASS: local pickup cuts actual line-following PWM even with the command mailbox locked
+PASS: the opening turn waits at zero for a temporarily missing IR sample
+PASS: bypass waits for new front clearance after the initial turn settles
+PASS: left-side bypass executes all seven legs and rejoins on fresh IR evidence
+PASS: bypass waits for new front clearance after the initial turn settles
+PASS: a brief missing echo holds both wheels stopped until fresh clearance
+PASS: right-side bypass mirrors all turns and rejoins on fresh IR evidence
+PASS: bypass waits for new front clearance after the initial turn settles
+PASS: missing tape leaves the car stopped instead of aligning or resuming line following
+PASS: bypass waits for new front clearance after the initial turn settles
+PASS: a new near echo aborts the powered bypass even before the next S5 phase
+PASS: returning clearance cannot restart an aborted bypass
+PASS: bypass waits for new front clearance after the initial turn settles
+PASS: STOP cancels a live bypass and leaves both PWM outputs zero
+PASS: bypass waits for new front clearance after the initial turn settles
+PASS: a sustained loss of the front echo faults the route with both wheels off
+PASS: returning clearance cannot restart an aborted bypass
+PASS: a settled STOP releases the scan request so front clearance can update
+PASS: bypass waits for new front clearance after the initial turn settles
+PASS: fresh tape at the return cutoff is confirmed while the wheels settle
+PASS: bypass waits for new front clearance after the initial turn settles
+PASS: pickup cancels a powered bypass and holds both PWM outputs at zero
+SUMMARY: 45 actual controller/PID/motor checks passed; no hardware or sockets.

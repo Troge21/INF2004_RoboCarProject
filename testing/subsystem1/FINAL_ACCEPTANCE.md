@@ -1,12 +1,9 @@
 # One final S1 hardware session
 
-Current normal Resume image - 17 November 2026:
-**build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt.uf2**, TEST=0 integrated,
-721920 bytes; SHA-256
-2c5a4652c7c434fb1d27743a3579b6a9ff0dcf2f2f9a4ee79a813840ecd1bcbe.
-**Raise both drive wheels before flashing or connecting power.** Normal
-control can start three seconds after boot; Resume can restart it after STOP.
-The servo remains active. This image has offline/build checks passed. On
+Use the [current normal integrated UF2](../../dashboard/README.md#current-integrated-firmware---20-november-2026).
+**Raise both drive wheels for the first flash and startup check.** The normal
+controller starts with STOP latched, and the servo can move during setup.
+The startup latch has offline/build checks passed. On
 18 November the user reported the basic Resume test works after the requested
 Stop -> Resume -> Stop procedure. This is a
 [user-reported functional pass](logs/2026-11-18-resume-user-bench-observation.md),
@@ -18,7 +15,7 @@ STOP and persistence through IR/scan changes and dashboard-only reconnect.
 [User bench record](logs/2026-11-17-normal-user-bench-observation.md).
 Longer normal timing exposed max 5499 ms main/max 9304 ms heartbeat; delivery
 acceptance remains open despite the short stationary pass.
-[Current build identity](logs/2026-11-17-resume-fingerprint.json),
+[17 November Resume build identity](logs/2026-11-17-resume-fingerprint.json),
 [normal mode and Resume procedure](MOTOR_STOP_TEST.md).
 
 The preceding stationary 62e5bd63 image passed a 60-second delivery capture:
@@ -29,7 +26,7 @@ fix is retained. The Resume image preserves the sensor contract and adds explici
 
 The whole car uses one laptop USB/power-bank supply. There is no separate
 battery switch. Keep the supply connected throughout each persistence or
-outage trial. Unplugging it restarts the next run and clears the STOP latch.
+outage trial. Reconnecting power starts a new run with STOP latched.
 
 ## Preparation
 
@@ -135,8 +132,9 @@ Normal driving can start after three seconds before WiFi connects.
       and dashboard-only reconnect, with USB continuously connected.
 - [ ] Record any motor fault as a failure/diagnosis condition, not an already
       stationary STOP pass. Do not bypass encoder/PID protections.
-- [x] User confirms car unplugged after the test. Do not reconnect normal firmware with wheels
-      on the surface: restart clears the inhibit and may start movement.
+- [x] User confirms car unplugged after the historical test.
+- [ ] Power-cycle the current normal build with both wheels raised and verify
+      Stop latched and zero movement past the startup delay.
 
 ## Explicit Resume - basic user pass; detailed acceptance pending
 
@@ -145,8 +143,9 @@ Keep both wheels raised, servo free and power continuous throughout.
 - [x] User reports the basic Resume test works following the requested
       Stop -> Resume -> Stop procedure (18 November). Do not infer every
       detailed item below from that short confirmation.
-- [ ] With a valid front target above 250 mm and valid line readings, observe
-      both wheels rotating. Latch stop; confirm both stop and matching result.
+- [ ] With a valid front target above 250 mm and valid line readings, click
+      Resume and observe both wheels rotating. Stop and confirm both wheels
+      halt and the dashboard shows the matching result.
 - [ ] Wait for zero measured velocities, click Resume once, and confirm its
       matching result and both wheels rotating again. Counts/path must retain
       the earlier run; STOP -> Resume does not restart the Pico.
@@ -162,8 +161,7 @@ Keep both wheels raised, servo free and power continuous throughout.
 
 ## Outages and delivery timing
 
-Return to the stationary build for these procedures. This avoids automatic
-movement after any intentional or accidental restart.
+Use the stationary build for timing measurements without motor load.
 
 - [ ] Record a sustained baseline with real telemetry, heartbeat and matching
       STATUS. Export telemetry CSV and evidence JSON from Communications.

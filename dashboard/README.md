@@ -4,7 +4,7 @@ Local real-MQTT dashboard for Buddy/Subsystem 1: Overview, Sensors & motion,
 Communications, charts and exports. No cloud hosting, demo feed, npm packages
 or website build step.
 
-## Current integrated firmware - 19 November 2026
+## Current integrated firmware - 20 November 2026
 
 One current **Packed v4** contract covers distance, IR, IMU, measured wheel
 velocity/counts/net travel, controller state, faults, encoder path and future barcode
@@ -14,26 +14,27 @@ v3/JSON decoders and controller beacon path are removed.
 Current normal operating image (motor control enabled):
 **build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt.uf2** (NO _test suffix)
 
-Profile: **NET=lwip MQTT=1 TEST=0 APP_MODE=integrated CONSOLE=usb_cdc CRASH_REPORT=0**.
-Bytes: **734208**; SHA-256: **55613bd59c5679964684dc3101f680ff1e41f9e789a7fbca2c9657962f76d3ee**.
-This single image runs S1 MQTT and S2 motor control, including the packed
-command and feedback records and the verified left/right obstacle turns.
-It adds S4's pickup detector. The user confirmed a powered ramp crossing
-followed by pickup STOP on the preceding trace image.
+Profile **NET=lwip MQTT=1 TEST=0 APP_MODE=integrated CONSOLE=usb_cdc CRASH_REPORT=0**.
+Size **733184 bytes**. SHA-256
+`72c2f984475bc59e351595e043fc6000b11fd9690c20d501bc0065388054ffcb`.
+The integrated build includes MQTT, encoder motor control, the S3 line
+sampling fixes and GP27 cutoff of 455, sensor-guided left-curve recovery,
+obstacle scans, S4 hump estimates, motion reporting and pickup STOP. Flash
+the UF2. The matching ELF and MAP are for debugging and memory inspection.
+The build and offline checks passed. The user confirmed
+right-wheel hump detection and pickup STOP on the earlier S4 trace image
+`c396fa80`.
+The demo layout places the barcode on the left and the hump under the right wheel.
 
-For the combined S4 bench session, use
-**build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_s4_motor_trace.uf2**.
-This powered image adds encoder-assisted hump measurement, run maximum,
-roll, motion events and an encoder-based turn-rate estimate. Size is
-741888 bytes and SHA-256 starts `c396fa80`. The rebuild matches the earlier
-version that detected the right-wheel ramp. Use **Sensors & motion** for
-the right-wheel height and pickup checks. The demo layout places the barcode
-on the left and the hump under the right wheel.
+The normal image uses IR and wheel feedback for line following. Ultrasonic
+distance and scans are telemetry only. Use a clear track because the normal
+image drives through missing readings and does not stop for obstacles. The
+separate `_s2_bypass.uf2` is for obstacle course testing.
 
-The dashboard offers **Resume** in Overview and Communications. After Latch
-stop, Resume explicitly releases the inhibit without rebooting or resetting
-run distance. It requires fresh stopped-wheel feedback, valid line data, a
-clear front and no motor fault. STOP takes priority; reconnect never resumes
+The controller starts with **STOP latched** on every power-up. **Resume** in
+Overview or Communications releases the inhibit without rebooting or resetting
+run distance. It requires fresh stopped-wheel feedback, valid line data and
+no motor fault. STOP takes priority; reconnect never resumes
 movement automatically. A pickup ends the run and requires a Pico restart.
 Barcode/navigation and external faults still await producers.
 
@@ -51,12 +52,10 @@ recorded; gaps also occurred while STOP was latched. The earlier stationary
 one-minute pass remains valid only for that captured window. See
 [normal observations](../testing/subsystem1/logs/2026-11-17-normal-stop-summary.json).
 
-**Raise BOTH drive wheels securely before flashing or connecting power.**
-Normal control may request movement three seconds after startup, before WiFi
-connects. Keep the GP12 servo and its leads free. The whole car uses USB or a
-power bank, with no separate battery switch. Disconnecting the supply ends
-the run; reconnecting clears STOP and can start movement again. Dashboard
-reconnect preserves STOP. Explicit Resume may release it in normal mode. See [normal mode and STOP/Resume check](../testing/subsystem1/MOTOR_STOP_TEST.md).
+**Raise both drive wheels securely for the first flash and startup check.**
+The whole car uses USB or a power bank. Reconnecting the supply starts a new
+run with STOP latched. Keep the GP12 servo and its leads free during setup.
+See [the normal mode and STOP/Resume check](../testing/subsystem1/MOTOR_STOP_TEST.md).
 
 The preceding stationary image 62e5bd63 passed a full-minute delivery capture:
 149 main packets, 15 heartbeats and six scans; median 402 ms/max 600 ms main,
@@ -67,12 +66,11 @@ trades power saving for latency; current draw remains unmeasured.
 [Delivery evidence](../testing/subsystem1/TELEMETRY_DELIVERY.md),
 [17 November Resume build identity](../testing/subsystem1/logs/2026-11-17-resume-fingerprint.json).
 
-Use the normal UF2 for integrated driving and telemetry. The
-`_s2_bypass.uf2` image is for the pending 6b track test. Build standalone
-motion diagnostics on demand with `TEST=1` and `APP_MODE=distance`,
-`APP_MODE=reverse` or `APP_MODE=turn S2_TURN_TRACK_MM=120`. A stationary
-hand-turn image can be built with `TEST=1 APP_MODE=integrated`, with wheel
-PWM disabled and servo scanning active.
+The `_s2_bypass.uf2` image and matching ELF/MAP are for the pending 6b
+bypass and line rejoin. Build a stationary sensor image on demand with
+`TEST=1 APP_MODE=integrated`. It disables wheel PWM and leaves servo scanning
+active. Build standalone motion diagnostics with `TEST=1` and `APP_MODE=distance`,
+`APP_MODE=reverse` or `APP_MODE=turn S2_TURN_TRACK_MM=120`.
 
 ## Start the bench
 
@@ -96,8 +94,9 @@ Use **node server.mjs** if PowerShell blocks npm.ps1. Open
 **http://127.0.0.1:4173**. Refresh after website changes.
 
 4. With both drive wheels securely raised and the servo free, flash the
-   current normal UF2 through BOOTSEL. Wheels may move after auto-restart.
-   Keep them raised and click Connect robot using:
+   current normal UF2 through BOOTSEL. Keep the wheels raised and click
+   Connect robot using the settings below. Check for **Stop latched** before
+   clicking Resume.
 
 | Setting | Value |
 | --- | --- |
@@ -190,9 +189,11 @@ millimetres. The card flags readings within 250 mm and labels a missing
 return **No echo**. The current firmware samples 30°, 90° and 150°. The CSV
 includes the bearing and distance of each sample.
 
-In normal mode, a clear front uses the existing IR line targets. Scanning
-requests zero wheels; a clear side permits a brief controller-owned turn.
-Blocked/invalid range, missing/busy/stale navigation and STOP inhibit motion.
+In normal mode, a fresh centre distance above 250 mm permits line following.
+A measured target within 250 mm triggers a stop and scan, and a measured
+clear side permits a brief controller-owned turn. Missing or invalid echoes
+inhibit motion, as do missing, busy or stale navigation and STOP. The
+restored sensing loop waits 300 ms at centre before each measurement.
 S5 never calls the motor API. The front-distance tile uses centre samples,
 not the left/right echoes. Servo sensing can continue while STOP is latched.
 
@@ -249,8 +250,8 @@ exclude kernel/radio stacks and are not stack high-water.
 make -B -C build_make PICO_SDK_PATH=/opt/robocar/pico-sdk-2.2.0 NET=lwip MQTT=1 TEST=0 APP_MODE=integrated CONSOLE=usb_cdc CRASH_REPORT=0 -j8
 ~~~
 
-Add `S4_MOTOR_TRACE=1` to build the powered S4 bench image with USB trace
-support. Build locally with your ignored WiFi configuration.
+Add `S4_MOTOR_TRACE=1` when a powered S4 USB trace is needed. Build locally
+with your ignored WiFi configuration.
 
 The current image is already normal TEST=0. Use TEST=1 only for an explicit
 stationary hand-turn/sensor profile. Standalone IR and
