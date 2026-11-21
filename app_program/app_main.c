@@ -147,7 +147,7 @@ static void app_controller_step(UW started_ms)
     unsigned state = APP_CTRL_STARTING;
     (void)app_controller_poll();
     ER line_er = subsystem3_get_line(&line);
-    ER motion_er = subsystem2_get_motion(&motion);
+    ER motion_er = subsystem2_get_motion_for_control(&motion);
 #ifdef APP_OBSTACLE_BYPASS
     S5_NAV_DATA navigation = {0};
     S5_RANGE_DATA range = {0};

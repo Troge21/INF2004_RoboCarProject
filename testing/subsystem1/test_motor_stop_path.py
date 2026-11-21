@@ -59,6 +59,7 @@ static UW operating_ms;
 static unsigned scenario,phase,ticks,checks,pattern,stale,invalid,compare[4];
 static unsigned right_edge_adc;
 static unsigned motor_busy,motor_brief_busy,controller_busy,encoder_fail;
+static unsigned feedback_brief_busy,feedback_wait_times_out;
 static unsigned nav_phase=S5_NAV_CLEAR,nav_stale,nav_busy,nav_reads;
 static UW nav_turn_id,ended_turn_id;
 #ifdef APP_OBSTACLE_BYPASS
@@ -74,11 +75,20 @@ static jmp_buf done;
 static ID tk_cre_sem(T_CSEM *s){assert(s->isemcnt==1&&s->maxsem==1);return ++created;}
 static ER tk_wai_sem(ID id,INT n,INT timeout){
     assert(id>=1&&id<=3&&n==1&&(timeout==TMO_POL||timeout==TMO_FEVR||
-        (id==2&&timeout==S2_COMMAND_READ_WAIT_MS)));
+        (id==2&&timeout==S2_COMMAND_READ_WAIT_MS)||
+        (id==3&&timeout==S2_CONTROL_FEEDBACK_WAIT_MS)));
     if(held[id]||(id==1&&controller_busy)||(id==2&&motor_busy))return E_TMOUT;
     if(id==2&&motor_brief_busy){
         if(timeout==TMO_POL)return E_TMOUT;
         motor_brief_busy=0;
+    }
+    if(id==3&&feedback_brief_busy){
+        if(timeout==TMO_POL)return E_TMOUT;
+        feedback_brief_busy=0;
+    }
+    if(id==3&&timeout==S2_CONTROL_FEEDBACK_WAIT_MS&&feedback_wait_times_out){
+        feedback_wait_times_out=0;
+        return E_TMOUT;
     }
     held[id]=1;return E_OK;
 }
@@ -351,6 +361,17 @@ static ER tk_dly_tsk(INT ms){
             const S2_COMMAND command=read_command();
             assert(command.mode==S2_MODE_RPM&&command.left==260&&command.right==260);
             pass("normal controller requests RPM and actual PID/motor loop produces nonzero output after startup");
+            feedback_brief_busy=1;
+            phase=10;
+        }else if(phase==10){
+            assert(!feedback_brief_busy&&moving()&&motion.stop_reason==S2_STOP_NONE);
+            pass("controller keeps real PWM active when the feedback snapshot unlocks within the wait budget");
+            feedback_wait_times_out=1;
+            phase=11;
+        }else if(phase==11){
+            stopped();
+            assert(!feedback_wait_times_out);
+            pass("controller still cuts PWM if valid feedback cannot be read within the wait budget");
             phase=9;
         }else if(phase==9){
             assert(!motor_brief_busy&&moving()&&motion.stop_reason==S2_STOP_NONE);
@@ -596,6 +617,7 @@ static ER tk_dly_tsk(INT ms){
 static void run(unsigned which){
     scenario=which;phase=ticks=operating_ms=created=stale=invalid=encoder_fail=0;pattern=right_edge_adc=0;
     motor_busy=motor_brief_busy=controller_busy=nav_stale=nav_busy=nav_reads=0;
+    feedback_brief_busy=feedback_wait_times_out=0;
     nav_phase=S5_NAV_CLEAR;counts=(S2_ENCODER_COUNTS){0,0};
     nav_turn_id=ended_turn_id=0;
 #ifdef APP_OBSTACLE_BYPASS

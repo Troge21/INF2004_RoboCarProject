@@ -4,7 +4,7 @@ Local real-MQTT dashboard for Buddy/Subsystem 1: Overview, Sensors & motion,
 Communications, charts and exports. No cloud hosting, demo feed, npm packages
 or website build step.
 
-## Current integrated firmware - 21 November 2026
+## Current integrated firmware - 22 November 2026
 
 One current **Packed v4** contract covers distance, IR, IMU, measured wheel
 velocity/counts/net travel, controller state, faults, encoder path and future barcode
@@ -16,7 +16,7 @@ Current normal operating image (motor control enabled):
 
 Profile **NET=lwip MQTT=1 TEST=0 APP_MODE=integrated CONSOLE=usb_cdc CRASH_REPORT=0**.
 Size **738816 bytes**. SHA-256
-`d8566a21469e118c8cc5e88a55e87642be6aa2c21368e2b5653a77d2d7e45d94`.
+`336ee965c0b974e4c6bda93900dd9388c5f25ee92ed718248fc0e449043e9c11`.
 The integrated build includes MQTT, encoder motor control, the S3 line
 sampling fixes and GP27 cutoff of 455, sensor-guided left-curve recovery,
 obstacle scans, S4 hump estimates, motion reporting and pickup STOP. Flash
@@ -30,6 +30,9 @@ The normal image uses the checkpoint's line-following logic and reports
 forward range while driving. A confirmed obstacle at **240 mm or closer**
 automatically latches STOP for a width scan. The separate `_s2_bypass.uf2`
 is for obstacle course testing.
+
+The controller allows a short bounded wait for the wheel-feedback snapshot
+to unlock. An unavailable or stale snapshot still stops the car.
 
 The controller starts with **STOP latched** on every power-up. **Resume** in
 Overview or Communications releases the inhibit without rebooting or resetting

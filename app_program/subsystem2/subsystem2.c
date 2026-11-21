@@ -113,13 +113,13 @@ EXPORT ER subsystem2_set_signed_rpm_x10(INT left, INT right)
     return submit_command(S2_MODE_RPM, left, right);
 }
 
-EXPORT ER subsystem2_get_motion(S2_MOTION_DATA *sample)
+static ER read_motion(S2_MOTION_DATA *sample, INT wait_ms)
 {
     ER er;
     uint64_t controls;
     if (sample == NULL) return E_PAR;
     if (s_feedback_sem <= 0) return E_OBJ;
-    er = tk_wai_sem(s_feedback_sem, 1, TMO_POL);
+    er = tk_wai_sem(s_feedback_sem, 1, wait_ms);
     if (er != E_OK) return er;
     controls = s_feedback.controls;
     if (!controls) {
@@ -158,6 +158,16 @@ EXPORT ER subsystem2_get_motion(S2_MOTION_DATA *sample)
         sample->target_right_rpm_x10 - sample->actual_right_rpm_x10 : 0;
     sample->distance_centre_mm_x10 = (sample->distance_left_mm_x10 + sample->distance_right_mm_x10) / 2;
     return E_OK;
+}
+
+EXPORT ER subsystem2_get_motion(S2_MOTION_DATA *sample)
+{
+    return read_motion(sample, TMO_POL);
+}
+
+EXPORT ER subsystem2_get_motion_for_control(S2_MOTION_DATA *sample)
+{
+    return read_motion(sample, S2_CONTROL_FEEDBACK_WAIT_MS);
 }
 
 int telemetry_get_travel(TELEMETRY_TRAVEL *out)

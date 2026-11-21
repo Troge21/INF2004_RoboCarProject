@@ -39,6 +39,7 @@ EXPORT void subsystem2_test_status(void);
 #define S2_PRI_MOTOR           14
 #define S2_PERIOD_MS           20
 #define S2_COMMAND_READ_WAIT_MS 10
+#define S2_CONTROL_FEEDBACK_WAIT_MS 10
 #define S2_COMMAND_MAX_AGE_MS  100U
 #define S2_SPEED_SAMPLE_MS     200U
 #define S2_FEEDBACK_MAX_AGE_MS  500U
@@ -124,5 +125,7 @@ EXPORT ER subsystem2_set_signed_rpm_x10(INT left, INT right);
  * E_OBJ until first snapshot; E_TMOUT on contention: retry later.
  * Consumers check timestamp age and speed_valid before showing live values. */
 EXPORT ER subsystem2_get_motion(S2_MOTION_DATA *sample);
+/* Controller task only. Allow an in-progress snapshot copy to finish. */
+EXPORT ER subsystem2_get_motion_for_control(S2_MOTION_DATA *sample);
 
 #endif /* SUBSYSTEM2_H */
