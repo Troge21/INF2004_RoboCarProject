@@ -279,6 +279,29 @@ static void test_stop_at_ramp_exit(void) {
     expect(s_hump_event==2 && s_hump_kind==S4_HUMP_LEFT && s_current_hump_mm>=9 &&
         s_current_hump_mm<=11,"alternating vibration on the flat still allows one completed crossing");
 }
+static void test_slow_right_hump(void) {
+    S2_MOTION_DATA wheel={0};
+    uint32_t now=0;
+    cancel_hump();
+    s_state=S4_STATE_MONITORING;
+    s_flags=S4_FLAG_SENSOR_OK;
+    s_current_hump_mm=s_max_hump_mm=0;
+    s_hump_event=0;
+    s_turn_code=256;
+    terrain_samples(&wheel,&now,0,0,12,6);
+    for (unsigned i=1;i<=325;++i) {
+        unsigned slope=i<=162?i:325-i;
+        terrain_samples(&wheel,&now,22,-(int)(55*slope/162),1,6);
+    }
+    expect(s_hump_event==1 && s_last_traversal_duration_ms>S4_MAX_TRAVERSAL_MS &&
+        s_hump_kind==S4_HUMP_RIGHT && s_current_hump_mm>=9 && s_current_hump_mm<=11,
+        "a slow 195 mm right hump can finish despite residual pitch and the old time limit");
+
+    terrain_samples(&wheel,&now,0,0,16,20);
+    terrain_samples(&wheel,&now,0,-55,10,20);
+    terrain_samples(&wheel,&now,0,0,24,20);
+    expect(s_hump_event==1,"a brief right tilt without sustained roll over distance is rejected");
+}
 static void test_motion_classes(void) {
     s_state=S4_STATE_MONITORING;
     S4_MOTION_PROGRESS motion={0};
@@ -409,6 +432,7 @@ int main(void) {
     test_gentle_pickup();
     test_terrain();
     test_stop_at_ramp_exit();
+    test_slow_right_hump();
     test_motion_classes();
 
 #if APP_TEST || APP_S4_MOTOR_TRACE

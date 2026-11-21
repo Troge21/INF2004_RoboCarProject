@@ -15,8 +15,8 @@ Current normal operating image (motor control enabled):
 **build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt.uf2** (NO _test suffix)
 
 Profile **NET=lwip MQTT=1 TEST=0 APP_MODE=integrated CONSOLE=usb_cdc CRASH_REPORT=0**.
-Size **738304 bytes**. SHA-256
-`b137ca70a5de98878d28b39131c8c59834ad6aa3b080c4f0345d79213e68469b`.
+Size **738816 bytes**. SHA-256
+`d8566a21469e118c8cc5e88a55e87642be6aa2c21368e2b5653a77d2d7e45d94`.
 The integrated build includes MQTT, encoder motor control, the S3 line
 sampling fixes and GP27 cutoff of 455, sensor-guided left-curve recovery,
 obstacle scans, S4 hump estimates, motion reporting and pickup STOP. Flash

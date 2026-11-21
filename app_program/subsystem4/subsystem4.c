@@ -51,6 +51,11 @@ IMPORT UW tm_usb_pending(void);
 #define S4_LEVEL_FILTER_MS         160U
 #define S4_HUMP_FLAT_MS            120U
 #define S4_HUMP_MIN_TRAVEL_X10     250U
+/* Confirm sustained right tilt before allowing a slower, noisier exit. */
+#define S4_RIGHT_HUMP_TILT_TRAVEL_X10 300U
+#define S4_RIGHT_HUMP_MAX_MS          4500U
+#define S4_RIGHT_HUMP_EXIT_ROLL_X10   20
+#define S4_RIGHT_HUMP_EXIT_PITCH_X10  30
 #define S4_ENCODER_MAX_AGE_MS      100U
 #define S4_HUMP_MAX_STEP_X10       120
 #define S4_HUMP_MAX_TURN_DEG_S     35
@@ -72,7 +77,7 @@ typedef struct {
 
 typedef struct {
     int64_t left_mm_x10, right_mm_x10;
-    uint32_t started_ms, flat_ms, travel_x10;
+    uint32_t started_ms, flat_ms, travel_x10, right_tilt_travel_x10;
     int32_t roll_x1000;
     int16_t pitch_x10, peak_roll_x10;
     int32_t level_pitch_x1000, level_roll_x1000;
@@ -262,11 +267,18 @@ static uint32_t side_height_mm(int16_t roll_x10)
     return (S4_WHEEL_CENTRES_MM * (uint32_t)s4_abs(slope_q10000(roll_x10)) + 5000U) / 10000U;
 }
 
+static BOOL right_hump_confirmed(void)
+{
+    return s_terrain.peak_roll_x10 < 0 &&
+        s_terrain.right_tilt_travel_x10 >= S4_RIGHT_HUMP_TILT_TRAVEL_X10;
+}
+
 static void complete_hump(uint32_t elapsed_ms)
 {
     const uint32_t pitch_mm = (s_accumulated_height_um + 500U) / 1000U;
     const uint32_t roll_mm = side_height_mm(s_terrain.peak_roll_x10);
     const BOOL side = roll_mm >= S4_MIN_VALID_HUMP_MM &&
+        (s_terrain.peak_roll_x10 > 0 || right_hump_confirmed()) &&
         (!s_terrain.pitch_descended || roll_mm >= pitch_mm);
     const uint32_t height = side ? roll_mm : pitch_mm;
     if (elapsed_ms < S4_MIN_TRAVERSAL_MS || s_terrain.travel_x10 < S4_HUMP_MIN_TRAVEL_X10 ||
@@ -346,7 +358,12 @@ static void terrain_update(const S2_MOTION_DATA *motion, int16_t pitch_x10,
         s_state = S4_STATE_HUMP_ASCENT;
     }
     const uint32_t duration = now_ms - s_terrain.started_ms;
-    if (duration > S4_MAX_TRAVERSAL_MS) {
+    if (roll_x10 <= -S4_ROLL_ENTER_X10)
+        s_terrain.right_tilt_travel_x10 += step_x10;
+    if (s4_abs(roll_x10) > s4_abs(s_terrain.peak_roll_x10))
+        s_terrain.peak_roll_x10 = roll_x10;
+    const BOOL right_confirmed = right_hump_confirmed();
+    if (duration > (right_confirmed ? S4_RIGHT_HUMP_MAX_MS : S4_MAX_TRAVERSAL_MS)) {
         cancel_hump();
         return;
     }
@@ -357,15 +374,17 @@ static void terrain_update(const S2_MOTION_DATA *motion, int16_t pitch_x10,
             s_accumulated_height_um += step_x10 * (uint32_t)slope / 100U;
         s_terrain.pitch_descended = pitch_x10 <= S4_TILT_EXIT_THRESH_X10;
     }
-    if (s4_abs(roll_x10) > s4_abs(s_terrain.peak_roll_x10))
-        s_terrain.peak_roll_x10 = roll_x10;
     /* The distance-smoothed roll supplies the peak. Settle against the live
      * level check so the filter need not advance after the wheels stop. */
+    const BOOL exit_level = level || (right_confirmed &&
+        roll_x10 - s_terrain.peak_roll_x10 >= S4_TILT_FLAT_THRESH_X10 &&
+        s4_abs(s_terrain.level_roll_x1000) <= S4_RIGHT_HUMP_EXIT_ROLL_X10 * 100 &&
+        s4_abs(s_terrain.level_pitch_x1000) <= S4_RIGHT_HUMP_EXIT_PITCH_X10 * 100);
     const BOOL side_descending = s4_abs(s_terrain.peak_roll_x10) >= S4_ROLL_ENTER_X10 &&
-        (level || s4_abs(s_terrain.peak_roll_x10) - s4_abs(roll_x10) >= S4_TILT_FLAT_THRESH_X10);
+        (exit_level || s4_abs(s_terrain.peak_roll_x10) - s4_abs(roll_x10) >= S4_TILT_FLAT_THRESH_X10);
     const BOOL descending = s_terrain.pitch_descended || side_descending;
     s_state = descending ? S4_STATE_HUMP_DESCENT : S4_STATE_HUMP_ASCENT;
-    if (!descending || !level) {
+    if (!descending || !exit_level) {
         s_terrain.settling = FALSE;
     } else if (!s_terrain.settling) {
         s_terrain.settling = TRUE;
