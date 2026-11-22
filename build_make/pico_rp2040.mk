@@ -140,6 +140,24 @@ ifeq ($(S4_MOTOR_TRACE),1)
 S4_TRACE_SUFFIX := _s4_motor_trace
 endif
 
+# The normal MQTT image includes the tested GP28 decoder. Other profiles
+# retain their previous default. Name explicit overrides separately.
+BARCODE_DEFAULT := 0
+ifeq ($(APP_MODE):$(TEST):$(MQTT):$(S4_MOTOR_TRACE),integrated:0:1:0)
+BARCODE_DEFAULT := 1
+endif
+BARCODE_DETECT ?= $(BARCODE_DEFAULT)
+ifneq ($(filter $(BARCODE_DETECT),0 1),$(BARCODE_DETECT))
+$(error Unknown BARCODE_DETECT '$(BARCODE_DETECT)'; use 0 or 1)
+endif
+ifneq ($(BARCODE_DETECT),$(BARCODE_DEFAULT))
+ifeq ($(BARCODE_DETECT),1)
+BARCODE_SUFFIX := _barcode_detect
+else
+BARCODE_SUFFIX := _no_barcode
+endif
+endif
+
 # CRASH_REPORT=1 also copies every console line to UART0 on GP0 (TX) /
 # GP1 (RX), 115200 8N1.  UART output is sent immediately, so it still shows
 # the last messages and the kernel's crash report after a crash, when the
@@ -165,7 +183,7 @@ endif
 # a live hazard: an SMP=1 build was once flashed in place of an SMP=0 one and
 # only the banner in the log revealed it.
 #
-EXE_FILE := mtk3pico_smp$(SMP)_$(CONSOLE)$(WIFI_SUFFIX)$(NET_SUFFIX)$(MQTT_SUFFIX)$(CRASH_SUFFIX)$(TEST_SUFFIX)$(APP_BENCH_SUFFIX)$(S4_TRACE_SUFFIX)
+EXE_FILE := mtk3pico_smp$(SMP)_$(CONSOLE)$(WIFI_SUFFIX)$(NET_SUFFIX)$(MQTT_SUFFIX)$(CRASH_SUFFIX)$(TEST_SUFFIX)$(APP_BENCH_SUFFIX)$(S4_TRACE_SUFFIX)$(BARCODE_SUFFIX)
 
 GCC := arm-none-eabi-gcc
 AS := arm-none-eabi-gcc
@@ -227,6 +245,9 @@ ASFLAGS += -DCNF_SMP=1
 endif
 CFLAGS  += -DAPP_TEST=$(TEST)
 CFLAGS  += -DAPP_S4_MOTOR_TRACE=$(S4_MOTOR_TRACE)
+ifeq ($(BARCODE_DETECT),1)
+CFLAGS  += -DAPP_S3_BARCODE_DETECT=1
+endif
 CFLAGS  += -DAPP_BENCH_MODE=$(APP_BENCH_VALUE)
 ifeq ($(APP_MODE),bypass)
 CFLAGS  += -DAPP_OBSTACLE_BYPASS=1
@@ -269,7 +290,7 @@ endif
 # before any recipe executes.
 ################################################################################
 
-PROFILE_ID := smp$(SMP)-$(CONSOLE)-wifi$(WIFI)-net$(NET)-mqtt$(MQTT)-crash$(CRASH_REPORT)-test$(TEST)-app$(APP_MODE)$(APP_BENCH_CONFIG)$(S4_TRACE_SUFFIX)
+PROFILE_ID := smp$(SMP)-$(CONSOLE)-wifi$(WIFI)-net$(NET)-mqtt$(MQTT)-crash$(CRASH_REPORT)-test$(TEST)-app$(APP_MODE)$(APP_BENCH_CONFIG)$(S4_TRACE_SUFFIX)$(if $(filter 1,$(BARCODE_DETECT)),_barcode_detect)
 PROFILE_FILE := .build_profile
 
 ifneq ($(strip $(shell cat $(PROFILE_FILE) 2>/dev/null)),$(PROFILE_ID))

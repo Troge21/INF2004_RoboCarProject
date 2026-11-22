@@ -123,7 +123,7 @@ static void reverse_fault_check(BOOL wrong_direction)
     S2_ENCODER_COUNTS counts = {0};
     S2_COMMAND command = {.mode = S2_MODE_RPM, .left = -350, .right = -350, .valid = TRUE};
     s2_control_init(&motor, 0, counts);
-    for (UW ms = 20; ms <= 4000 && !motor.data.faults; ms += 20) {
+    for (UW ms = 20; ms <= S2_STALL_TIMEOUT_MS + 2000U && !motor.data.faults; ms += 20) {
         if (wrong_direction && motor.data.duty_left_x100 < 0) counts.left += 7;
         if (wrong_direction && motor.data.duty_right_x100 < 0) counts.right -= 6;
         command.timestamp_ms = ms;
@@ -131,6 +131,10 @@ static void reverse_fault_check(BOOL wrong_direction)
     }
     UW expected = wrong_direction ? S2_FAULT_LEFT_DIRECTION : S2_FAULT_LEFT_STALL;
     assert(motor.data.faults & expected);
+    if (wrong_direction)
+        assert(motor.data.timestamp_ms < S2_STALL_TIMEOUT_MS);
+    else
+        assert(motor.data.timestamp_ms - motor.no_edge_ms[0] == S2_STALL_TIMEOUT_MS);
     assert(!motor.data.duty_left_x100 && !motor.data.duty_right_x100);
 }
 

@@ -1,6 +1,9 @@
 /* S3 is the integrated ADC owner. AO: GP28/27/26 -> ADC2/1/0.
  * Never configures encoder GP16 or starts the old digital barcode timer. */
 #include "line_detection.h"
+#if APP_S3_BARCODE_DETECT
+#include "../telemetry_sources.h"
+#endif
 #include <sys/sysdef.h>
 #include <tk/syslib.h>
 
@@ -8,6 +11,12 @@ static ID s_line_sem, s_adc;
 /* timestamp:32 + two ADC values:12 each + valid:1 + reserved:7 = eight bytes.
  * Pattern derives from ADC values; no duplicate state or native padding. */
 static UB published[8];
+#if APP_S3_BARCODE_DETECT
+/* Separate lock so barcode readers never contend with the steering snapshot. */
+static ID s_barcode_sem;
+static UB barcode_event[7]; /* publication timestamp:32, event counter:16, code:8 */
+static S3_BARCODE_SIGNAL published_barcode_signal;
+#endif
 static UW read32(const UB *b)
 {
     return (UW)b[0] | ((UW)b[1]<<8) | ((UW)b[2]<<16) | ((UW)b[3]<<24);
@@ -43,6 +52,9 @@ ER s3_line_init(void)
     sem.sematr=TA_TFIFO|TA_FIRST;sem.isemcnt=sem.maxsem=1;
     for(i=0;i<sizeof(published);++i) published[i]=0;
     s_line_sem=tk_cre_sem(&sem);
+#if APP_S3_BARCODE_DETECT
+    if(s_line_sem>E_OK)s_barcode_sem=tk_cre_sem(&sem);
+#endif
     return s_line_sem<E_OK ? s_line_sem:E_OK;
 }
 ER s3_line_configure(void)
@@ -64,6 +76,65 @@ static ER read_raw(INT channel,UW *out)
     if(er!=E_OK) return er;
     return count==1 && *out<=4095U ? E_OK:E_IO;
 }
+#if APP_S3_BARCODE_DETECT
+ER s3_barcode_read_ao(UW *value, BOOL channel_changed)
+{
+    if(channel_changed){
+        ER er=read_raw(S3_BARCODE_ADC,value);
+        if(er!=E_OK)return er;
+    }
+    return read_raw(S3_BARCODE_ADC,value);
+}
+
+ER s3_publish_barcode_detection(UW timestamp_ms, UB code)
+{
+    if(!s3_barcode_character(code))return E_PAR;
+    if(s_barcode_sem<=0)return E_OBJ;
+    ER er=tk_wai_sem(s_barcode_sem,1,TMO_POL);
+    if(er!=E_OK)return er;
+    uint16_t sequence=(uint16_t)(barcode_event[4]|((UINT)barcode_event[5]<<8));
+    if(++sequence==0U)++sequence;
+    for(UINT i=0;i<4U;++i)barcode_event[i]=(UB)(timestamp_ms>>(8U*i));
+    barcode_event[4]=(UB)sequence;
+    barcode_event[5]=(UB)(sequence>>8);
+    barcode_event[6]=code;
+    (void)tk_sig_sem(s_barcode_sem,1);
+    return E_OK;
+}
+
+int telemetry_get_barcode(TELEMETRY_BARCODE *out)
+{
+    if(!out)return E_PAR;
+    if(s_barcode_sem<=0)return E_OBJ;
+    ER er=tk_wai_sem(s_barcode_sem,1,TMO_POL);
+    if(er!=E_OK)return er;
+    const UW timestamp=read32(barcode_event);
+    const uint16_t sequence=(uint16_t)(barcode_event[4]|((UINT)barcode_event[5]<<8));
+    const UB code=barcode_event[6];
+    (void)tk_sig_sem(s_barcode_sem,1);
+    if(!sequence)return E_TMOUT;
+    *out=(TELEMETRY_BARCODE){.timestamp_ms=timestamp,.event_sequence=sequence,.code=code};
+    return E_OK;
+}
+
+void s3_publish_barcode_signal(const S3_BARCODE_SIGNAL *value)
+{
+    if(s_barcode_sem<=0 || tk_wai_sem(s_barcode_sem,1,TMO_POL)!=E_OK)return;
+    published_barcode_signal=*value;
+    (void)tk_sig_sem(s_barcode_sem,1);
+}
+
+ER s3_get_barcode_signal(S3_BARCODE_SIGNAL *out)
+{
+    if(!out)return E_PAR;
+    if(s_barcode_sem<=0)return E_OBJ;
+    ER er=tk_wai_sem(s_barcode_sem,1,TMO_POL);
+    if(er!=E_OK)return er;
+    *out=published_barcode_signal;
+    (void)tk_sig_sem(s_barcode_sem,1);
+    return E_OK;
+}
+#endif
 void s3_line_sample(void)
 {
     const INT channels[]={S3_IR_CENTRE_ADC,S3_IR_RIGHT_ADC};

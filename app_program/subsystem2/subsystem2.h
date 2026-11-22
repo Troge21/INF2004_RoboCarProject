@@ -44,7 +44,7 @@ EXPORT void subsystem2_test_status(void);
 #define S2_SPEED_SAMPLE_MS     200U
 #define S2_FEEDBACK_MAX_AGE_MS  500U
 #define S2_LOOP_MAX_GAP_MS      250U
-#define S2_STALL_TIMEOUT_MS    1500U
+#define S2_STALL_TIMEOUT_MS    5000U
 #define S2_MAX_RPM_X10          600
 
 /* Conservative initial PID tuning; requires physical verification.

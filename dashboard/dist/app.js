@@ -74,7 +74,7 @@ function sensors(){
   <div class="two-columns">${chartCard('Wheel velocity','Compare the two encoder speed estimates','speed-chart',speedLegend,speedFoot)}${chartCard('Obstacle proximity','Live ultrasonic range measurements','obstacle-chart',obstacleLegend,obstacleFoot)}</div>
   <div class="two-columns">${chartCard('Vehicle pitch','Live IMU angle; front-up is positive','pitch-chart','<div class="legend"><span><i class="teal"></i>Pitch</span></div>','<span>Sensor angle <strong>· degrees</strong></span><span>Calibrating or stale samples appear as gaps</span>')}${card('IMU & height status','Real sensor status and estimator assumptions','<div class="vehicle-details"><div class="vehicle-detail"><span>Pitch</span><strong data-value="pitch">Unavailable</strong></div><div class="vehicle-detail"><span>Roll from level</span><strong data-value="roll">Unavailable</strong></div><div class="vehicle-detail"><span>Motion</span><strong data-value="motion-class">Unavailable</strong></div><div class="vehicle-detail"><span>Turn rate estimate</span><strong data-value="turn-rate">Unavailable</strong></div><div class="vehicle-detail"><span>Last hump type</span><strong data-value="hump-kind">Unavailable</strong></div><div class="vehicle-detail"><span>IMU state</span><strong data-value="imu-state">Unavailable</strong></div><div class="vehicle-detail"><span>Last accepted hump</span><strong data-value="last-hump">Unavailable</strong></div><div class="vehicle-detail"><span>Run maximum estimate</span><strong data-value="run-hump">Unavailable</strong></div></div><div class="card-bottom-note" data-value="imu-note">Waiting for IMU telemetry</div>')}</div>
   <div class="two-columns">${chartCard('Terrain & hump height','Current estimate and highest hump of the run','hump-chart','<div class="legend"><span><i class="teal"></i>Current</span><span><i class="purple"></i>Run maximum</span></div>','<span>Estimated height <strong>· mm</strong></span><span data-value="height-source">Waiting for IMU telemetry</span>')}${chartCard('Distance travelled','Cumulative encoder estimate for the current run','distance-chart','<div class="legend"><span><i class="teal"></i>Distance</span></div>','<span>Measured distance <strong>· m</strong></span><span>Since Pico restart; wheel slip affects accuracy</span>')}</div>
-  ${motionCard()}<div class="two-columns">${card('Line & navigation','Analog line pair GP27/GP26; GP28 reserved for barcode','<div class="sensor-status" id="sensor-status"></div><div class="barcode-row">'+icon('barcode')+'Latest barcode<strong data-value="barcode">Unavailable</strong></div><div class="card-bottom-note">Filled = black · empty = white · ? = unavailable. White/white and black/black drive forward.</div>')}${obstacleScanCard()}</div>`;
+  ${motionCard()}<div class="two-columns">${card('Line & navigation','Analog line pair GP27/GP26 and barcode sensor GP28','<div class="sensor-status" id="sensor-status"></div><div class="barcode-row">'+icon('barcode')+'Latest barcode<strong data-value="barcode">Unavailable</strong></div><div class="barcode-row">'+icon('barcode')+'GP28 barcode sensor<strong data-value="barcode-signal">Unavailable</strong></div><div class="card-bottom-note" data-value="barcode-signal-detail">Waiting for barcode sensor diagnostics</div><div class="card-bottom-note">Filled = black · empty = white · ? = unavailable. White/white and black/black drive forward.</div>')}${obstacleScanCard()}</div>`;
 }
 function communications(){
   return `<div class="metrics">${metric('broker','Broker connection','','MQTT WebSocket session','radio')}${metric('messages','Received messages','','Includes rejected messages','packet')}${metric('interval-metric','Telemetry interval','ms','Target ≤ 2000 ms','clock')}${metric('payload','Latest payload','bytes','Application payload only','chip')}</div>
@@ -146,7 +146,17 @@ function update(force=false){
     'Waiting for S4 motion and terrain telemetry.';
   value('imu-note',imuNote);value('height-source',imuNote);
   const control=store.currentController(now,status==='connected');
-  value('state',control?`${control.controller_state}${control.stop_latched&&control.controller_state_code!==6?' · stop latched':''}`:'Controller unavailable');value('barcode',current?.barcode?(current.barcode_navigation?current.barcode+' ? '+current.barcode_navigation:current.barcode):'Unavailable');
+  value('state',control?`${control.controller_state}${control.stop_latched&&control.controller_state_code!==6?' · stop latched':''}`:'Controller unavailable');
+  const barcode=store.lastBarcode?.session_token===current?.session_token?store.lastBarcode:null;
+  value('barcode',barcode?.barcode?(barcode.barcode_navigation?barcode.barcode+' → '+barcode.barcode_navigation:
+    `${barcode.barcode} · Scan #${barcode.sequence}`):
+    barcode?`Detected #${barcode.sequence}`:'Unavailable');
+  const barcodeSignal=store.currentBarcodeSignal(now,status==='connected');
+  value('barcode-signal',barcodeSignal?.adc==null?'Unavailable':
+    `${barcodeSignal.adc} · ${barcodeSignal.black?'BLACK':'WHITE'}`);
+  value('barcode-signal-detail',barcodeSignal?
+    `${barcodeSignal.edges} edges · ${barcodeSignal.rejected} rejected scans · ${barcodeSignal.gaps} sampling gaps`:
+    'Waiting for barcode sensor diagnostics');
   const faultNames=current?.faults;
   if(faultNames?.length)value('faults',faultNames.join(', '));
   else if(control?.controller_state_code===7)value('faults','Controller / motor fault');

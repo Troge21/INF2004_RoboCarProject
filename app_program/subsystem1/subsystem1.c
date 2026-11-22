@@ -23,6 +23,10 @@ static UB requested_stack_bytes[3];
 /* Network owner only. Full-width counters/clocks wrap with unsigned arithmetic. */
 static UW next_sequence,last_tx,last_aux,last_terrain,last_chunk,last_scan,last_session,network_busy,scan_boot;
 static UB scan_cursor,last_chunk_count;
+#if APP_S3_BARCODE_DETECT
+#define BARCODE_SIGNAL_INTERVAL_MS 250U
+static UW last_barcode_signal;
+#endif
 static UW source_now(void){SYSTIM t={0};(void)tk_get_tim(&t);return t.lo;}
 EXPORT void s1_resource_add_stack(uint32_t bytes)
 {
@@ -132,7 +136,12 @@ EXPORT int s1_network_aux(unsigned char *out,unsigned capacity,uint32_t session,
     UB packed[S1_SCAN_PACKED_BYTES],count;unsigned i,width_mm;int n;
     if(!out||!session||!counters||capacity<S1_SCAN_PACKET_BYTES)return E_PAR;
     if(s1_network_uptime(&boot)!=E_OK)return E_OBJ;
-    if(session!=last_session){last_session=session;scan_cursor=0;last_aux=boot-5000U;last_terrain=boot-500U;}
+    if(session!=last_session){
+        last_session=session;scan_cursor=0;last_aux=boot-5000U;last_terrain=boot-500U;
+#if APP_S3_BARCODE_DETECT
+        last_barcode_signal=boot-BARCODE_SIGNAL_INTERVAL_MS;
+#endif
+    }
     if((UW)(boot-last_aux)>=5000U) {
         if(tk_wai_sem(publication_sem,1,TMO_POL)!=E_OK){++network_busy;return E_TMOUT;}
         t=s1_read_u32(resource_data+15);
@@ -161,6 +170,35 @@ EXPORT int s1_network_aux(unsigned char *out,unsigned capacity,uint32_t session,
             }
         }
     }
+#if APP_S3_BARCODE_DETECT
+    if((UW)(boot-last_barcode_signal)>=BARCODE_SIGNAL_INTERVAL_MS) {
+        S3_BARCODE_SIGNAL signal={0};
+        const ER er=s3_get_barcode_signal(&signal);
+        if(er==E_OK || er==E_OBJ){
+            const uint16_t words[]={
+                (UW)(now-signal.timestamp_ms)<=500U?signal.sample_word:0,
+                signal.edges,signal.rejected,signal.gaps
+            };
+            out[0]=0xb8U;
+            s1_write_u32(out+1,session);
+            s1_write_u32(out+5,boot);
+            for(i=0;i<4U;++i){
+                out[9U+2U*i]=(UB)words[i];
+                out[10U+2U*i]=(UB)(words[i]>>8);
+            }
+            /* Append only acquired runs, in chronological order. The maximum
+             * is 47 bytes, within the scan packet capacity checked above. */
+            unsigned run=(signal.next_run+S3_BARCODE_SIGNAL_RUNS-signal.run_count)%
+                S3_BARCODE_SIGNAL_RUNS;
+            for(i=0;i<signal.run_count;++i){
+                out[17U+i]=signal.runs[run];
+                if(++run==S3_BARCODE_SIGNAL_RUNS)run=0;
+            }
+            last_barcode_signal=boot;
+            return 17+signal.run_count;
+        }
+    }
+#endif
     if((UW)(boot-last_chunk)<100U)return E_TMOUT;
     if(tk_wai_sem(publication_sem,1,TMO_POL)!=E_OK){++network_busy;return E_TMOUT;}
     count=scan_count;t=s1_read_u32(scan_time);seq=s1_read_u32(scan_sequence);

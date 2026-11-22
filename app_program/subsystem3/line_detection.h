@@ -10,4 +10,10 @@ ER s3_line_configure(void);
  * record. Other tasks only use subsystem3_get_line(), without driver calls. */
 void s3_line_sample(void);
 
+#if APP_S3_BARCODE_DETECT
+ER s3_barcode_read_ao(UW *value, BOOL channel_changed);
+ER s3_publish_barcode_detection(UW timestamp_ms, UB code);
+void s3_publish_barcode_signal(const S3_BARCODE_SIGNAL *value);
+#endif
+
 #endif /* LINE_DETECTION_H */

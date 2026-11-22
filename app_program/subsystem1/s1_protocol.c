@@ -101,7 +101,7 @@ int s1_set_barcode(S1_SNAPSHOT *s,unsigned code,unsigned navigation,uint16_t seq
     unsigned compact=0;
     if(!s||navigation>4||(!code&&navigation)||code>255||(code&&(!(code&128U)||(code&63U)>=43)))return -1;
     if(code)compact=(code&64U)|((code&63U)+1U);
-    s1_set_bits(s->body,S1_B_BARCODE,7,compact);s1_set_bits(s->body,S1_B_EVENT,16,code?seq:0);
+    s1_set_bits(s->body,S1_B_BARCODE,7,compact);s1_set_bits(s->body,S1_B_EVENT,16,seq);
     s1_set_bits(s->body,S1_B_NAV,3,navigation);
     time_set(s,S1_AGE_BARCODE,t);return 0;
 }
@@ -122,7 +122,7 @@ static int body_ok(const uint8_t *b) {
     return s1_get_bits(b,S1_B_NAV,3)<=4&&(!s1_get_bits(b,S1_B_NAV,3)||bc)&&
         (!d||(d>=20&&d<=4000))&&(!l||l>=4)&&
         imu_ok(get_imu(b))&&(a<=10000||a==SPEED_NULL)&&(c<=10000||c==SPEED_NULL)&&
-        (!bc||((bc&63U)>=1&&(bc&63U)<=43))&&(bc||!s1_get_bits(b,S1_B_EVENT,16))&&
+        (!bc||((bc&63U)>=1&&(bc&63U)<=43))&&
         !(s1_get_bits(b,S1_B_FAULT,11)&~s1_get_bits(b,S1_B_KNOWN,11))&&
         s1_valid_control_word(s1_get_bits(b,S1_B_CONTROL,6))&&(reason<=5||reason==7);
 }

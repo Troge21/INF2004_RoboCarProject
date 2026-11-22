@@ -26,10 +26,10 @@ export function decodeTelemetry(payload){
   const session=v.getUint32(9,true),body=b.subarray(13),get=(o,n)=>bits(body,o,n);
   if(!session)throw new Error('Invalid telemetry session/reserved bits');
   const distance=get(0,12),line=get(12,3),left=get(49,14),right=get(63,14),bc=get(227,7);
-  const known=get(205,11),fault=get(216,11),mode=get(256,2),reason=get(258,3),navigation=get(261,3);
+  const known=get(205,11),fault=get(216,11),eventSequence=get(234,16),mode=get(256,2),reason=get(258,3),navigation=get(261,3);
   if((distance&&(distance<20||distance>4000))||(line&&line<4)||
     (left>10000&&left!==16383)||(right>10000&&right!==16383)||
-    (bc&&((bc&63)<1||(bc&63)>43))||(!bc&&get(234,16))||navigation>4||(!bc&&navigation)||(fault&~known)||(reason>5&&reason!==7))throw new Error('Invalid telemetry field range');
+    (bc&&((bc&63)<1||(bc&63)>43))||navigation>4||(!bc&&navigation)||(fault&~known)||(reason>5&&reason!==7))throw new Error('Invalid telemetry field range');
   const sample={sequence:v.getUint32(1,true),uptime_ms:v.getUint32(5,true),session_token:session,...decodeControlWord(get(250,6)),
     obstacle_valid:distance!==0,obstacle_mm:distance||null,line_bits:line,ir:line?[null,(line>>1)&1,line&1]:[null,null,null],
     left_mps:left===16383?null:(left-5000)/10000,right_mps:right===16383?null:(right-5000)/10000,
@@ -38,7 +38,7 @@ export function decodeTelemetry(payload){
     distance_m:get(173,32)===0xffffffff?null:get(173,32)/1000,
     motor_mode:mode===3?null:['Stopped','Duty','RPM'][mode],motor_stop_reason:reason===7?null:['Requested','None','Command timeout','Command busy','Motor fault','Feedback wait'][reason],
     fault_known_mask:known,fault_mask:fault,faults:known?FAULT_NAMES.filter((_,i)=>fault&(1<<i)):null,
-    barcode:bc?ALPHABET[(bc&63)-1]:null,barcode_navigation:navigation?[null,'Turn left','Turn right','Go straight','U-turn'][navigation]:null,barcode_reversed:bc?Boolean(bc&64):null,barcode_event_sequence:bc?get(234,16):null,
+    barcode:bc?ALPHABET[(bc&63)-1]:null,barcode_navigation:navigation?[null,'Turn left','Turn right','Go straight','U-turn'][navigation]:null,barcode_reversed:bc?Boolean(bc&64):null,barcode_event_sequence:bc||eventSequence?eventSequence:null,
     pitch_deg:null,hump_mm:null,max_hump_mm:null,imu_state:null,imu_flags:null,imu_speed_source:null,scan:null};
   const pitch=get(15,11),height=get(26,7),max=get(33,7),state=get(40,3),flags=get(43,6);
   const heightOK=x=>x===0||(x>=6&&x<=80);
@@ -91,6 +91,16 @@ export function decodeTerrain(payload){
   return {session_token:v.getUint32(1,true),uptime_ms:v.getUint32(5,true),
     roll_deg:roll?(roll-901)/10:null,turn_deg_s:turn?turn-256:null,
     motion_class:MOTION_CLASSES[motion],hump_kind:HUMP_KINDS[bits(body,24,2)],hump_event_sequence:bits(body,26,16)};
+}
+export function decodeBarcodeSignal(payload){
+  const b=bytesOf(payload),v=viewOf(b);
+  if(b.length<17||b.length>47||b[0]!==0xb8||!v.getUint32(1,true))throw new Error('Invalid barcode sensor packet');
+  const word=v.getUint16(9,true),valid=Boolean(word&4096);
+  if((word&49152)||(!valid&&word))throw new Error('Invalid barcode sensor sample');
+  return {session_token:v.getUint32(1,true),uptime_ms:v.getUint32(5,true),
+    adc:valid?word&4095:null,black:valid?Boolean(word&8192):null,
+    edges:v.getUint16(11,true),rejected:v.getUint16(13,true),gaps:v.getUint16(15,true),
+    runs_ms:Array.from(b.subarray(17),ticks=>ticks*2)};
 }
 export function decodeHeartbeat(payload){const b=bytesOf(payload);if(b.length!==5||b[0]!==0x80)throw new Error('Expected 5-byte binary heartbeat');return viewOf(b).getUint32(1,true);}
 export function encodeStatusRequest(id){
@@ -168,13 +178,24 @@ export class TelemetryStore {
     return connected&&terrain&&terrain.session_token===this.clockAnchor?.session&&
       at>=terrain.at&&at-terrain.at+terrain.age<=2000?terrain:null;
   }
+  currentBarcodeSignal(at=Date.now(),connected=true) {
+    const signal=this.barcodeSignal;
+    return connected&&signal&&signal.session_token===this.clockAnchor?.session&&
+      at>=signal.at&&at-signal.at+signal.age<=2000?signal:null;
+  }
   ingestAux(bytes,at,packet) {
     const marker=bytes[0];
-    const value=marker===0xb5?decodeScan(bytes):marker===0xb6?decodeDiagnostics(bytes):decodeTerrain(bytes);
+    const value=marker===0xb5?decodeScan(bytes):marker===0xb6?decodeDiagnostics(bytes):
+      marker===0xb7?decodeTerrain(bytes):decodeBarcodeSignal(bytes);
     this.seenSession=value.session_token;
     const age=this.packetAge(value,at,marker===0xb5?10000:marker===0xb6?7000:2000);
     packet.accepted=true;packet.decoded=value;
     if(age===null){packet.detail='Waiting for fresh Pico STATUS clock sync';return true;}
+    if(marker===0xb8){
+      packet.detail='GP28 barcode sensor';
+      this.barcodeSignal={...value,at,age};
+      return true;
+    }
     if(marker===0xb7){
       packet.detail='S4 motion and terrain';
       const before=this.terrain?.session_token===value.session_token?this.terrain:null;
@@ -218,7 +239,7 @@ export class TelemetryStore {
     this.lastTelemetry=null; this.lastHeartbeat=null; this.lastSequence=null; this.lastHeartbeatCounter=null;
     this.messageCount=0; this.telemetryCount=0; this.rejected=0; this.sequenceGaps=0;
     this.totalBytes=0; this.lastPayloadBytes=0; this.lastInterval=null; this.format='â€”';
-    this.clockAnchor=null;this.seenSession=null;this.scanProfile=null;this.scanPending=null;this.diagnostics=null;this.diagnosticHistory=[];this.heartbeatIntervals=[];this.lastBarcodeEvent=null;
+    this.clockAnchor=null;this.seenSession=null;this.scanProfile=null;this.scanPending=null;this.diagnostics=null;this.diagnosticHistory=[];this.heartbeatIntervals=[];this.lastBarcodeEvent=null;this.lastBarcode=null;this.barcodeSignal=null;
     this.terrain=null;this.lastHumpEvent=null;
     this.pendingStatus=null;this.statusReply=null;this.lastStatusId=0;this.statusLastSentAt=null;
     this.pendingResume=null;this.resumeReply=null;this.lastResumeId=0;this.resumeNotice='Resume releases STOP only after fresh controller checks.';
@@ -341,7 +362,7 @@ export class TelemetryStore {
     this.packets.unshift(packet); this.packets.length=Math.min(this.packets.length,30);
     try {
       if (retained) throw new Error('Retained message ignored; waiting for a fresh sample');
-      if(kind==='telemetry'&&[0xb5,0xb6,0xb7].includes(bytes[0]))return this.ingestAux(bytes,at,packet);
+      if(kind==='telemetry'&&[0xb5,0xb6,0xb7,0xb8].includes(bytes[0]))return this.ingestAux(bytes,at,packet);
       if(kind==='status') {
         if(bytes[0]===0xa6){
           const reply=decodeResumeArmReply(bytes),p=this.pendingResume;this.expireCommands(at);
@@ -419,8 +440,14 @@ export class TelemetryStore {
       this.lastSequence=sample.sequence;
       this.lastInterval=this.lastTelemetry===null ? null : at-this.lastTelemetry;
       if (sample.state && sample.state!==this.sample?.state) this.event(sample.state,'Vehicle state changed','neutral',at);
-      const barcodeKey=sample.barcode?sample.session_token+'/'+sample.barcode_event_sequence+'/'+sample.barcode:null;
-      if(barcodeKey&&barcodeKey!==this.lastBarcodeEvent){this.lastBarcodeEvent=barcodeKey;this.event('Barcode decoded',sample.barcode,'success',at);}
+      const barcodeKey=sample.barcode_event_sequence!==null?sample.session_token+'/'+sample.barcode_event_sequence+'/'+sample.barcode:null;
+      if(barcodeKey&&barcodeKey!==this.lastBarcodeEvent){
+        this.lastBarcodeEvent=barcodeKey;
+        this.lastBarcode={session_token:sample.session_token,sequence:sample.barcode_event_sequence,
+          barcode:sample.barcode,barcode_navigation:sample.barcode_navigation};
+        if(sample.barcode)this.event('Barcode decoded',sample.barcode,'success',at);
+        else this.event('Barcode detected',`Scan #${sample.barcode_event_sequence}`,'success',at);
+      }
       if(sample.imu_state && sample.imu_state!==this.sample?.imu_state)
         this.event(`IMU Â· ${sample.imu_state}`,'S4 sensor state changed',sample.imu_state==='Sensor fault'?'warning':'neutral',at);
       if (!sample.obstacle_valid && this.sample?.obstacle_valid!==false) this.event('Range unavailable','No valid ultrasonic measurement','warning',at);

@@ -12,8 +12,8 @@
 #define TELEMETRY_UNKNOWN_U32 UINT32_MAX
 typedef struct {
     uint32_t timestamp_ms;
-    uint16_t event_sequence;
-    uint8_t code; /* S3 Code39 byte: valid:1/reversed:1/alphabet index:6 */
+    uint16_t event_sequence; /* Nonzero sequence with no code means detection only */
+    uint8_t code; /* Zero or S3 Code39 byte: valid:1/reversed:1/alphabet index:6 */
     uint8_t navigation; /* 0 unmapped, 1 left, 2 right, 3 straight, 4 U-turn */
 } TELEMETRY_BARCODE;
 typedef struct {

@@ -4,10 +4,10 @@ Local real-MQTT dashboard for Buddy/Subsystem 1: Overview, Sensors & motion,
 Communications, charts and exports. No cloud hosting, demo feed, npm packages
 or website build step.
 
-## Current integrated firmware - 22 November 2026
+## Current integrated firmware - 23 November 2026
 
 One current **Packed v4** contract covers distance, IR, IMU, measured wheel
-velocity/counts/net travel, controller state, faults, encoder path and future barcode
+velocity/counts/net travel, controller state, faults, encoder path and barcode
 data. Typed scan chunks, diagnostics and S4 terrain reports share the telemetry topic. The old
 v3/JSON decoders and controller beacon path are removed.
 
@@ -15,11 +15,11 @@ Current normal operating image (motor control enabled):
 **build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt.uf2** (NO _test suffix)
 
 Profile **NET=lwip MQTT=1 TEST=0 APP_MODE=integrated CONSOLE=usb_cdc CRASH_REPORT=0**.
-Size **738816 bytes**. SHA-256
-`336ee965c0b974e4c6bda93900dd9388c5f25ee92ed718248fc0e449043e9c11`.
+Size **747008 bytes**. SHA-256
+`6407153e1132760578ce6ac2d09a3b780d48d3ad8706d821040988ff91ae49be`.
 The integrated build includes MQTT, encoder motor control, the S3 line
 sampling fixes and GP27 cutoff of 455, sensor-guided left-curve recovery,
-obstacle scans, S4 hump estimates, motion reporting and pickup STOP. Flash
+obstacle scans, S4 hump estimates, motion reporting, pickup STOP and Code 39 decoding. Flash
 the UF2. The matching ELF and MAP are for debugging and memory inspection.
 The build and offline checks passed. The user confirmed
 right-wheel hump detection and pickup STOP on the earlier S4 trace image
@@ -33,13 +33,25 @@ is for obstacle course testing.
 
 The controller allows a short bounded wait for the wheel-feedback snapshot
 to unlock. An unavailable or stale snapshot still stops the car.
+Wheel stall protection stops both motors after five seconds without encoder
+pulses from a wheel the controller is trying to drive.
+
+The normal MQTT build enables `BARCODE_DETECT=1` by default and has the same
+UF2 bytes as the tested barcode trial. The user confirmed A, F and Z in both
+directions, including after replugging and on a power bank. GP28 samples at
+2 ms intervals. The decoder uses
+the start and stop patterns to estimate bar and gap widths, then compares
+the middle pattern against Code 39 templates. A confidently decoded label
+appears under **Latest barcode**, for example **A · Scan #1**.
+For a stationary contrast check, **Sensors & motion → Line & navigation**
+shows the live **GP28 barcode sensor** ADC value and black/white classification.
 
 The controller starts with **STOP latched** on every power-up. **Resume** in
 Overview or Communications releases the inhibit without rebooting or resetting
 run distance. It requires fresh stopped-wheel feedback, valid line data and
 no motor fault. STOP takes priority; reconnect never resumes
 movement automatically. A pickup ends the run and requires a Pico restart.
-Barcode/navigation and external faults still await producers.
+Barcode-triggered navigation and external fault reporting still await integration.
 
 On **18 November**, the user reported that the Resume test works after the
 requested Stop -> Resume -> Stop procedure. This is a user-reported basic

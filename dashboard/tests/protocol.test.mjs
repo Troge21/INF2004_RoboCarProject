@@ -1,12 +1,31 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {decodeTelemetry,decodeHeartbeat,decodeScan,decodeDiagnostics,decodeTerrain,TelemetryStore,packetText} from '../dist/protocol.js';
+import {decodeTelemetry,decodeHeartbeat,decodeScan,decodeDiagnostics,decodeTerrain,decodeBarcodeSignal,TelemetryStore,packetText} from '../dist/protocol.js';
 import {telemetry,heartbeat,statusReply,scanChunk,diagnostics,putBits,syncStore} from './fixtures.mjs';
 test('v4 real motion preserves signed counts/net distance and separates path length',()=>{
   const s=decodeTelemetry(telemetry({left:1191,right:-1191,leftCount:2147483647,rightCount:-2147483647,net:-1234,travel:0})).sample;
   assert.equal(s.left_mps,.1191);assert.equal(s.right_mps,-.1191);
   assert.equal(s.left_encoder_count,2147483647);assert.equal(s.right_encoder_count,-2147483647);
   assert.equal(s.net_distance_m,-.1234);assert.equal(s.distance_m,0);
+});
+test('barcode sensor diagnostics show the live ADC value and stale data expires',()=>{
+  const store=syncStore(new TelemetryStore());
+  const b=new Uint8Array(17),v=new DataView(b.buffer);
+  b[0]=0xb8;v.setUint32(1,0x12345678,true);v.setUint32(5,1000,true);
+  v.setUint16(9,0x3000|194,true);v.setUint16(11,22,true);
+  v.setUint16(13,2,true);v.setUint16(15,1,true);
+  assert.equal(store.ingest(b,'telemetry',1001),true);
+  const signal=store.currentBarcodeSignal(1001);
+  assert.equal(signal.adc,194);assert.equal(signal.black,true);
+  assert.equal(signal.edges,22);assert.equal(signal.rejected,2);assert.equal(signal.gaps,1);
+  assert.deepEqual(signal.runs_ms,[]);
+  assert.equal(store.currentBarcodeSignal(3002),null);
+  const timed=new Uint8Array(47);
+  timed.set(b);timed.set([255,10,30],17);
+  assert.deepEqual(decodeBarcodeSignal(timed).runs_ms,[510,20,60,...Array(27).fill(0)]);
+  assert.throws(()=>decodeBarcodeSignal(Uint8Array.of(...timed,1)));
+  v.setUint16(9,0,true);assert.equal(decodeBarcodeSignal(b).adc,null);
+  v.setUint16(9,0x2000,true);assert.throws(()=>decodeBarcodeSignal(b));
 });
 test('S4 terrain checks freshness, reports events once and preserves main-frame cadence',()=>{
   const store=syncStore(new TelemetryStore());
@@ -52,7 +71,7 @@ test('all IR codes retain physical left/right roles',()=>{
 });
 test('malformed ranges, source flags and fault coverage are rejected',()=>{
   for(const options of [{distance:19},{distance:4001},{pitch:1802},{height:5},{height:80,max:6},{state:7},
-    {known:1,fault:2},{barcode:44},{barcode:0,event:1},{barcode:0,navigation:1},{navigation:5}])
+    {known:1,fault:2},{barcode:44},{barcode:0,navigation:1},{navigation:5}])
     assert.throws(()=>decodeTelemetry(telemetry(options)));
   const b=telemetry();putBits(b.subarray(13),49,14,10001);assert.throws(()=>decodeTelemetry(b));
 });
@@ -124,6 +143,17 @@ test('barcode events are not duplicated after a brief missing snapshot',()=>{
   s.ingest(telemetry({sequence:2}),'telemetry',1002);
   s.ingest(telemetry({sequence:3,barcode:11,event:5}),'telemetry',1003);
   assert.equal(s.events.filter(e=>e.title==='Barcode decoded').length,1);
+});
+test('detection-only barcode event has an ID, no letter and no navigation',()=>{
+  const s=syncStore(new TelemetryStore());
+  assert.equal(s.ingest(telemetry({sequence:1,event:7}),'telemetry',1001),true);
+  assert.equal(s.sample.barcode,null);
+  assert.equal(s.sample.barcode_navigation,null);
+  assert.equal(s.sample.barcode_event_sequence,7);
+  s.ingest(telemetry({sequence:2}),'telemetry',1002);
+  s.ingest(telemetry({sequence:3,event:7}),'telemetry',1003);
+  assert.equal(s.events.filter(e=>e.title==='Barcode detected').length,1);
+  assert.equal(s.lastBarcode.sequence,7);
 });
 test('181 point profile reassembles without treating chunks as telemetry samples',()=>{
   const s=syncStore(new TelemetryStore());

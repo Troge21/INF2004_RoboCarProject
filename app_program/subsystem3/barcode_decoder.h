@@ -12,6 +12,7 @@
 #define S3_BC_MAX_RUN_US       600000U
 #define S3_BC_FRAME_TIMEOUT_US 8000000U
 #define S3_BC_QUIET_CAP_US     1000000U
+#define S3_BC_ANALOG_SAMPLE_US  2000U
 #define S3_BC_VALID            0x80U
 #define S3_BC_REVERSED         0x40U
 #define S3_BC_SYMBOL_MASK      0x3fU
@@ -24,6 +25,11 @@ char s3_barcode_character(uint8_t code);
 int s3_barcode_decode(const uint32_t widths[S3_BC_RUNS],
                       uint32_t leading_white_us, uint32_t trailing_white_us,
                       uint8_t *code);
+/* Analog fallback: complete frame, optionally with one short false pulse.
+ * Returns the trailing white interval still required before reporting. */
+int s3_barcode_decode_analog(const uint32_t *widths, unsigned count,
+                            uint32_t leading_white_us, uint32_t *quiet_us,
+                            uint8_t *code);
 
 typedef struct {
     uint32_t widths[S3_BC_RUNS];

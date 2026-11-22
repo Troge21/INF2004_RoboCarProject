@@ -54,6 +54,9 @@ class BarcodeTests(unittest.TestCase):
         cls.lib = c.CDLL(str(library))
         cls.lib.s3_barcode_decode.argtypes = [c.POINTER(c.c_uint32), c.c_uint32,
                                              c.c_uint32, c.POINTER(c.c_uint8)]
+        cls.lib.s3_barcode_decode_analog.argtypes = [c.POINTER(c.c_uint32), c.c_uint,
+                                                    c.c_uint32, c.POINTER(c.c_uint32),
+                                                    c.POINTER(c.c_uint8)]
         cls.lib.s3_barcode_character.argtypes = [c.c_uint8]
         cls.lib.s3_barcode_character.restype = c.c_char
         cls.lib.s3_barcode_reset.argtypes = [c.POINTER(Decoder), c.c_int, c.c_uint32]
@@ -129,6 +132,48 @@ class BarcodeTests(unittest.TestCase):
                     status, code = self.decode(runs)
                     self.assertEqual(status, 1)
                     self.assertEqual(self.lib.s3_barcode_character(code).decode(), char)
+
+    def test_analog_decoder_handles_one_short_pulse_across_the_alphabet(self):
+        for char in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ':
+            for reverse in (False, True):
+                runs = widths(char, 10000, 3, reverse)
+                middle_wide = next(i for i in range(10, 19) if runs[i] == 30000)
+                runs[middle_wide:middle_wide+1] = [14000, 2000, 14000]
+                quiet, code = c.c_uint32(), c.c_uint8()
+                status = self.lib.s3_barcode_decode_analog(
+                    (c.c_uint32*len(runs))(*runs), len(runs), 200000,
+                    c.byref(quiet), c.byref(code))
+                self.assertEqual(status, 1, (char, reverse))
+                self.assertEqual(self.lib.s3_barcode_character(code).decode(), char)
+                self.assertEqual(bool(code.value & 64), reverse)
+                self.assertEqual(quiet.value, 100000)
+
+    def test_analog_template_distinguishes_close_letters_and_rejects_ties(self):
+        for reverse in (False, True):
+            for first, third, want in ((22400, 17600, b'A'), (20000, 20000, b'\0'),
+                                       (17600, 22400, b'B')):
+                with self.subTest(reverse=reverse, expected=want):
+                    runs = widths('A', narrow=10000)
+                    # A and B differ in the first and third bars. Leave every
+                    # other bar and space identical and vary their widths.
+                    runs[10], runs[12] = first, third
+                    if reverse:
+                        runs.reverse()
+                    quiet, code = c.c_uint32(), c.c_uint8()
+                    status = self.lib.s3_barcode_decode_analog(
+                        (c.c_uint32*29)(*runs), 29, 200000, c.byref(quiet), c.byref(code))
+                    self.assertEqual(status, 2 if want == b'\0' else 1)
+                    self.assertEqual(self.lib.s3_barcode_character(code).decode(), want.decode())
+
+    def test_analog_template_rejects_a_corrupted_driving_frame(self):
+        # The last live snapshot before the change contained 30 transitions,
+        # but the leading guard was distorted enough to favor a wrong letter.
+        runs = [20,268,448,86,236,150,114,230,72,90,212,102,66,218,80,
+                78,102,254,270,90,54,82,208,112,222,88,58,232,56]
+        quiet, code = c.c_uint32(), c.c_uint8()
+        status = self.lib.s3_barcode_decode_analog(
+            (c.c_uint32*29)(*(n*1000 for n in runs)), 29, 1500000, c.byref(quiet), c.byref(code))
+        self.assertEqual((status, code.value), (2, 0))
 
     def test_malformed_clusters_guards_gaps_and_quiet(self):
         base = widths('A')
@@ -364,6 +409,11 @@ class BarcodeTests(unittest.TestCase):
                 command, executable = self.compile_line_harness(enabled)
                 subprocess.run(command, check=True)
                 subprocess.run([str(executable)], check=True)
+
+    def test_fast_analog_barcode_detection_actual_task(self):
+        command, executable = self.compile_line_harness(1, ['-DAPP_S3_BARCODE_DETECT=1'])
+        subprocess.run(command, check=True)
+        subprocess.run([str(executable)], check=True)
 
 
 if __name__ == '__main__':

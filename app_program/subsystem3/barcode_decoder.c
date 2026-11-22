@@ -115,6 +115,181 @@ int s3_barcode_decode(const uint32_t widths[S3_BC_RUNS],
     return S3_BC_INVALID;
 }
 
+/* A score of 256 is one typical wide-minus-narrow width of error.
+ * Use the same units for ink and paper and bound the impact of one outlier. */
+#define BC_SCORE_ONE         256U
+#define BC_GUARD_MAX_COST    640U
+#define BC_DATA_MAX_COST     736U
+#define BC_MIN_SCORE_MARGIN   77U
+
+typedef struct {
+    uint32_t best, second, data_cost, quiet;
+    uint8_t code;
+} ANALOG_MATCH;
+
+static void insert_width(uint32_t *sorted, unsigned count, uint32_t width)
+{
+    while(count>0U && sorted[count-1U]>width){
+        sorted[count]=sorted[count-1U];
+        --count;
+    }
+    sorted[count]=width;
+}
+
+static unsigned width_class(unsigned pattern, unsigned index)
+{
+    return 2U*(index&1U)+((pattern>>(8U-index))&1U);
+}
+
+static uint32_t narrow_median(const uint32_t *widths, unsigned pattern)
+{
+    uint32_t narrow[6];
+    unsigned count=0;
+    for(unsigned i=0;i<9U;++i)
+        if(!(width_class(pattern,i)&1U))insert_width(narrow,count++,widths[i]);
+    return (narrow[2]+narrow[3])/2U;
+}
+
+/* The two known guards supply four typical widths. Using medians keeps
+ * a single stretched run from becoming the reference for every letter. */
+static int guard_profile(const uint32_t *widths, unsigned guard, uint32_t profile[4])
+{
+    uint32_t samples[4][6];
+    unsigned counts[4]={0,0,0,0};
+    for(unsigned i=0;i<9U;++i){
+        const unsigned group=width_class(guard,i);
+        insert_width(samples[group],counts[group]++,widths[i]);
+        insert_width(samples[group],counts[group]++,widths[20U+i]);
+    }
+    for(unsigned i=0;i<4U;++i){
+        const unsigned n=counts[i];
+        profile[i]=(samples[i][(n-1U)/2U]+samples[i][n/2U])/2U;
+    }
+    return profile[0]>=S3_BC_MIN_NARROW_US && profile[2]>=S3_BC_MIN_NARROW_US &&
+           profile[1]*2U>=profile[0]*3U && profile[3]*2U>=profile[2]*3U;
+}
+
+static uint32_t symbol_cost(const uint32_t *widths, unsigned pattern,
+                            const uint32_t profile[4], uint32_t *scale)
+{
+    uint32_t ratios[9], cost=0;
+    for(unsigned i=0;i<9U;++i){
+        const unsigned group=width_class(pattern,i);
+        insert_width(ratios,i,widths[i]*BC_SCORE_ONE/profile[group]);
+    }
+    *scale=ratios[4];
+    if(*scale<BC_SCORE_ONE/2U || *scale>BC_SCORE_ONE*2U)return UINT32_MAX;
+    for(unsigned i=0;i<9U;++i){
+        const unsigned group=width_class(pattern,i);
+        const uint32_t expected=profile[group]*(*scale)/BC_SCORE_ONE;
+        const uint32_t span=(profile[group|1U]-profile[group&~1U])*(*scale)/BC_SCORE_ONE;
+        const uint32_t error=expected>widths[i]?expected-widths[i]:widths[i]-expected;
+        const uint32_t penalty=error*BC_SCORE_ONE/span;
+        cost+=penalty<BC_SCORE_ONE*3U/2U?penalty:BC_SCORE_ONE*3U/2U;
+    }
+    return cost;
+}
+
+static uint32_t analog_space_unit(const uint32_t *widths,unsigned pattern)
+{
+    uint32_t sum=0;
+    unsigned spaces=0;
+    for(unsigned i=1U;i<9U;i+=2U){
+        if(pattern&(1U<<(8U-i)))continue;
+        sum+=widths[i];
+        ++spaces;
+    }
+    /* Four white elements with only three wide elements in a symbol. */
+    return sum/spaces;
+}
+
+static int analog_gap(uint32_t gap, uint32_t before, uint32_t after)
+{
+    const uint32_t unit=(before+after)/2U;
+    return gap>=(unit+1U)/2U && gap<=unit*18U/10U;
+}
+
+static void match_analog_frame(const uint32_t *widths, uint32_t leading, uint32_t pulse,
+                               ANALOG_MATCH *match)
+{
+    for(unsigned i=0;i<S3_BC_RUNS;++i)
+        if(!widths[i] || widths[i]>S3_BC_MAX_RUN_US)return;
+    for(unsigned reversed=0;reversed<2U;++reversed){
+        const unsigned guard=reversed?reverse_nine(BC_STAR):BC_STAR;
+        const uint32_t start=narrow_median(widths,guard);
+        const uint32_t end=narrow_median(widths+20U,guard);
+        uint32_t profile[4], start_scale, end_scale;
+        if(leading<start*BC_QUIET_MODULES ||
+           !guard_profile(widths,guard,profile))continue;
+        const uint32_t start_cost=symbol_cost(widths,guard,profile,&start_scale);
+        const uint32_t end_cost=symbol_cost(widths+20U,guard,profile,&end_scale);
+        if(start_cost>BC_GUARD_MAX_COST || end_cost>BC_GUARD_MAX_COST ||
+           pulse*4U>(start<end?start:end))continue;
+        const uint32_t start_space=analog_space_unit(widths,guard);
+        const uint32_t end_space=analog_space_unit(widths+20U,guard);
+        const uint32_t small_scale=start_scale<end_scale?start_scale:end_scale;
+        const uint32_t large_scale=start_scale>end_scale?start_scale:end_scale;
+        for(unsigned i=0;i<sizeof(s_patterns)/sizeof(s_patterns[0]);++i){
+            const unsigned pattern=reversed?reverse_nine(s_patterns[i]):s_patterns[i];
+            uint32_t scale;
+            const uint32_t data_cost=symbol_cost(widths+10U,pattern,profile,&scale);
+            if(data_cost==UINT32_MAX ||
+               (scale>large_scale?scale:large_scale)*3U>
+               (scale<small_scale?scale:small_scale)*5U)continue;
+            const uint32_t middle_space=analog_space_unit(widths+10U,pattern);
+            if(!analog_gap(widths[9],start_space,middle_space) ||
+               !analog_gap(widths[19],middle_space,end_space))continue;
+            const uint32_t cost=start_cost+data_cost+end_cost;
+            const uint8_t code=(uint8_t)(S3_BC_VALID|(reversed?S3_BC_REVERSED:0U)|i);
+            if(cost<match->best){
+                if(code!=match->code)match->second=match->best;
+                match->best=cost;
+                match->data_cost=data_cost;
+                match->code=code;
+                match->quiet=end*BC_QUIET_MODULES;
+            }else if(code!=match->code && cost<match->second){
+                match->second=cost;
+            }
+        }
+    }
+}
+
+int s3_barcode_decode_analog(const uint32_t *widths, unsigned count,
+                            uint32_t leading_white_us, uint32_t *quiet_us,
+                            uint8_t *code)
+{
+    ANALOG_MATCH match={.best=UINT32_MAX,.second=UINT32_MAX};
+    if(!code || !quiet_us)return S3_BC_INVALID;
+    *code=0;
+    *quiet_us=0;
+    if(!widths)return S3_BC_INVALID;
+    if(count==S3_BC_RUNS){
+        match_analog_frame(widths,leading_white_us,0U,&match);
+    }else if(count==S3_BC_RUNS+2U){
+        uint32_t corrected[S3_BC_RUNS], minimum=UINT32_MAX;
+        unsigned corrections=0;
+        for(unsigned i=0;i<count;++i){
+            if(widths[i]==0U || widths[i]>S3_BC_MAX_RUN_US)return S3_BC_INVALID;
+            if(widths[i]<minimum)minimum=widths[i];
+        }
+        for(unsigned i=1U;i+1U<count;++i){
+            /* One brief opposite-color excursion divides a genuine run.
+             * Require its neighbors together to be much longer. */
+            if(widths[i]>minimum*2U || widths[i]*8U>widths[i-1U]+widths[i+1U])continue;
+            if(++corrections>4U)return S3_BC_INVALID; /* Bound work on noisy input. */
+            for(unsigned j=0;j<i-1U;++j)corrected[j]=widths[j];
+            corrected[i-1U]=widths[i-1U]+widths[i]+widths[i+1U];
+            for(unsigned j=i;j<S3_BC_RUNS;++j)corrected[j]=widths[j+2U];
+            match_analog_frame(corrected,leading_white_us,widths[i],&match);
+        }
+    }
+    if(!match.code || match.data_cost>BC_DATA_MAX_COST ||
+       match.second<match.best+BC_MIN_SCORE_MARGIN)return S3_BC_INVALID;
+    *quiet_us=match.quiet;
+    *code=match.code;
+    return S3_BC_OK;
+}
+
 /* Streaming decoder: reset, poll and edge() collect a frame over successive
  * calls, enforce timeouts, and wait for trailing white before reporting. */
 void s3_barcode_reset(S3_BARCODE_DECODER *decoder, int black, uint32_t now_us)
