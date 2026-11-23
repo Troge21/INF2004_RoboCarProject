@@ -15,10 +15,10 @@ Current normal operating image (motor control enabled):
 **build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt.uf2** (NO _test suffix)
 
 Profile **NET=lwip MQTT=1 TEST=0 APP_MODE=integrated CONSOLE=usb_cdc CRASH_REPORT=0**.
-Size **747008 bytes**. SHA-256
-`6407153e1132760578ce6ac2d09a3b780d48d3ad8706d821040988ff91ae49be`.
+Size **745472 bytes**. SHA-256
+`3273ea8f4684120f09b6a8795331d34b183ddcb3232507ad54a891cd7dcd94c1`.
 The integrated build includes MQTT, encoder motor control, the S3 line
-sampling fixes and GP27 cutoff of 455, sensor-guided left-curve recovery,
+sampling fixes and GP27 cutoff of 455, live analog steering,
 obstacle scans, S4 hump estimates, motion reporting, pickup STOP and Code 39 decoding. Flash
 the UF2. The matching ELF and MAP are for debugging and memory inspection.
 The build and offline checks passed. The user confirmed
@@ -26,8 +26,9 @@ right-wheel hump detection and pickup STOP on the earlier S4 trace image
 `c396fa80`.
 The demo layout places the barcode on the left and the hump under the right wheel.
 
-The normal image uses the checkpoint's line-following logic and reports
-forward range while driving. A confirmed obstacle at **240 mm or closer**
+The normal image steers from the current analog readings. When both sensors
+return to their white baseline, both wheels target 26 RPM. It reports forward
+range while driving. A confirmed obstacle at **240 mm or closer**
 automatically latches STOP for a width scan. The separate `_s2_bypass.uf2`
 is for obstacle course testing.
 

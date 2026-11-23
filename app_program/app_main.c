@@ -69,69 +69,6 @@ static ER app_motor_request(INT left, INT right)
 #endif
 }
 
-#if S2_LINE_USE_RPM_CONTROL && !defined(APP_OBSTACLE_BYPASS)
-#define APP_LEFT_BEND_CONFIRM_MS 300U
-#define APP_LEFT_EXIT_GAP_MS      60U
-#define APP_LEFT_SEARCH_ARM_MS   220U
-#define APP_LEFT_SEARCH_LIMIT_MS 1100U
-
-typedef enum {
-    APP_LEFT_TRACKING, APP_LEFT_SEARCHING, APP_LEFT_WAITING
-} APP_LEFT_PHASE;
-
-typedef struct {
-    UW first_seen_ms, last_seen_ms, search_started_ms;
-    INT peak_trim;
-    APP_LEFT_PHASE phase;
-} APP_LEFT_BEND;
-
-static APP_LEFT_BEND left_bend;
-
-/* Search only after a confirmed left bend. Tape ends the search; elapsed
- * time limits it even if no sensor sees the outgoing line. */
-static unsigned app_left_exit(UINT pattern, UW now_ms, INT *left, INT *right)
-{
-    const INT trim = *right - *left;
-    if (pattern != 0U || trim < 0) {
-        if (pattern == 2U && trim > 0) {
-            if (left_bend.phase != APP_LEFT_TRACKING || left_bend.peak_trim == 0 ||
-                now_ms - left_bend.last_seen_ms >= APP_IR_MAX_AGE_MS)
-                left_bend = (APP_LEFT_BEND){.first_seen_ms = now_ms};
-            if (trim > left_bend.peak_trim) left_bend.peak_trim = trim;
-            left_bend.last_seen_ms = now_ms;
-        } else {
-            left_bend = (APP_LEFT_BEND){0};
-        }
-        return APP_CTRL_FOLLOWING;
-    }
-
-    if (left_bend.phase == APP_LEFT_TRACKING) {
-        const UW gap = now_ms - left_bend.last_seen_ms;
-        if (gap >= APP_LEFT_SEARCH_ARM_MS || left_bend.peak_trim < S2_TURN_MIN_SPLIT_RPM_X10 ||
-            left_bend.last_seen_ms - left_bend.first_seen_ms < APP_LEFT_BEND_CONFIRM_MS) {
-            left_bend = (APP_LEFT_BEND){0};
-            return APP_CTRL_FOLLOWING;
-        }
-        if (trim > 0) return APP_CTRL_FOLLOWING; /* the left edge still has a live correction */
-        if (gap < APP_LEFT_EXIT_GAP_MS) {
-            *left = *right - left_bend.peak_trim;
-            return APP_CTRL_FOLLOWING;
-        }
-        left_bend.phase = APP_LEFT_SEARCHING;
-        left_bend.search_started_ms = now_ms;
-    }
-
-    *left = 0; /* bring the chassis left with the outside wheel only */
-    if (left_bend.phase == APP_LEFT_SEARCHING &&
-        now_ms - left_bend.search_started_ms < APP_LEFT_SEARCH_LIMIT_MS)
-        return APP_CTRL_RECOVERING;
-
-    left_bend.phase = APP_LEFT_WAITING;
-    *right = 0;
-    return APP_CTRL_WAITING_LINE;
-}
-#endif
-
 #ifdef APP_OBSTACLE_BYPASS
 static UW last_drive_ms;
 static OBSTACLE_BYPASS bypass;
@@ -217,9 +154,6 @@ static void app_controller_step(UW started_ms)
     else if (follow_line) {
         app_line_targets(&line, &left, &right);
         state = APP_CTRL_FOLLOWING;
-#if S2_LINE_USE_RPM_CONTROL && !defined(APP_OBSTACLE_BYPASS)
-        state = app_left_exit(line.pattern, operating.lo, &left, &right);
-#endif
     } else if (startup_done) {
         state = ready ? APP_CTRL_STOPPED : APP_CTRL_WAITING_LINE;
     }
@@ -260,14 +194,6 @@ static void app_controller_step(UW started_ms)
             (void)subsystem5_end_turn(navigation.turn_id);
 #endif
     }
-#if S2_LINE_USE_RPM_CONTROL && !defined(APP_OBSTACLE_BYPASS)
-    if (!follow_line || inhibit || er != E_OK) {
-        if ((inhibit & APP_CTRL_LATCH) || left_bend.phase == APP_LEFT_TRACKING)
-            left_bend = (APP_LEFT_BEND){0};
-        else
-            left_bend.phase = APP_LEFT_WAITING;
-    }
-#endif
     app_controller_publish(state, er);
 }
 static void vehicle_controller_task(INT stacd, void *exinf)

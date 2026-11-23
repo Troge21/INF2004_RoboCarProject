@@ -22,21 +22,15 @@ Steering scales the raw GP27 and GP26 readings separately, using the ranges
 on the tape side. The weak-edge response applies up to 60% contrast. Above
 that, the correction increases to 14 RPM at full contrast for a tighter arc.
 The correction follows the current sample and fades as it returns to white.
-In the normal RPM build, a left bend held for at least 300 ms with a peak
-correction of at least 7 RPM can arm recovery. When the left sensor has seen
-white for at least 60 ms and the live correction goes neutral, the car turns
-left with the outside wheel. Tape detection or a live right-edge correction
-ends the search immediately. After 1.1 seconds of searching it stops and
-waits for tape. Invalid input during a search also stops both wheels and
-waits for valid tape. STOP clears the search and latches the motors off.
+When both sensors return to their white baseline, both wheels target 26 RPM
+even after a sustained bend.
 
 Missing/invalid/stale sensor or motor feedback requests zero. A known S2
 fault is reported as Controller fault. The controller checks its latched
 STOP before steering, repeatedly requests zero and never clears the inhibit
 because of new line input or reconnection. The S2 task alone writes PWM;
 its watchdog and faults remain active. Command acceptance does not establish
-physical wheel standstill. Outside an armed left recovery, white/white
-continues to mean forward.
+physical wheel standstill.
 
 Default APP_MODE=integrated runs all subsystem lifecycles. TEST=1 integrated
 is stationary (no motor task); TEST=0 integrated enables driving after the

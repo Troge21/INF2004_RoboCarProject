@@ -483,72 +483,32 @@ static ER tk_dly_tsk(INT ms){
             pass("clearance keeps the car stopped until explicit Resume restores line following");
             longjmp(done,1);
         }
-    }else if(scenario==17){
+    }else if(scenario==17||scenario==19){
         const S2_COMMAND command=read_command();
-        switch(ticks){
-        case 1: pattern=2;break;
-        case 2: pattern=0;break;
-        case 3:
-            assert(command.left==260&&command.right==260);
-            pattern=2;
-            break;
-        case 23: pattern=0;break;
-        case 24:
-            assert(command.left==120&&command.right==260);
-            break;
-        case 26:
-            assert(command.left==0&&command.right==260&&!compare[0]&&!compare[1]);
-            assert(app_controller_snapshot(snapshot)==E_OK&&(snapshot[4]&15)==APP_CTRL_RECOVERING);
-            pass("a sustained left bend starts a one-wheel search, a single hit does not");
-            break;
-        case 80:
-            assert(command.left==0&&command.right==260);
-            break;
-        case 81:
-            stopped();assert(command.mode==S2_MODE_STOP);
-            assert(app_controller_snapshot(snapshot)==E_OK&&(snapshot[4]&15)==APP_CTRL_WAITING_LINE);
-            stale=1;
-            break;
-        case 82:
-            stopped();stale=0;break;
-        case 83:
-            stopped();assert(command.mode==S2_MODE_STOP);
-            pass("an expired left search stops both wheels and stays stopped across an input gap");
-            pattern=2;
-            break;
-        case 84:
-            assert(command.left==120&&command.right==260);
+        const BOOL turning_left=scenario==17;
+        const UINT inside_pattern=turning_left?2U:1U;
+        const INT inside_target=turning_left?command.left:command.right;
+        const INT outside_target=turning_left?command.right:command.left;
+        if(ticks==1U){
+            pattern=inside_pattern;
+        }else if(ticks<=21U){
+            assert(command.mode==S2_MODE_RPM&&inside_target==120&&outside_target==260);
+            if(ticks==21U)pattern=0;
+        }else if(ticks<=81U){
+            assert(command.mode==S2_MODE_RPM&&command.left==260&&command.right==260);
             assert(app_controller_snapshot(snapshot)==E_OK&&(snapshot[4]&15)==APP_CTRL_FOLLOWING);
-            pass("reacquired tape resumes live line following after the search expires");
-            break;
-        case 102: pattern=0;break;
-        case 105:
-            assert(command.left==0&&command.right==260);
-            pattern=1;
-            break;
-        case 106:
-            assert(command.left==260&&command.right==120&&left_bend.peak_trim==0);
-            pass("right-side tape ends an active left search and applies live right correction");
-            pattern=2;
-            break;
-        case 125: pattern=0;break;
-        case 128:
-            assert(command.left==0&&command.right==260);
-            pattern=2;
-            break;
-        case 129:
-            assert(command.left==120&&command.right==260);
-            assert(app_controller_snapshot(snapshot)==E_OK&&(snapshot[4]&15)==APP_CTRL_FOLLOWING);
-            pass("left tape ends an active search without waiting for the timeout");
-            break;
-        case 147: pattern=0;break;
-        case 150:
-            assert(command.left==0&&command.right==260);
+            if(ticks==81U){
+                pass(turning_left?"after a sustained left bend both white sensors command straight immediately":
+                                  "after a sustained right bend both white sensors command straight immediately");
+                pattern=inside_pattern^3U;
+            }
+        }else if(ticks==82U){
+            assert(command.mode==S2_MODE_RPM&&inside_target==260&&outside_target==120);
             assert(app_controller_submit_stop(106,99,operating_ms+1000U)==E_OK);
-            break;
-        case 151:
-            stopped();assert((app_controller_poll()&APP_CTRL_LATCH)&&left_bend.peak_trim==0);
-            pass("STOP cuts PWM and clears the left search state");
+        }else{
+            stopped();
+            assert(app_controller_poll()&APP_CTRL_LATCH);
+            pass("new tape still steers and STOP cuts PWM after a tape gap");
             longjmp(done,1);
         }
 #else
@@ -624,7 +584,6 @@ static void run(unsigned which){
     last_drive_ms=0;
     bypass=(OBSTACLE_BYPASS){0};range_hold_ms=0;front_blocked=front_missing=FALSE;
 #else
-    left_bend=(APP_LEFT_BEND){0};
     obstacle_stop_required=FALSE;
     if(which==4){nav_phase=S5_NAV_UNAVAILABLE;nav_busy=1;}
 #endif
@@ -768,7 +727,7 @@ int main(void){
 #ifdef APP_OBSTACLE_BYPASS
     run(7);run(8);run(9);run(10);run(11);run(12);run(13);run(14);run(16);
 #else
-    run(4);run(17);run(18);
+    run(4);run(17);run(18);run(19);
 #endif
     printf("SUMMARY: %u actual controller/PID/motor checks passed; no hardware or sockets.\n",checks);return 0;
 }
