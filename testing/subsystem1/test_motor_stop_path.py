@@ -62,12 +62,11 @@ static unsigned motor_busy,motor_brief_busy,controller_busy,encoder_fail;
 static unsigned feedback_brief_busy,feedback_wait_times_out;
 static unsigned nav_phase=S5_NAV_CLEAR,nav_stale,nav_busy,nav_reads;
 static UW nav_turn_id,ended_turn_id;
-#ifdef APP_OBSTACLE_BYPASS
-static UW range_hold_ms;
-static BOOL front_blocked,front_missing;
-#else
 static BOOL obstacle_stop_required;
 BOOL subsystem5_obstacle_stop_required(void){return obstacle_stop_required;}
+#ifdef APP_OBSTACLE_BYPASS
+static UW range_hold_ms;
+static BOOL front_blocked,front_missing,front_no_return;
 #endif
 static int created,held[4];
 static S2_ENCODER_COUNTS counts;
@@ -118,8 +117,9 @@ ER subsystem5_end_turn(UW id){
 ER subsystem5_get_range(S5_RANGE_DATA *out){
     if(nav_busy)return E_TMOUT;
     out->timestamp_ms=range_hold_ms?range_hold_ms:operating_ms+1000000U;
-    out->distance_mm=front_blocked?100U:700U;
-    out->valid=!front_missing;
+    out->distance_mm=front_blocked?100U:front_missing||front_no_return?0U:700U;
+    out->valid=out->distance_mm!=0U;
+    out->no_return=front_no_return&&!front_blocked&&!front_missing;
     return E_OK;
 }
 #include "obstacle_bypass.c"
@@ -145,6 +145,7 @@ tests = r'''
 static void pass(const char *name){++checks;printf("PASS: %s\n",name);}
 static void stopped(void){for(unsigned i=0;i<4;++i)assert(compare[i]==0);}
 static BOOL moving(void){return compare[0]>0&&compare[2]>0;}
+enum { line_forward_rpm_x10 = 234, line_straight_left_rpm_x10 = 206, line_inside_rpm_x10 = 108 };
 #ifdef APP_OBSTACLE_BYPASS
 static void run_bypass_cycle(void){
     static unsigned seen, release_at;
@@ -165,15 +166,18 @@ static void run_bypass_cycle(void){
         return;
     }
     if(phase==0&&moving()){
-        seen=0;checked_opening_gap=checked_range_gap=FALSE;nav_phase=S5_NAV_SCANNING;phase=1;
+        seen=0;checked_opening_gap=checked_range_gap=FALSE;obstacle_stop_required=TRUE;nav_phase=S5_NAV_SCANNING;phase=1;
     }else if(phase==1){
         stopped();pattern=0;nav_turn_id=1;
+        assert(app_controller_scan_stop_ready()&&!(app_controller_poll()&APP_CTRL_LATCH));
         nav_phase=side>0?S5_NAV_LEFT:S5_NAV_RIGHT;phase=2;
     }else if(phase==2&&scenario==7&&!checked_opening_gap&&
              bypass.phase==BYPASS_TURN_OUT&&bypass.move.result==S2_MOVE_IDLE){
         checked_opening_gap=TRUE;invalid=1;release_at=ticks+5U;phase=9;
     }else if(phase==2&&ended_turn_id){
         stopped();assert(bypass.phase==BYPASS_SHIFT_OUT);
+        obstacle_stop_required=FALSE;
+        front_no_return=scenario==7;
         range_hold_ms=bypass.phase_started_ms;nav_phase=S5_NAV_CLEAR;
         release_at=ticks+5U;phase=3;
     }else if(phase==3){
@@ -202,13 +206,20 @@ static void run_bypass_cycle(void){
         }else if(scenario==16&&bypass.phase==BYPASS_PASS&&moving()){
             app_controller_report_pickup();phase=11;
         }else if(scenario==9&&bypass.phase==BYPASS_FAILED){
+#ifdef APP_BYPASS_ENCODER_ALIGN
+            assert(!"encoder-guided alignment faulted while the tape was absent");
+#endif
             stopped();assert(bypass.line_state!=LINE_CONFIRMED);
             assert(app_controller_snapshot(snapshot)==E_OK&&(snapshot[4]&15)==APP_CTRL_FAULT);
             release_at=ticks+20U;phase=7;
         }else if(bypass.phase==BYPASS_IDLE){
             const unsigned all=(1U<<(BYPASS_ALIGN+1))-2U;
-            assert((seen&all)==all&&bypass.line_state==LINE_CONFIRMED);
-            assert(scenario==7||scenario==8||scenario==14);
+            assert((seen&all)==all);
+#ifdef APP_BYPASS_ENCODER_ALIGN
+            assert((bypass.line_state==LINE_CONFIRMED)==(scenario!=9));
+#else
+            assert(scenario!=9&&bypass.line_state==LINE_CONFIRMED);
+#endif
             phase=8;
         }
     }else if(phase==5){
@@ -224,7 +235,7 @@ static void run_bypass_cycle(void){
     }else if(phase==7){
         stopped();assert(bypass.phase==BYPASS_FAILED);
         if(ticks==release_at){
-            pass(scenario==9?"missing tape leaves the car stopped instead of aligning or resuming line following":
+            pass(scenario==9?"missing tape at the fixed return distance leaves the car stopped":
                 "returning clearance cannot restart an aborted bypass");
             longjmp(done,1);
         }
@@ -232,6 +243,11 @@ static void run_bypass_cycle(void){
         assert(app_controller_snapshot(snapshot)==E_OK&&(snapshot[4]&15)==APP_CTRL_FOLLOWING);
         if(scenario==14)
             pass("fresh tape at the return cutoff is confirmed while the wheels settle");
+        else if(scenario==9){
+            const S2_COMMAND command=read_command();
+            assert(!pattern&&command.left==206&&command.right==234);
+            pass("encoder-guided final turn resumes straight driving on white");
+        }
         else
             pass(side>0?"left-side bypass executes all seven legs and rejoins on fresh IR evidence":
                         "right-side bypass mirrors all turns and rejoins on fresh IR evidence");
@@ -267,6 +283,9 @@ static void run_bypass_cycle(void){
         if(leg==BYPASS_SHIFT_OUT||leg==BYPASS_PASS||leg==BYPASS_SHIFT_IN){
             if(moving())seen|=1U<<leg;
             assert(!compare[1]&&!compare[3]);
+            const S2_COMMAND command=read_command();
+            if(command.mode==S2_MODE_RPM&&bypass.move.trim_rpm_x10==0)
+                assert(command.left==command.right*206/234);
         }else{
             int direction=(leg==BYPASS_TURN_OUT||leg==BYPASS_ALIGN)?side:-side;
             BOOL left_turn=compare[1]&&compare[2],right_turn=compare[0]&&compare[3];
@@ -359,7 +378,7 @@ static ER tk_dly_tsk(INT ms){
         if(operating_ms<APP_START_DELAY_MS)stopped();
         else if(phase==0&&moving()){
             const S2_COMMAND command=read_command();
-            assert(command.mode==S2_MODE_RPM&&command.left==260&&command.right==260);
+            assert(command.mode==S2_MODE_RPM&&command.left==line_straight_left_rpm_x10&&command.right==line_forward_rpm_x10);
             pass("normal controller requests RPM and actual PID/motor loop produces nonzero output after startup");
             feedback_brief_busy=1;
             phase=10;
@@ -426,7 +445,10 @@ static ER tk_dly_tsk(INT ms){
         if(ticks<=24U){
             const S2_COMMAND command=read_command();
             assert(moving()&&!compare[1]&&!compare[3]);
-            assert(command.left==(pattern==2U?120:260)&&command.right==(pattern==1U?120:260));
+            const INT expected_left=pattern==0U?line_straight_left_rpm_x10:
+                (pattern==2U?line_inside_rpm_x10:line_forward_rpm_x10);
+            assert(command.left==expected_left);
+            assert(command.right==(pattern==1U?line_inside_rpm_x10:line_forward_rpm_x10));
             assert(app_controller_snapshot(snapshot)==E_OK&&(snapshot[4]&15)==APP_CTRL_FOLLOWING);
             pattern=ticks%4U;nav_phase=ticks%6U;nav_turn_id=ticks;
             nav_stale=ticks%5U==0U;nav_busy=ticks%7U==0U;
@@ -436,14 +458,16 @@ static ER tk_dly_tsk(INT ms){
             }
         }else if(ticks<=32U){
             const S2_COMMAND command=read_command();
-            assert(command.left==260&&command.mode==S2_MODE_RPM);
-            if(ticks==25U){assert(command.right==120);pattern=0;right_edge_adc=1000;}
-            if(ticks==26U){assert(command.right==243);right_edge_adc=0;}
-            if(ticks==27U)assert(command.right==260);
+            assert(command.mode==S2_MODE_RPM);
+            const BOOL neutral_white=pattern==0U&&right_edge_adc==0U;
+            assert(command.left==(neutral_white?line_straight_left_rpm_x10:line_forward_rpm_x10));
+            if(ticks==25U){assert(command.right==line_inside_rpm_x10);pattern=0;right_edge_adc=1000;}
+            if(ticks==26U){assert(command.right==218);right_edge_adc=0;}
+            if(ticks==27U)assert(command.right==line_forward_rpm_x10);
             if(ticks==31U)pattern=1;
             if(ticks==32U){
-                assert(command.right==120);
-                pass("the live controller tapers correction at the edge and returns to equal targets on white");
+                assert(command.right==line_inside_rpm_x10);
+                pass("the live controller applies left-wheel trim on neutral white and preserves the tape-edge corrections");
                 assert(app_controller_submit_stop(105,99,operating_ms+1000U)==E_OK);
             }
         }else{
@@ -492,10 +516,10 @@ static ER tk_dly_tsk(INT ms){
         if(ticks==1U){
             pattern=inside_pattern;
         }else if(ticks<=21U){
-            assert(command.mode==S2_MODE_RPM&&inside_target==120&&outside_target==260);
+            assert(command.mode==S2_MODE_RPM&&inside_target==line_inside_rpm_x10&&outside_target==line_forward_rpm_x10);
             if(ticks==21U)pattern=0;
         }else if(ticks<=81U){
-            assert(command.mode==S2_MODE_RPM&&command.left==260&&command.right==260);
+            assert(command.mode==S2_MODE_RPM&&command.left==line_straight_left_rpm_x10&&command.right==line_forward_rpm_x10);
             assert(app_controller_snapshot(snapshot)==E_OK&&(snapshot[4]&15)==APP_CTRL_FOLLOWING);
             if(ticks==81U){
                 pass(turning_left?"after a sustained left bend both white sensors command straight immediately":
@@ -503,7 +527,7 @@ static ER tk_dly_tsk(INT ms){
                 pattern=inside_pattern^3U;
             }
         }else if(ticks==82U){
-            assert(command.mode==S2_MODE_RPM&&inside_target==260&&outside_target==120);
+            assert(command.mode==S2_MODE_RPM&&inside_target==line_forward_rpm_x10&&outside_target==line_inside_rpm_x10);
             assert(app_controller_submit_stop(106,99,operating_ms+1000U)==E_OK);
         }else{
             stopped();
@@ -538,7 +562,7 @@ static ER tk_dly_tsk(INT ms){
             pass("actual normal controller releases the latch only after fresh stopped feedback and accepted motor handoff");phase=5;
         }else if(phase==5&&moving()){
             const S2_COMMAND command=read_command();
-            assert(command.left==260&&command.right==260);
+            assert(command.left==line_straight_left_rpm_x10&&command.right==line_forward_rpm_x10);
             pass("explicit Resume returns to the existing line targets and actual PID wheel outputs without a reboot");
             assert(app_controller_submit_stop(302,99,operating_ms+1000U)==0);phase=6;
         }else if(phase==6){
@@ -579,12 +603,11 @@ static void run(unsigned which){
     motor_busy=motor_brief_busy=controller_busy=nav_stale=nav_busy=nav_reads=0;
     feedback_brief_busy=feedback_wait_times_out=0;
     nav_phase=S5_NAV_CLEAR;counts=(S2_ENCODER_COUNTS){0,0};
-    nav_turn_id=ended_turn_id=0;
+    nav_turn_id=ended_turn_id=0;obstacle_stop_required=FALSE;
 #ifdef APP_OBSTACLE_BYPASS
     last_drive_ms=0;
-    bypass=(OBSTACLE_BYPASS){0};range_hold_ms=0;front_blocked=front_missing=FALSE;
+    bypass=(OBSTACLE_BYPASS){0};range_hold_ms=0;front_blocked=front_missing=front_no_return=FALSE;
 #else
-    obstacle_stop_required=FALSE;
     if(which==4){nav_phase=S5_NAV_UNAVAILABLE;nav_busy=1;}
 #endif
     for(unsigned i=0;i<4;++i){held[i]=0;compare[i]=0;}
@@ -735,7 +758,8 @@ int main(void){
 with tempfile.TemporaryDirectory(prefix='robocar-ao-stop-') as directory:
     c=Path(directory)/'stop_path.c';exe=Path(directory)/'stop_path.exe'
     c.write_text(prefix+'\n#include "motion_control.c"\n#include "odometry.c"\n'+api+loop+controller+tests,encoding='utf-8')
-    for flags in ([],['-DAPP_OBSTACLE_BYPASS=1']):
+    for flags in ([],['-DAPP_OBSTACLE_BYPASS=1'],
+                  ['-DAPP_OBSTACLE_BYPASS=1','-DAPP_BYPASS_ENCODER_ALIGN=1']):
         subprocess.run(['gcc','-std=c11','-Wall','-Wextra','-Werror',*flags,
                         '-I',str(root/'app_program'),'-I',str(root/'app_program/subsystem2'),
                         str(c),'-o',str(exe)],check=True)

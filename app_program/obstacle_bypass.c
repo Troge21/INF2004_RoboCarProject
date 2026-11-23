@@ -4,7 +4,7 @@
 #ifdef APP_OBSTACLE_BYPASS
 #define BYPASS_EFFECTIVE_TRACK_MM 120U
 #define BYPASS_SHIFT_MM 280
-#define BYPASS_PASS_MM 550
+#define BYPASS_PASS_MM 600
 #define BYPASS_RANGE_MAX_AGE_MS 500U
 #define BYPASS_SENSOR_WAIT_MS 500U
 #define BYPASS_START_LIMIT_MS 2500U
@@ -44,7 +44,7 @@ static BOOL opening_turn(const S5_NAV_DATA *nav)
 static BOOL range_available(const BYPASS_INPUT *input)
 {
     const S5_RANGE_DATA *range = input->range;
-    return range && range->valid &&
+    return range && (range->valid || range->no_return) &&
         (UW)(input->now_ms - range->timestamp_ms) <= BYPASS_RANGE_MAX_AGE_MS;
 }
 
@@ -80,11 +80,11 @@ unsigned app_bypass_step(OBSTACLE_BYPASS *bypass, const BYPASS_INPUT *input,
     const BOOL have_range = range_available(input);
     if (input->motion->faults || elapsed >= BYPASS_LEG_LIMIT_MS ||
         (initial && input->nav && !matching_turn) ||
-        (!initial && !awaiting_start && !reached && have_range &&
+        (!initial && !awaiting_start && !reached && have_range && input->range->valid &&
          input->range->distance_mm <= S5_OBSTACLE_MM))
         return fail_bypass(bypass);
 
-    const BOOL clearance = have_range && input->range->distance_mm > S5_OBSTACLE_MM &&
+    const BOOL clearance = have_range && (input->range->no_return || input->range->distance_mm > S5_OBSTACLE_MM) &&
         input->nav && input->nav->phase == S5_NAV_CLEAR;
     const BOOL ready = input->ready && (initial ? matching_turn : (reached || clearance));
     if (awaiting_start && elapsed >= BYPASS_START_LIMIT_MS) return fail_bypass(bypass);
@@ -105,11 +105,27 @@ unsigned app_bypass_step(OBSTACLE_BYPASS *bypass, const BYPASS_INPUT *input,
     if (reached) {
         if (!input->settled) return APP_CTRL_STOPPED;
         if (initial && subsystem5_end_turn(bypass->scan_id) != E_OK) return APP_CTRL_STOPPED;
+#ifndef APP_BYPASS_ENCODER_ALIGN
         if (phase == BYPASS_SHIFT_IN && bypass->line_state != LINE_CONFIRMED)
             return fail_bypass(bypass);
+#endif
         set_phase(bypass, phase == BYPASS_ALIGN ? BYPASS_IDLE : (BYPASS_PHASE)(phase + 1),
                   input->now_ms);
         return APP_CTRL_STOPPED;
+    }
+
+    const INT turn = route[phase].turn_deg;
+    const S2_MOTION_DATA *motion = input->motion;
+    S2_MOTION_DATA calibrated;
+    if (!turn) {
+        /* The straight-line calibration models extra travel per left-wheel
+         * encoder unit. Use the same ratio for progress and the RPM request. */
+        calibrated = *motion;
+        calibrated.distance_left_mm_x10 = calibrated.distance_left_mm_x10 *
+            input->straight_right_rpm_x10 / input->straight_left_rpm_x10;
+        calibrated.distance_centre_mm_x10 =
+            (calibrated.distance_left_mm_x10 + calibrated.distance_right_mm_x10) / 2;
+        motion = &calibrated;
     }
 
     if (awaiting_start) {
@@ -118,19 +134,21 @@ unsigned app_bypass_step(OBSTACLE_BYPASS *bypass, const BYPASS_INPUT *input,
         if (!input->settled ||
             (!initial && (UW)(input->now_ms - input->range->timestamp_ms) >= elapsed))
             return APP_CTRL_STOPPED;
-        ER er = route[phase].turn_deg ?
-            s2_turn_begin(&bypass->move, route[phase].turn_deg * bypass->side,
-                          BYPASS_EFFECTIVE_TRACK_MM, input->motion, input->now_ms) :
-            s2_linear_begin(&bypass->move, route[phase].distance_mm, input->motion, input->now_ms);
+        ER er = turn ? s2_turn_begin(&bypass->move, turn * bypass->side,
+                                    BYPASS_EFFECTIVE_TRACK_MM, motion, input->now_ms) :
+                       s2_linear_begin(&bypass->move, route[phase].distance_mm, motion, input->now_ms);
         if (er == E_BUSY || er == E_TMOUT) return APP_CTRL_STOPPED;
         if (er != E_OK) return fail_bypass(bypass);
         bypass->line_timestamp_ms = input->line->timestamp_ms;
     }
 
-    S2_MOVE_RESULT result = s2_encoder_move_step(&bypass->move, input->motion, input->now_ms,
+    S2_MOVE_RESULT result = s2_encoder_move_step(&bypass->move, motion, input->now_ms,
                                                 TRUE, targets);
     if (result == S2_MOVE_REACHED) return APP_CTRL_STOPPED;
     if (result != S2_MOVE_RUNNING) return fail_bypass(bypass);
+    if (!turn)
+        targets->left_rpm_x10 = targets->left_rpm_x10 * input->straight_left_rpm_x10 /
+            input->straight_right_rpm_x10;
     if (initial) return bypass->side > 0 ? APP_CTRL_TURNING_LEFT : APP_CTRL_TURNING_RIGHT;
     return phase >= BYPASS_TURN_IN ? APP_CTRL_RECOVERING : APP_CTRL_AVOIDING;
 }

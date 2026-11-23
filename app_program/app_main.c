@@ -31,10 +31,17 @@ static INT app_tape_level(UINT adc, UINT edge, UINT dark)
     return (INT)((adc - edge) * 100U / (dark - edge));
 }
 
+enum {
+    LINE_FORWARD_RPM_X10 = 260,
+    LINE_SPEED_PERCENT = 90,
+    STRAIGHT_RIGHT_RPM_X10 = LINE_FORWARD_RPM_X10 * LINE_SPEED_PERCENT / 100,
+    STRAIGHT_LEFT_RPM_X10 = STRAIGHT_RIGHT_RPM_X10 - 28
+};
+
 static void app_line_targets(const S3_LINE_DATA *line, INT *left, INT *right)
 {
 #if S2_LINE_USE_RPM_CONTROL
-    const INT forward = 260, edge_trim = 70, bend_trim = 70; /* tenths of RPM */
+    const INT forward = LINE_FORWARD_RPM_X10, edge_trim = 70, bend_trim = 70;
 #else
     const INT forward = APP_FORWARD_DUTY, edge_trim = APP_FORWARD_DUTY - APP_INNER_DUTY;
     const INT bend_trim = 0;
@@ -107,7 +114,9 @@ static void app_controller_step(UW started_ms)
 #ifdef APP_OBSTACLE_BYPASS
     BOOL navigation_fresh = navigation_er == E_OK &&
         (UW)(now.lo - navigation.timestamp_ms) <= S5_NAV_MAX_AGE_MS;
-    resume_ready = resume_ready && navigation_fresh && navigation.phase == S5_NAV_CLEAR;
+    const BOOL obstacle_hold = subsystem5_obstacle_stop_required();
+    const BOOL scanning = navigation_fresh && navigation.phase == S5_NAV_SCANNING;
+    resume_ready = resume_ready && !obstacle_hold && !scanning;
     if (motion_fresh && (motion.command_active || motion.duty_left_x100 || motion.duty_right_x100))
         last_drive_ms = now.lo;
     /* Wait for a full stopped speed window so neither wheel is held back
@@ -128,7 +137,7 @@ static void app_controller_step(UW started_ms)
     BOOL follow_line = permitted;
 
 #ifdef APP_OBSTACLE_BYPASS
-    follow_line = permitted && navigation_fresh && navigation.phase == S5_NAV_CLEAR;
+    follow_line = permitted && !obstacle_hold && !scanning;
     BOOL bypass_requested = turn_requested || bypass.phase != BYPASS_IDLE;
     if ((inhibit & APP_CTRL_LATCH) && bypass.phase != BYPASS_FAILED)
         bypass.phase = BYPASS_IDLE;
@@ -140,12 +149,14 @@ static void app_controller_step(UW started_ms)
             .nav = navigation_fresh ? &navigation : NULL,
             .range = range_er == E_OK ? &range : NULL,
             .now_ms = now.lo, .ready = permitted, .settled = turn_settled,
+            .straight_left_rpm_x10 = STRAIGHT_LEFT_RPM_X10,
+            .straight_right_rpm_x10 = STRAIGHT_RIGHT_RPM_X10,
         };
         S2_MOVE_TARGETS targets;
         state = app_bypass_step(&bypass, &inputs, &targets);
         left = targets.left_rpm_x10;
         right = targets.right_rpm_x10;
-    } else if (permitted && navigation_fresh && navigation.phase == S5_NAV_SCANNING) {
+    } else if (startup_done && !inhibit && (obstacle_hold || scanning)) {
         state = APP_CTRL_SCANNING;
     } else
 #endif
@@ -153,6 +164,13 @@ static void app_controller_step(UW started_ms)
     else if (inhibit & APP_CTRL_POLL_BUSY) state = APP_CTRL_WAITING_LINE;
     else if (follow_line) {
         app_line_targets(&line, &left, &right);
+#if S2_LINE_USE_RPM_CONTROL
+        left = left * LINE_SPEED_PERCENT / 100;
+        right = right * LINE_SPEED_PERCENT / 100;
+        /* Compensate for the observed rightward drift on plain white. */
+        if (line.pattern == 0U && left == right)
+            left = STRAIGHT_LEFT_RPM_X10;
+#endif
         state = APP_CTRL_FOLLOWING;
     } else if (startup_done) {
         state = ready ? APP_CTRL_STOPPED : APP_CTRL_WAITING_LINE;

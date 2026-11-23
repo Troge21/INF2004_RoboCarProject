@@ -25,6 +25,7 @@ typedef struct {
     const S5_RANGE_DATA *range;
     UW now_ms;
     BOOL ready, settled;
+    INT straight_left_rpm_x10, straight_right_rpm_x10;
 } BYPASS_INPUT;
 
 /* Returns the existing controller state and the single wheel request. */

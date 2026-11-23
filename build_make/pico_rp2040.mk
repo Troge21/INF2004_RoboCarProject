@@ -95,6 +95,9 @@ endif
 APP_MODE ?= integrated
 ifeq ($(APP_MODE),integrated)
 APP_BENCH_VALUE := 0
+ifeq ($(TEST),0)
+APP_BENCH_CONFIG := -encoder-bypass
+endif
 else ifeq ($(APP_MODE),bypass)
 APP_BENCH_VALUE := 0
 APP_BENCH_SUFFIX := _s2_bypass
@@ -131,6 +134,19 @@ else
 $(error Unknown APP_MODE '$(APP_MODE)'; use integrated, bypass, ir, servo, encoder, distance, reverse or turn)
 endif
 
+# Allow an encoder-only final turn in an explicitly named floor test.
+BYPASS_FLOOR_TEST ?= 0
+ifneq ($(filter $(BYPASS_FLOOR_TEST),0 1),$(BYPASS_FLOOR_TEST))
+$(error Unknown BYPASS_FLOOR_TEST '$(BYPASS_FLOOR_TEST)'; use 0 or 1)
+endif
+ifeq ($(BYPASS_FLOOR_TEST),1)
+ifneq ($(APP_MODE),bypass)
+$(error BYPASS_FLOOR_TEST=1 requires APP_MODE=bypass)
+endif
+APP_BENCH_CONFIG := -floor
+APP_BENCH_SUFFIX := _s2_bypass_floor_test
+endif
+
 # Explicit USB diagnostics for powered S4 trials.
 S4_MOTOR_TRACE ?= 0
 ifneq ($(filter $(S4_MOTOR_TRACE),0 1),$(S4_MOTOR_TRACE))
@@ -144,6 +160,9 @@ endif
 # retain their previous default. Name explicit overrides separately.
 BARCODE_DEFAULT := 0
 ifeq ($(APP_MODE):$(TEST):$(MQTT):$(S4_MOTOR_TRACE),integrated:0:1:0)
+BARCODE_DEFAULT := 1
+endif
+ifeq ($(APP_MODE):$(TEST):$(MQTT):$(S4_MOTOR_TRACE),bypass:0:1:0)
 BARCODE_DEFAULT := 1
 endif
 BARCODE_DETECT ?= $(BARCODE_DEFAULT)
@@ -249,8 +268,13 @@ ifeq ($(BARCODE_DETECT),1)
 CFLAGS  += -DAPP_S3_BARCODE_DETECT=1
 endif
 CFLAGS  += -DAPP_BENCH_MODE=$(APP_BENCH_VALUE)
-ifeq ($(APP_MODE),bypass)
+ifeq ($(APP_MODE):$(TEST),integrated:0)
+CFLAGS  += -DAPP_OBSTACLE_BYPASS=1 -DAPP_BYPASS_ENCODER_ALIGN=1
+else ifeq ($(APP_MODE),bypass)
 CFLAGS  += -DAPP_OBSTACLE_BYPASS=1
+ifeq ($(BYPASS_FLOOR_TEST),1)
+CFLAGS  += -DAPP_BYPASS_ENCODER_ALIGN=1
+endif
 else ifeq ($(APP_MODE),distance)
 CFLAGS  += -DS2_BENCH_DISTANCE_MM=300
 else ifeq ($(APP_MODE),reverse)

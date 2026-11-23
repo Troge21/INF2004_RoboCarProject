@@ -15,22 +15,25 @@ Current normal operating image (motor control enabled):
 **build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt.uf2** (NO _test suffix)
 
 Profile **NET=lwip MQTT=1 TEST=0 APP_MODE=integrated CONSOLE=usb_cdc CRASH_REPORT=0**.
-Size **745472 bytes**. SHA-256
-`3273ea8f4684120f09b6a8795331d34b183ddcb3232507ad54a891cd7dcd94c1`.
+Size **758272 bytes**. SHA-256
+`aa0ad897216ffed7990cd24ce38e55c9dc24dfcaac24a2544e7342bff8846684`.
+The original pre-trim UF2 is kept locally as
+`build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_backup.uf2` (`3273ea8f`).
 The integrated build includes MQTT, encoder motor control, the S3 line
 sampling fixes and GP27 cutoff of 455, live analog steering,
-obstacle scans, S4 hump estimates, motion reporting, pickup STOP and Code 39 decoding. Flash
+obstacle scans and bypass, S4 hump estimates, motion reporting, pickup STOP and Code 39 decoding. Flash
 the UF2. The matching ELF and MAP are for debugging and memory inspection.
 The build and offline checks passed. The user confirmed
 right-wheel hump detection and pickup STOP on the earlier S4 trace image
 `c396fa80`.
 The demo layout places the barcode on the left and the hump under the right wheel.
 
-The normal image steers from the current analog readings. When both sensors
-return to their white baseline, both wheels target 26 RPM. It reports forward
-range while driving. A confirmed obstacle at **240 mm or closer**
-automatically latches STOP for a width scan. The separate `_s2_bypass.uf2`
-is for obstacle course testing.
+The normal image steers from the current analog readings. With both sensors
+on white and neutral steering, the targets are 20.6 RPM left and 23.4 RPM
+right. It reports forward range while driving. At a confirmed obstacle
+**240 mm or closer**, it holds the wheels for a width scan and starts the
+encoder-guided bypass if the scan finds a clear side. This is the route
+tested on bare floor.
 
 The controller allows a short bounded wait for the wheel-feedback snapshot
 to unlock. An unavailable or stale snapshot still stops the car.
@@ -82,8 +85,8 @@ trades power saving for latency; current draw remains unmeasured.
 [Delivery evidence](../testing/subsystem1/TELEMETRY_DELIVERY.md),
 [17 November Resume build identity](../testing/subsystem1/logs/2026-11-17-resume-fingerprint.json).
 
-The `_s2_bypass.uf2` image and matching ELF/MAP are for the pending 6b
-bypass and line rejoin. Build a stationary sensor image on demand with
+The `_s2_bypass.uf2` image and matching ELF/MAP are for testing a final turn
+that requires tape detection. Build a stationary sensor image on demand with
 `TEST=1 APP_MODE=integrated`. It disables wheel PWM and leaves servo scanning
 active. Build standalone motion diagnostics with `TEST=1` and `APP_MODE=distance`,
 `APP_MODE=reverse` or `APP_MODE=turn S2_TURN_TRACK_MM=120`.
@@ -214,11 +217,19 @@ millimetres for the last completed scan. An ambiguous scan shows **Edges
 unclear**. Scan CSV includes each measured bearing, distance and the estimate
 if available. Use a measured, flat box to check physical accuracy.
 
-After an automatic stop, move the obstacle away and wait for two centred
-polls to show a clear path (above 280 mm or no return). The car stays stopped
-until you click **Resume**. Two far readings also rearm a manual scan for a
-new target. Front-distance telemetry uses centre echoes. The bypass test
-profile uses its existing three-angle scans and separate turn/rejoin policy.
+After a manual STOP, wait for the front clearance before clicking **Resume**.
+Two clear centred readings (above 280 mm or no return) rearm a scan for a new
+target. Front-distance telemetry uses centre echoes.
+
+The full scan selects a bypass side using its outer readings. The route uses
+a 280 mm lateral shift and a 600 mm pass along
+the obstacle. A width estimate is published when both edges can be measured.
+The turn can start with a clear side even if the width stays **Edges unclear**.
+The controller checks front clearance between legs and while moving. The
+normal UF2 and `_s2_bypass_floor_test.uf2` make the final turn at the fixed
+encoder distance and resume forward driving on white. The `_s2_bypass.uf2`
+variant requires tape confirmation before its final turn. Physical tape
+reacquisition still needs a track test. STOP and pickup cancel the maneuver.
 
 See [the integration and evidence](../testing/subsystem1/SENSOR_INTEGRATION.md)
 and [the physical checklist](../testing/subsystem1/FINAL_ACCEPTANCE.md).

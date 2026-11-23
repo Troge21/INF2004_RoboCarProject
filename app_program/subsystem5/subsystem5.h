@@ -28,18 +28,16 @@ typedef enum {
 typedef struct { UW timestamp_ms, turn_id; UINT phase; } S5_NAV_DATA;
 /* Nonconsuming publication; the controller checks age and its own STOP latch. */
 EXPORT ER subsystem5_get_navigation(S5_NAV_DATA *out);
-#ifndef APP_OBSTACLE_BYPASS
 /* True from a confirmed front obstacle until the centred readings clear. */
 EXPORT BOOL subsystem5_obstacle_stop_required(void);
-#endif
 /* End the matching turn attempt after the controller observes stopped wheels. */
 EXPORT ER subsystem5_end_turn(UW turn_id);
 EXPORT S5_MOTION s5_choose_motion(BOOL centre_valid, UW centre_mm,
                                 BOOL left_valid, UW left_mm,
                                 BOOL right_valid, UW right_mm);
-typedef struct { UW timestamp_ms,sequence,distance_mm; BOOL valid; } S5_RANGE_DATA;
+typedef struct { UW timestamp_ms,sequence,distance_mm; BOOL valid,no_return; } S5_RANGE_DATA;
 /* Protected passive snapshot. E_TMOUT before first result or when busy.
- * A valid snapshot may report valid=FALSE (no usable echo), never clear space. */
+ * no_return distinguishes a clean timeout from an unusable sensor result. */
 EXPORT ER subsystem5_get_range(S5_RANGE_DATA *out);
 
 /* Internal conversion shared with subsystem5_test.c. Valid range 20–4000 mm.

@@ -185,7 +185,7 @@ void app_controller_publish(unsigned state,int motor_result) {
     if((owner_word&APP_CTRL_LATCH)&&state!=APP_CTRL_DISABLED&&state!=APP_CTRL_FAULT&&state!=APP_CTRL_UNAVAILABLE)
         state=APP_CTRL_STOP_LATCHED;
     owner_word=(uint8_t)((owner_word&~APP_CTRL_STATE_MASK)|state);
-    const uint8_t ready=state==APP_CTRL_STOP_LATCHED && !picked_up;
+    const uint8_t ready=(state==APP_CTRL_STOP_LATCHED || state==APP_CTRL_SCANNING) && !picked_up;
     if(__atomic_load_n(&scan_stop_ready,__ATOMIC_RELAXED)!=ready)
         __atomic_store_n(&scan_stop_ready,ready,__ATOMIC_RELEASE);
     if(!locked)return;

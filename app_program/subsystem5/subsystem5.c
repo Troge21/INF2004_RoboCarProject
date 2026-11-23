@@ -7,9 +7,7 @@
 #include "../gpio_irq.h"
 #include "../telemetry_sources.h"
 #include "../subsystem2/subsystem2.h"
-#ifndef APP_OBSTACLE_BYPASS
 #include "../controller.h"
-#endif
 #include <sys/sysdef.h>
 #include <tk/syslib.h>
 
@@ -31,15 +29,9 @@
 #define S5_PWM_SLICE 6U
 #define S5_PWM_TOP 39062U
 #define S5_PWM_REG(offset) (PWM_BASE + S5_PWM_SLICE * 0x14U + (offset))
-#ifdef APP_OBSTACLE_BYPASS
-#define SCAN_FIRST_DEG S5_SCAN_RIGHT_DEG
-#define SCAN_LAST_DEG S5_SCAN_LEFT_DEG
-#define SCAN_STEP_DEG 60U
-#else
 #define SCAN_FIRST_DEG 0U
 #define SCAN_LAST_DEG 180U
 #define SCAN_STEP_DEG 5U
-#endif
 #define SCAN_POINTS ((SCAN_LAST_DEG - SCAN_FIRST_DEG) / SCAN_STEP_DEG + 1U)
 #define SCAN_MIDDLE (SCAN_POINTS / 2U)
 #define SCAN_POINT_OFFSET 10U
@@ -48,9 +40,6 @@
 static UINT scan_bearing(UINT index)
 {
     const UINT command=SCAN_FIRST_DEG+index*SCAN_STEP_DEG;
-#ifdef APP_OBSTACLE_BYPASS
-    return command;
-#else
     /* Bearings estimated from overhead photos at commands 0, 45, 90,
      * 135 and 180. The installed horn travels about 82 degrees. */
     static const UB measured[]={48U,70U,90U,110U,130U};
@@ -58,17 +47,18 @@ static UINT scan_bearing(UINT index)
     if(segment==4U)return measured[4];
     const UINT fraction=command%45U;
     return (measured[segment]*(45U-fraction)+measured[segment+1U]*fraction+22U)/45U;
-#endif
 }
 
 enum { WAIT_RISE, WAIT_FALL, COMPLETE, BAD_EDGES };
 static ID echo_done;
 static ID range_sem;
-/* seq32 + publication32 + distance12/present1/reserved3; no native padding. */
+typedef enum { RANGE_OK, RANGE_NO_RETURN, RANGE_ERROR } RANGE_RESULT;
+/* seq32 + publication32 + distance12/no-return1/reserved2/present1. */
 static UB range_publication[10];
-static void range_write(UW seq,UW mm,BOOL valid)
+static void range_write(UW seq,UW mm,RANGE_RESULT result)
 {
-    SYSTIM now={0};UINT i;UW word=0x8000U|(valid?mm:0U);
+    SYSTIM now={0};UINT i;
+    UW word=0x8000U|(result==RANGE_OK?mm:result==RANGE_NO_RETURN?0x1000U:0U);
     (void)tk_get_tim(&now);
     if(tk_wai_sem(range_sem,1,TMO_POL)!=E_OK)return;
     for(i=0;i<4;++i) {
@@ -89,7 +79,7 @@ EXPORT ER subsystem5_get_range(S5_RANGE_DATA *out)
     (void)tk_sig_sem(range_sem,1);
     if(!(word&0x8000U))return E_TMOUT;
     out->sequence=seq;out->timestamp_ms=t;out->distance_mm=word&4095U;
-    out->valid=out->distance_mm!=0;return E_OK;
+    out->valid=out->distance_mm!=0;out->no_return=(word&0x1000U)!=0U;return E_OK;
 }
 /* Shared under range_sem. A completed scan stores time:32, ID:32,
  * width:10, reserved:5, present:1 and one 12-bit distance per fixed angle. */
@@ -256,8 +246,6 @@ static void echo_isr(UINT pin, UINT events, UW levels, UW now)
     tk_sig_sem(echo_done, 1); /* no printing or waiting in interrupt context */
 }
 
-typedef enum { RANGE_OK, RANGE_NO_RETURN, RANGE_ERROR } RANGE_RESULT;
-
 static RANGE_RESULT measure(UW *mm)
 {
     ER er;
@@ -282,7 +270,6 @@ static RANGE_RESULT measure(UW *mm)
     return s5_echo_to_mm(width_us, mm) == E_OK ? RANGE_OK : RANGE_ERROR;
 }
 
-#ifndef APP_OBSTACLE_BYPASS
 #define SCAN_BAD_ECHO UINT16_MAX
 #define SCAN_TRIG_SPACING_MS 80U
 #define SCAN_MAX_ATTEMPTS 2U
@@ -404,7 +391,20 @@ static BOOL scan_allowed(void)
     return APP_TEST || app_controller_scan_stop_ready();
 }
 
-static SWEEP_RESULT sweep_obstacle(UW profile,UW hold_since,UW reference,UW *sequence)
+/* The outside three rays have to agree there is room on that side. A drop
+ * out with a bad pulse cannot establish clearance. */
+static UW side_clearance(const uint16_t *distances)
+{
+    UW nearest=4000U;
+    for(UINT i=0;i<3U;++i){
+        if(distances[i]==SCAN_BAD_ECHO)return 0U;
+        if(distances[i] && distances[i]<nearest)nearest=distances[i];
+    }
+    return nearest;
+}
+
+static SWEEP_RESULT sweep_obstacle(UW profile,UW hold_since,UW reference,UW *sequence,
+                                  S5_MOTION *escape)
 {
     uint16_t distances[SCAN_POINTS];
     S2_MOTION_DATA motion;
@@ -421,7 +421,7 @@ static SWEEP_RESULT sweep_obstacle(UW profile,UW hold_since,UW reference,UW *seq
         }
         const RANGE_RESULT result=measure(&mm);
         distances[i]=(uint16_t)(result==RANGE_ERROR?SCAN_BAD_ECHO:mm);
-        if(i==SCAN_MIDDLE)range_write((*sequence)++,mm,result==RANGE_OK);
+        if(i==SCAN_MIDDLE)range_write((*sequence)++,mm,result);
     }
     servo_point_to(S5_SCAN_CENTRE_DEG);
     phase_delay(S5_SERVO_SETTLE_MS,S5_NAV_SCANNING);
@@ -429,6 +429,12 @@ static SWEEP_RESULT sweep_obstacle(UW profile,UW hold_since,UW reference,UW *seq
        motion.count_left!=start_left || motion.count_right!=start_right)
         return SWEEP_DISCARDED;
     const UINT width=scan_width(distances,reference);
+    const BOOL centre_valid=distances[SCAN_MIDDLE]>=20U && distances[SCAN_MIDDLE]<=S5_OBSTACLE_MM;
+    if(escape && centre_valid){
+        const UW left=side_clearance(distances+SCAN_POINTS-3U);
+        const UW right=side_clearance(distances);
+        *escape=s5_choose_motion(TRUE,distances[SCAN_MIDDLE],left!=0U,left,right!=0U,right);
+    }
     for(UINT i=0;i<SCAN_POINTS;++i)if(distances[i]==SCAN_BAD_ECHO)distances[i]=0;
     if(!scan_write(profile,distances,width))return SWEEP_DISCARDED;
     return width ? SWEEP_MEASURED : SWEEP_UNCLEAR;
@@ -445,7 +451,7 @@ static void obstacle_width_loop(void)
         servo_point_to(S5_SCAN_CENTRE_DEG);
         if(!approaching)phase_delay(S5_SERVO_SETTLE_MS,phase);
         const RANGE_RESULT result=measure(&centre);
-        range_write(sequence++,centre,result==RANGE_OK);
+        range_write(sequence++,centre,result);
         const BOOL may_scan=scan_allowed();
         BOOL automatic=subsystem5_obstacle_stop_required();
         /* Keep the normal centre cadence until approaching a valid return.
@@ -472,12 +478,25 @@ static void obstacle_width_loop(void)
                 attempts=0;
             }
             if(may_scan && attempts<SCAN_MAX_ATTEMPTS){
-                const SWEEP_RESULT sweep=sweep_obstacle(profile,hold_since,centre,&sequence);
+#ifdef APP_OBSTACLE_BYPASS
+                S5_MOTION escape=S5_MOTION_STOP;
+                const UW completed_profile=profile;
+                S5_MOTION *escape_out=automatic?&escape:NULL;
+#else
+                S5_MOTION *escape_out=NULL;
+#endif
+                const SWEEP_RESULT sweep=sweep_obstacle(profile,hold_since,centre,&sequence,escape_out);
                 if(sweep==SWEEP_UNCLEAR || sweep==SWEEP_MEASURED){
                     if(++profile==0U)++profile;
                 }
                 if(sweep!=SWEEP_NOT_STARTED)++attempts;
                 if(sweep==SWEEP_MEASURED)attempts=SCAN_MAX_ATTEMPTS;
+#ifdef APP_OBSTACLE_BYPASS
+                if((sweep==SWEEP_MEASURED || (sweep==SWEEP_UNCLEAR && attempts==SCAN_MAX_ATTEMPTS)) &&
+                   (escape==S5_MOTION_LEFT || escape==S5_MOTION_RIGHT)){
+                    wait_for_turn(escape==S5_MOTION_LEFT?S5_NAV_LEFT:S5_NAV_RIGHT,completed_profile);
+                }
+#endif
             }
         } else if(encounter && ((result==RANGE_OK && centre>OBSTACLE_RELEASE_MM) ||
                                 (automatic && result==RANGE_NO_RETURN))){
@@ -490,11 +509,13 @@ static void obstacle_width_loop(void)
         if(!scan_allowed() && !subsystem5_obstacle_stop_required())encounter=FALSE;
         if(encounter && attempts<SCAN_MAX_ATTEMPTS)phase=S5_NAV_SCANNING;
         else if(!encounter && result==RANGE_OK && centre>S5_OBSTACLE_MM)phase=S5_NAV_CLEAR;
+#ifdef APP_OBSTACLE_BYPASS
+        else if(!encounter && result==RANGE_NO_RETURN)phase=S5_NAV_CLEAR;
+#endif
         else phase=S5_NAV_BLOCKED;
         phase_delay(SAMPLE_PAUSE_MS,phase);
     }
 }
-#endif
 
 static void ultrasonic_task(INT stacd, void *exinf)
 {
@@ -511,47 +532,7 @@ static void ultrasonic_task(INT stacd, void *exinf)
     (void)tk_dly_tsk(100);
     servo_point_to(S5_SCAN_CENTRE_DEG);
     phase_delay(S5_SERVO_SETTLE_MS,S5_NAV_SCANNING);
-#ifndef APP_OBSTACLE_BYPASS
     obstacle_width_loop();
-#else
-    {
-        UW sequence=0,profile=0;
-        S5_NAV_PHASE current=S5_NAV_SCANNING;
-        for(;;) {
-            UW centre=0,left=0,right=0;
-            servo_point_to(S5_SCAN_CENTRE_DEG);
-            phase_delay(S5_SERVO_SETTLE_MS,current);
-            const RANGE_RESULT result=measure(&centre);
-            /* Only actual centre samples reach the front-distance tile. */
-            range_write(sequence++,centre,result==RANGE_OK);
-            if(result!=RANGE_OK) {
-                current=S5_NAV_BLOCKED;phase_delay(SAMPLE_PAUSE_MS,current);continue;
-            }
-            if(centre>S5_OBSTACLE_MM) {
-                current=S5_NAV_CLEAR;phase_delay(SAMPLE_PAUSE_MS,current);continue;
-            }
-            phase_delay(SAMPLE_PAUSE_MS,S5_NAV_SCANNING);
-            servo_point_to(S5_SCAN_LEFT_DEG);
-            phase_delay(S5_SERVO_SETTLE_MS,S5_NAV_SCANNING);
-            (void)measure(&left);
-            phase_delay(SAMPLE_PAUSE_MS,S5_NAV_SCANNING);
-            servo_point_to(S5_SCAN_RIGHT_DEG);
-            phase_delay(S5_SERVO_SETTLE_MS,S5_NAV_SCANNING);
-            (void)measure(&right);
-            servo_point_to(S5_SCAN_CENTRE_DEG);
-            if(++profile==0U)++profile; /* Zero is reserved for no turn request. */
-            const uint16_t distances[SCAN_POINTS]={(uint16_t)right,(uint16_t)centre,(uint16_t)left};
-            (void)scan_write(profile,distances,0U);
-            S5_MOTION choice=s5_choose_motion(TRUE,centre,left!=0U,left,right!=0U,right);
-            if(choice==S5_MOTION_LEFT||choice==S5_MOTION_RIGHT) {
-                wait_for_turn(choice==S5_MOTION_LEFT?S5_NAV_LEFT:S5_NAV_RIGHT,profile);
-                current=S5_NAV_SCANNING; /* stop until a fresh centre check */
-            } else {
-                current=S5_NAV_BLOCKED;phase_delay(SAMPLE_PAUSE_MS,current);
-            }
-        }
-    }
-#endif
 }
 
 static ER servo_init(void)

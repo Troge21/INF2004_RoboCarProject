@@ -16,14 +16,14 @@ diagnostic for calibration. The integrated steering loop reads GP27 and GP26.
 The controller uses the teammate's RPM API/PID without
 changing its gains, polarity, calibration or encoder driver:
 
-Both wheels normally target 26 RPM on white and when both sensors detect a junction.
+In the normal integrated profile, the base target for each wheel is 23.4 RPM.
 Steering scales the raw GP27 and GP26 readings separately, using the ranges
 250–750 and 450–2650 respectively. The difference reduces the wheel target
 on the tape side. The weak-edge response applies up to 60% contrast. Above
-that, the correction increases to 14 RPM at full contrast for a tighter arc.
+that, the correction increases to 12.6 RPM at full contrast for a tighter arc.
 The correction follows the current sample and fades as it returns to white.
-When both sensors return to their white baseline, both wheels target 26 RPM
-even after a sustained bend.
+When both sensors report white and steering is neutral, the controller reduces
+the left target to 20.6 RPM to compensate for rightward drift.
 
 Missing/invalid/stale sensor or motor feedback requests zero. A known S2
 fault is reported as Controller fault. The controller checks its latched
