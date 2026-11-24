@@ -130,6 +130,11 @@ int s1_network_arm_resume(const unsigned char *b,unsigned n,unsigned char *out,u
 int s1_network_submit_resume(uint32_t ticket,uint32_t token,uint32_t deadline){
     ++resume_calls;submitted_id=ticket;submitted_token=token;submitted_deadline=deadline;return resume_submit_result;
 }
+static unsigned map_calls;
+static uint32_t map_letters;
+unsigned app_controller_set_barcode_map(uint32_t letters,uint32_t deadline){
+    ++map_calls;map_letters=letters;submitted_deadline=deadline;return APP_BARCODE_MAP_APPLIED;
+}
 #include "../../../lib/liblwip/sysdepend/pico_rp2040/mqtt_utk.c"
 static const UB request_a[5]={0xa0,12,0,0,0},request_b[5]={0xa0,13,0,0,0};
 static void expect(int condition,const char *message) {
@@ -156,6 +161,23 @@ static void make_stop(UB out[13],uint32_t id,uint32_t token,uint32_t deadline) {
     out[0]=0xa2;s1_write_u32(out+1,id);s1_write_u32(out+5,token);s1_write_u32(out+9,deadline);
 }
 int main(void) {
+    reset(1);
+    UB mapping[14]={S1_BARCODE_MAP_REQUEST,0x34,0x12};
+    s1_write_u32(mapping+3,session_nonce);s1_write_u32(mapping+7,boot_ms+1200U);
+    mapping[11]=0xa0;mapping[12]=0x24;mapping[13]=0x08;
+    incoming_publish_cb(NULL,MQTT_COMMAND_TOPIC,sizeof(mapping));
+    incoming_data_cb(NULL,mapping,4,0);
+    incoming_data_cb(NULL,mapping+4,sizeof(mapping)-4,MQTT_DATA_FLAG_LAST);
+    mqtt_utk_poll();
+    expect(map_calls==1&&map_letters==0x0824a0&&submitted_deadline==boot_ms+1200U&&
+        last_length==8&&last_payload[0]==S1_BARCODE_MAP_REPLY&&last_payload[1]==0x34&&
+        s1_read_u32(last_payload+3)==session_nonce&&last_payload[7]==APP_BARCODE_MAP_APPLIED,
+        "fragmented mapping dispatches once and returns a correlated result");
+    deliver(MQTT_COMMAND_TOPIC,mapping,sizeof(mapping),sizeof(mapping));mqtt_utk_poll();
+    expect(map_calls==1&&last_payload[7]==APP_BARCODE_MAP_REPLAY,"duplicate lease cannot overwrite the mapping");
+    s1_write_u32(mapping+3,session_nonce^0x80000000U);
+    deliver(MQTT_COMMAND_TOPIC,mapping,sizeof(mapping),sizeof(mapping));mqtt_utk_poll();
+    expect(map_calls==1&&last_payload[7]==APP_BARCODE_MAP_SESSION,"another robot session cannot change the mapping");
     reset(1);
     expect(subscriptions==1 && !strcmp(subscribed_topic,MQTT_COMMAND_TOPIC),
         "firmware subscribes to real command topic, replacing heartbeat loopback");

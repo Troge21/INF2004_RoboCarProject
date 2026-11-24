@@ -417,6 +417,7 @@ static SWEEP_RESULT sweep_obstacle(UW profile,UW hold_since,UW reference,UW *seq
         phase_delay(i==0U?S5_SERVO_SETTLE_MS:SCAN_TRIG_SPACING_MS,S5_NAV_SCANNING);
         if(!scan_allowed()){
             servo_point_to(S5_SCAN_CENTRE_DEG);
+            phase_delay(S5_SERVO_SETTLE_MS,S5_NAV_SCANNING);
             return SWEEP_DISCARDED;
         }
         const RANGE_RESULT result=measure(&mm);
@@ -444,25 +445,23 @@ static void obstacle_width_loop(void)
 {
     UW sequence=0,profile=1,hold_since=0,previous_near=0;
     unsigned clear_samples=0,attempts=0;
-    BOOL encounter=FALSE,approaching=FALSE;
+    BOOL encounter=FALSE;
     S5_NAV_PHASE phase=S5_NAV_SCANNING;
     for(;;){
         UW centre=0;
-        servo_point_to(S5_SCAN_CENTRE_DEG);
-        if(!approaching)phase_delay(S5_SERVO_SETTLE_MS,phase);
+        /* Startup and both sweep exits already centre and settle the head.
+         * Centred samples need only the inter-ping delay below. */
         const RANGE_RESULT result=measure(&centre);
         range_write(sequence++,centre,result);
         const BOOL may_scan=scan_allowed();
         BOOL automatic=subsystem5_obstacle_stop_required();
-        /* Keep the normal centre cadence until approaching a valid return.
-         * Two consistent forward pings are required to request a stop. */
-        approaching=!APP_TEST && !may_scan && !automatic && result==RANGE_OK && centre<=AUTO_APPROACH_MM;
+        /* Two consistent forward pings are required to request a stop. */
+        const BOOL approaching=!APP_TEST && !may_scan && !automatic && result==RANGE_OK && centre<=AUTO_APPROACH_MM;
         if(approaching && centre<=AUTO_STOP_MM){
             if(previous_near && centre<=previous_near+AUTO_CONFIRM_DELTA_MM &&
                previous_near<=centre+AUTO_CONFIRM_DELTA_MM){
                 __atomic_store_n(&obstacle_stop,1U,__ATOMIC_RELEASE);
                 automatic=TRUE;
-                approaching=FALSE;
             }
             previous_near=centre;
         } else previous_near=0;

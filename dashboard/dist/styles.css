@@ -72,3 +72,9 @@
   .radar-scale{font-size:15px}
 }
 @media(max-width:360px){.scan-distance small{display:block}}
+
+.barcode-mapping{max-width:490px;padding:12px 21px 20px}
+.barcode-map-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.barcode-map-row label{margin:0 0 12px}
+.barcode-map-row select{min-width:0;padding:9px 10px;border:1px solid #dfe4ec;border-radius:6px;background:#fcfdfe;color:#283548;font:inherit}
+.barcode-mapping .field-note{margin:10px 0 0;color:#596475}

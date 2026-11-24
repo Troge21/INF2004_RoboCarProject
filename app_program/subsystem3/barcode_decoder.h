@@ -16,6 +16,7 @@
 #define S3_BC_VALID            0x80U
 #define S3_BC_REVERSED         0x40U
 #define S3_BC_SYMBOL_MASK      0x3fU
+#define S3_BC_FIRST_LETTER_INDEX 10U /* Alphabet begins with digits 0–9. */
 
 enum { S3_BC_NONE, S3_BC_OK, S3_BC_INVALID, S3_BC_TIMEOUT };
 

@@ -1,7 +1,26 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {decodeTelemetry,decodeHeartbeat,decodeScan,decodeDiagnostics,decodeTerrain,decodeBarcodeSignal,TelemetryStore,packetText} from '../dist/protocol.js';
+import {decodeTelemetry,decodeHeartbeat,decodeScan,decodeDiagnostics,decodeTerrain,decodeBarcodeSignal,encodeBarcodeMap,TelemetryStore,packetText} from '../dist/protocol.js';
 import {telemetry,heartbeat,statusReply,scanChunk,diagnostics,putBits,syncStore} from './fixtures.mjs';
+test('barcode mapping requires four unique letters and a matching Pico acknowledgment',()=>{
+  assert.deepEqual([...encodeBarcodeMap(0x1234,7,2000,['A','F','J','Q'])],
+    [0xa9,0x34,0x12,7,0,0,0,0xd0,7,0,0,0xa0,0x24,8]);
+  assert.throws(()=>encodeBarcodeMap(1,7,2000,['A','Z','F','A']),/different letter/);
+  const store=syncStore(new TelemetryStore());
+  const at=store.clockAnchor.at+20,session=store.clockAnchor.session;
+  assert.throws(()=>store.beginBarcodeMap(42,['A','F','Z','Q'],at),/Latch STOP/);
+  store.observeController({controller_valid:true,stop_latched:true,controller_state_code:6,controller_word:22,session_token:session},at);
+  store.beginBarcodeMap(42,['A','F','Z','Q'],at);
+  const reply=Uint8Array.of(0xaa,41,0,0,0,0,0,0);
+  new DataView(reply.buffer).setUint32(3,session,true);
+  assert.equal(store.ingest(reply,'status',at+5),false);
+  reply[1]=42;
+  assert.equal(store.ingest(reply,'status',at+8,true),false);
+  assert.equal(store.ingest(reply,'status',at+10),true);
+  assert.deepEqual(store.confirmedMap,['A','F','Z','Q']);
+  store.clearController();
+  assert.equal(store.confirmedMap,null);
+});
 test('v4 real motion preserves signed counts/net distance and separates path length',()=>{
   const s=decodeTelemetry(telemetry({left:1191,right:-1191,leftCount:2147483647,rightCount:-2147483647,net:-1234,travel:0})).sample;
   assert.equal(s.left_mps,.1191);assert.equal(s.right_mps,-.1191);

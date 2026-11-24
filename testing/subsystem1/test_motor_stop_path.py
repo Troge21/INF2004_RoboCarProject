@@ -16,6 +16,7 @@ prefix = r'''
 #include <stdint.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <string.h>
 #include <setjmp.h>
 #define APP_H
 #define APP_TEST 0
@@ -54,6 +55,10 @@ typedef struct {UINT pattern;UW timestamp_ms;BOOL valid;uint16_t centre_adc,righ
 #include "motion_control.h"
 #include "odometry.h"
 #include "telemetry_sources.h"
+#if APP_S3_BARCODE_DETECT
+static TELEMETRY_BARCODE barcode_sample;
+int telemetry_get_barcode(TELEMETRY_BARCODE *out){*out=barcode_sample;return barcode_sample.event_sequence?E_OK:E_TMOUT;}
+#endif
 #include "subsystem5/subsystem5.h"
 static UW operating_ms;
 static unsigned scenario,phase,ticks,checks,pattern,stale,invalid,compare[4];
@@ -195,10 +200,11 @@ static void run_bypass_cycle(void){
             }
         }
         if(scenario==14)assert(bypass.phase!=BYPASS_FAILED);
-        if((scenario==8||scenario==12)&&!checked_range_gap&&
-           bypass.phase==BYPASS_PASS&&moving()){
+        if(!checked_range_gap&&
+           ((scenario==8&&bypass.phase==BYPASS_TURN_ALONG&&compare[1]&&compare[2])||
+            (scenario==12&&bypass.phase==BYPASS_PASS&&moving()))){
             checked_range_gap=TRUE;front_missing=TRUE;
-            release_at=ticks+(scenario==12?30U:5U);phase=10;
+            release_at=ticks+(scenario==12?BYPASS_SENSOR_WAIT_MS/20U+5U:40U);phase=10;
         }else if(scenario==10&&bypass.phase==BYPASS_SHIFT_OUT&&moving()){
             front_blocked=TRUE;phase=5;
         }else if(scenario==11&&bypass.phase==BYPASS_PASS&&moving()){
@@ -265,8 +271,8 @@ static void run_bypass_cycle(void){
             pass("a sustained loss of the front echo faults the route with both wheels off");
             front_missing=FALSE;release_at=ticks+20U;phase=7;
         }else if(ticks==release_at){
-            assert(scenario==8&&bypass.phase==BYPASS_PASS);
-            pass("a brief missing echo holds both wheels stopped until fresh clearance");
+            assert(scenario==8&&bypass.phase==BYPASS_TURN_ALONG);
+            pass("an 800 ms range dropout pauses the second turn and resumes on fresh clearance");
             front_missing=FALSE;phase=4;
         }
     }else if(phase==11){
@@ -737,7 +743,74 @@ static void test_pid_turn_slew(unsigned inside){
         assert(motor.data.faults==0);
     }
 }
+#if APP_S3_BARCODE_DETECT
+static void test_junction(void){
+    const uint32_t map=APP_BARCODE_MAP_SET|(1U<<5)|(2U<<10)|(3U<<15);
+    const INT angles[]={90,-90,0,180};
+    __atomic_store_n(&barcode_map,map,__ATOMIC_RELEASE);
+    for(unsigned choice=0;choice<4;++choice){
+        memset(&junction,0,sizeof(junction));
+        S3_LINE_DATA line={.valid=TRUE,.pattern=3,.timestamp_ms=1000};
+        S2_MOTION_DATA motion={.encoder_valid=TRUE,.speed_valid=TRUE,.mode=S2_MODE_STOP,
+            .timestamp_ms=1000,.speed_timestamp_ms=1000};
+        S2_MOVE_TARGETS targets;
+        barcode_sample=(TELEMETRY_BARCODE){.timestamp_ms=1000,.event_sequence=1,
+            .code=S3_BC_VALID|S3_BC_REVERSED|(S3_BC_FIRST_LETTER_INDEX+choice)};
+        junction_read_barcode(TRUE,1000);
+        junction_observe(&line,&motion,1000);
+        junction_observe(&line,&motion,1020);
+        assert(junction.phase==JUNCTION_IDLE&&junction.pending_code==barcode_sample.code);
+        line.timestamp_ms=1040;
+        junction_observe(&line,&motion,1040);
+        assert(junction.crossed&&!junction.pending_code);
+        if(angles[choice]==0){assert(junction.phase==JUNCTION_IDLE);continue;}
+        assert(junction.phase==JUNCTION_CENTERING&&junction.turn_degrees==angles[choice]);
+        motion.timestamp_ms=motion.speed_timestamp_ms=1060;
+        (void)junction_step(&motion,1060,TRUE,&targets);
+        assert(targets.left_rpm_x10>0&&targets.right_rpm_x10>0);
+        motion.distance_centre_mm_x10=JUNCTION_CENTER_MM*10;
+        motion.timestamp_ms=motion.speed_timestamp_ms=1100;
+        (void)junction_step(&motion,1100,FALSE,&targets);
+        assert(junction.phase==JUNCTION_TURNING&&!targets.left_rpm_x10&&!targets.right_rpm_x10);
+        (void)junction_step(&motion,1100,FALSE,&targets);
+        assert(!targets.left_rpm_x10&&!targets.right_rpm_x10);
+        (void)junction_step(&motion,1100,TRUE,&targets);
+        assert((angles[choice]>0?targets.left_rpm_x10<0:targets.left_rpm_x10>0)&&
+               (angles[choice]>0?targets.right_rpm_x10>0:targets.right_rpm_x10<0));
+        const INT arc=junction.move.target_mm_x10;
+        motion.distance_left_mm_x10=angles[choice]>0?-arc:arc;
+        motion.distance_right_mm_x10=-motion.distance_left_mm_x10;
+        (void)junction_step(&motion,1100,FALSE,&targets);
+        assert(junction.phase==JUNCTION_SETTLING&&!targets.left_rpm_x10&&!targets.right_rpm_x10);
+        (void)junction_step(&motion,1100,TRUE,&targets);
+        assert(junction.phase==JUNCTION_IDLE&&junction.crossed&&junction.needs_exit);
+        junction_read_barcode(TRUE,1100);
+        line.timestamp_ms=1120;
+        junction_observe(&line,&motion,1120);
+        assert(junction.phase==JUNCTION_IDLE&&!junction.pending_code);
+        line.pattern=0;
+        motion.distance_centre_mm_x10+=JUNCTION_EXIT_MM_X10;
+        for(unsigned i=0;i<3;++i){line.timestamp_ms+=20;junction_observe(&line,&motion,line.timestamp_ms);}
+        assert(!junction.crossed&&!junction.needs_exit);
+    }
+    junction.phase=JUNCTION_TURNING;
+    junction.move.result=S2_MOVE_RUNNING;
+    junction.pending_code=barcode_sample.code;
+    junction_cancel(TRUE);
+    assert(junction.phase==JUNCTION_IDLE&&junction.move.result==S2_MOVE_IDLE&&!junction.pending_code);
+    S2_MOVE_TARGETS targets;
+    junction.phase=JUNCTION_TURNING;
+    assert(junction_step(NULL,1200,FALSE,&targets)==APP_CTRL_FAULT&&
+        !targets.left_rpm_x10&&!targets.right_rpm_x10);
+    memset(&junction,0,sizeof(junction));barcode_sample=(TELEMETRY_BARCODE){0};
+    __atomic_store_n(&barcode_map,0,__ATOMIC_RELEASE);
+    pass("barcode route uses distinct IR samples, executes each action once, rearms after leaving and cancels on STOP");
+}
+#endif
 int main(void){
+#if APP_S3_BARCODE_DETECT
+    test_junction();
+#endif
     test_command_mailbox();
     test_pid_ramp(0);
     test_pid_ramp(UINT32_MAX-1990U);
@@ -759,7 +832,7 @@ with tempfile.TemporaryDirectory(prefix='robocar-ao-stop-') as directory:
     c=Path(directory)/'stop_path.c';exe=Path(directory)/'stop_path.exe'
     c.write_text(prefix+'\n#include "motion_control.c"\n#include "odometry.c"\n'+api+loop+controller+tests,encoding='utf-8')
     for flags in ([],['-DAPP_OBSTACLE_BYPASS=1'],
-                  ['-DAPP_OBSTACLE_BYPASS=1','-DAPP_BYPASS_ENCODER_ALIGN=1']):
+                  ['-DAPP_OBSTACLE_BYPASS=1','-DAPP_BYPASS_ENCODER_ALIGN=1','-DAPP_S3_BARCODE_DETECT=1']):
         subprocess.run(['gcc','-std=c11','-Wall','-Wextra','-Werror',*flags,
                         '-I',str(root/'app_program'),'-I',str(root/'app_program/subsystem2'),
                         str(c),'-o',str(exe)],check=True)

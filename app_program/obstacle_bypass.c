@@ -6,8 +6,10 @@
 #define BYPASS_SHIFT_MM 280
 #define BYPASS_PASS_MM 600
 #define BYPASS_RANGE_MAX_AGE_MS 500U
-#define BYPASS_SENSOR_WAIT_MS 500U
-#define BYPASS_START_LIMIT_MS 2500U
+/* Centred pings are roughly 400 ms apart. A single unusable ping can
+ * leave clearance unavailable for two intervals while turning. */
+#define BYPASS_SENSOR_WAIT_MS 1600U
+#define BYPASS_START_LIMIT_MS 3500U
 #define BYPASS_LEG_LIMIT_MS 25000U
 
 enum { WAIT_BACKGROUND, WAIT_LINE, LINE_ONCE, LINE_CONFIRMED };

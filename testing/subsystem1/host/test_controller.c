@@ -49,6 +49,26 @@ static void latch(void){
 }
 int main(void){
     uint8_t reply[10],state[5];
+    const uint32_t map=(5U<<5)|(25U<<10)|(16U<<15);
+    boot();app_controller_publish(APP_TEST?APP_CTRL_DISABLED:APP_CTRL_STARTING,E_OK);
+    check(app_controller_set_barcode_map(map,clock_ms+1000U)==
+        (APP_TEST?APP_BARCODE_MAP_NOT_STOPPED:APP_BARCODE_MAP_APPLIED),"only a normal latched controller accepts a map");
+    if(!APP_TEST){
+        uint32_t stored=app_controller_barcode_map();
+        check(app_barcode_map_action(stored,S3_BC_VALID|10U)==APP_BARCODE_LEFT&&
+            app_barcode_map_action(stored,S3_BC_VALID|S3_BC_REVERSED|10U)==APP_BARCODE_LEFT&&
+            app_barcode_map_action(stored,S3_BC_VALID|15U)==APP_BARCODE_RIGHT&&
+            app_barcode_map_action(stored,S3_BC_VALID|35U)==APP_BARCODE_FORWARD&&
+            app_barcode_map_action(stored,S3_BC_VALID|26U)==APP_BARCODE_UTURN&&
+            app_barcode_map_action(stored,S3_BC_VALID|1U)==APP_BARCODE_UNMAPPED&&
+            app_barcode_map_action(stored,10U)==APP_BARCODE_UNMAPPED,"letters match in both directions, and unsupported codes stay unmapped");
+        check(app_controller_set_barcode_map(0,clock_ms+1000U)==APP_BARCODE_MAP_INVALID&&
+            app_controller_set_barcode_map(map,clock_ms)==APP_BARCODE_MAP_EXPIRED&&
+            app_controller_barcode_map()==stored,"duplicate letters and expired edits leave the previous map intact");
+        reset();
+        check(!app_controller_barcode_map()&&app_controller_set_barcode_map(map,clock_ms+1000U)==APP_BARCODE_MAP_NOT_STOPPED,
+            "normal restart clears the map and a moving controller rejects changes");
+    }
     boot();
     check(!app_controller_scan_stop_ready(),"scanning waits for the initial motor-stop handoff");
     check(app_controller_poll()==(APP_TEST?0:APP_CTRL_LATCH),"normal boot inhibits motion before the first publication");

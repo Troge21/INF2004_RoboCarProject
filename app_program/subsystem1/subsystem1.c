@@ -297,7 +297,8 @@ static void gather_sources(S1_SNAPSHOT *s)
     }
     if(telemetry_get_travel(&travel)==E_OK)(void)s1_set_travel(s,travel.distance_mm,travel.timestamp_ms);
     if(telemetry_get_barcode(&barcode)==E_OK)
-        (void)s1_set_barcode(s,barcode.code,barcode.navigation,barcode.event_sequence,barcode.timestamp_ms);
+        (void)s1_set_barcode(s,barcode.code,app_barcode_map_action(app_controller_barcode_map(),barcode.code),
+                             barcode.event_sequence,barcode.timestamp_ms);
     if(telemetry_get_faults(&f)==E_OK)(void)s1_set_faults(s,f.known,f.active,f.timestamp_ms);
 }
 static void telemetry_task(INT stacd,void *exinf)

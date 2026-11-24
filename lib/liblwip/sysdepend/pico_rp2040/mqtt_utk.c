@@ -43,7 +43,7 @@
 #ifndef MQTT_STATUS_TOPIC
 #define MQTT_STATUS_TOPIC MQTT_CLIENT_ID "/status"
 #endif
-/* One bounded union slot. Low four bits hold remaining bytes 0..13,
+/* One bounded union slot. Low four bits hold remaining bytes 0..14,
  * or 15 while WiFi is unavailable. Four flags fill the other half byte. */
 #define CMD_LENGTH 15U
 #define CMD_LINK_DOWN 15U
@@ -59,6 +59,7 @@ static u8_t command_state = CMD_LINK_DOWN;
 static u8_t command_bytes[S1_COMMAND_MAX_BYTES];
 static u32_t last_status_ms,session_nonce,last_stop_id;
 static u32_t last_arm_ms,last_resume_ms,last_resume_id;
+static u32_t last_map_deadline;
 
 static void heartbeat_timeout(void *arg);
 static void publish_done_cb(void *arg, err_t result);
@@ -95,6 +96,7 @@ void mqtt_utk_set_link(unsigned int available)
 
 static unsigned command_length(unsigned marker)
 {
+    if(marker==S1_BARCODE_MAP_REQUEST)return S1_BARCODE_MAP_REQUEST_BYTES;
     return marker==0xa0U?S1_STATUS_REQUEST_BYTES:
         (marker==0xa2U||marker==0xa5U||marker==0xa7U)?S1_STOP_REQUEST_BYTES:0U;
 }
@@ -140,6 +142,26 @@ static void resume_result(uint32_t id,unsigned result)
     n=s1_pack_resume_reply(id,session_nonce,result,s1_network_controller_word(),bytes,sizeof(bytes));
     if(n>0)(void)publish_packet(client,MQTT_STATUS_TOPIC,bytes,(u16_t)n,0,0,publish_done_cb,NULL);
 }
+static void apply_barcode_map(void)
+{
+    uint32_t session=s1_read_u32(command_bytes+3);
+    uint32_t deadline=s1_read_u32(command_bytes+7),now;
+    uint32_t letters=command_bytes[11]|((uint32_t)command_bytes[12]<<8)|((uint32_t)command_bytes[13]<<16);
+    unsigned result;
+    if(session!=session_nonce)result=APP_BARCODE_MAP_SESSION;
+    else if(s1_network_uptime(&now)!=0||deadline-now==0U||deadline-now>APP_CTRL_STOP_LEASE_MS)
+        result=APP_BARCODE_MAP_EXPIRED;
+    else if(last_map_deadline-now<=APP_CTRL_STOP_LEASE_MS &&
+            (deadline-last_map_deadline==0U || deadline-last_map_deadline>0x7fffffffU))
+        result=APP_BARCODE_MAP_REPLAY;
+    else result=app_controller_set_barcode_map(letters,deadline);
+    if(result==APP_BARCODE_MAP_APPLIED)last_map_deadline=deadline;
+    else ++network_counters[1];
+    UB reply[S1_BARCODE_MAP_REPLY_BYTES]={S1_BARCODE_MAP_REPLY,command_bytes[1],command_bytes[2]};
+    s1_write_u32(reply+3,session_nonce);
+    reply[7]=(UB)result;
+    (void)publish_packet(client,MQTT_STATUS_TOPIC,reply,sizeof(reply),0,0,publish_done_cb,NULL);
+}
 void mqtt_utk_poll(void)
 {
     UB payload[S1_TX_CAPACITY];
@@ -159,6 +181,8 @@ void mqtt_utk_poll(void)
             UB reply[S1_STATUS_MAX_BYTES];
             int size=s1_network_status(command_bytes,S1_STATUS_REQUEST_BYTES,reply,sizeof(reply),session_nonce);
             if(size>0)(void)publish_packet(client,MQTT_STATUS_TOPIC,reply,(u16_t)size,0,0,publish_done_cb,NULL);
+        } else if(command_bytes[0]==S1_BARCODE_MAP_REQUEST) {
+            apply_barcode_map();
         } else if(command_bytes[0]==0xa5U) {
             int size=s1_network_arm_resume(command_bytes,13,payload,sizeof(payload),session_nonce);
             if(size>0) {
@@ -230,14 +254,15 @@ static void incoming_publish_cb(void *arg, const char *topic, u32_t total_len)
     if(!link_available()) return;
     unsigned stop_only=0;
     if(command_state&CMD_PENDING) {
-        if(strcmp(topic,MQTT_COMMAND_TOPIC)==0&&total_len==13U&&
-           (command_bytes[0]==0xa5U||command_bytes[0]==0xa7U)) {
+        if(strcmp(topic,MQTT_COMMAND_TOPIC)==0&&total_len==S1_STOP_REQUEST_BYTES&&
+           (command_bytes[0]==0xa5U||command_bytes[0]==0xa7U||command_bytes[0]==S1_BARCODE_MAP_REQUEST)) {
             command_state&=(u8_t)~CMD_PENDING;stop_only=1;
         } else {if(strcmp(topic,MQTT_COMMAND_TOPIC)==0)++network_counters[1];return;}
     }
     command_state &= (u8_t)~(CMD_LENGTH | CMD_COLLECTING);
     if((command_state & CMD_SUBSCRIBED) && !(command_state & CMD_PENDING) &&
-        (total_len==S1_STATUS_REQUEST_BYTES||total_len==S1_STOP_REQUEST_BYTES)&&strcmp(topic,MQTT_COMMAND_TOPIC)==0) {
+        (total_len==S1_STATUS_REQUEST_BYTES||total_len==S1_STOP_REQUEST_BYTES||
+         total_len==S1_BARCODE_MAP_REQUEST_BYTES)&&strcmp(topic,MQTT_COMMAND_TOPIC)==0) {
         command_bytes[0]=(u8_t)stop_only; /* 1 means the replacement must be STOP. */
         command_state|=(u8_t)(CMD_COLLECTING|total_len);
     } else if(strcmp(topic,MQTT_COMMAND_TOPIC)==0)++network_counters[1];
@@ -269,6 +294,8 @@ static void incoming_data_cb(void *arg, const u8_t *data, u16_t len, u8_t flags)
         if(s1_parse_status_request(command_bytes,total,&id)!=S1_CODEC_OK||
            (u32_t)(now-last_status_ms)<STATUS_MIN_INTERVAL_MS){++network_counters[1];return;}
         last_status_ms=now;
+    } else if(total==S1_BARCODE_MAP_REQUEST_BYTES) {
+        if(!(command_bytes[1]|command_bytes[2])||!s1_read_u32(command_bytes+3)) {++network_counters[1];return;}
     } else {
         u32_t *last=command_bytes[0]==0xa5U?&last_arm_ms:&last_resume_ms;
         if(parse_control_request(command_bytes,total,&id,&token,&deadline)!=S1_CODEC_OK||
@@ -383,7 +410,7 @@ static void connection_cb(mqtt_client_t *c, void *arg, mqtt_connection_status_t 
         {
             u32_t next=mqtt_utk_session_entropy();
             if(!next||next==session_nonce){next=session_nonce+1U;if(!next)next=1U;}
-            session_nonce=next;last_stop_id=last_resume_id=0;
+            session_nonce=next;last_stop_id=last_resume_id=last_map_deadline=0;
             app_controller_cancel_resume();
             last_status_ms=sys_now()-STATUS_MIN_INTERVAL_MS;
             last_arm_ms=last_resume_ms=last_status_ms;

@@ -4,6 +4,9 @@ export const IMU_STATES=['Initializing','Calibrating','Monitoring','Ascending hu
 export const CONTROLLER_STATES=['Unavailable','Control disabled','Starting','Following line','Recovering line','Waiting for line','Stop latched','Controller fault','Ready','Turning left','Turning right','Scanning obstacle','Avoiding obstacle','Stopped'];
 export const STOP_RESULTS=['Stop latched','Request expired','Robot session changed','Duplicate request','Controller busy','Controller fault'];
 export const RESUME_RESULTS=['Stop latch released','Request expired','Robot session changed','Duplicate request','Controller busy','Controller fault','Resume conditions not ready','Resume authorization changed'];
+export const BARCODE_LETTERS='ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+export const BARCODE_ACTIONS=['Left','Right','Forward','U-turn'];
+const BARCODE_MAP_RESULTS=['Applied','Request expired','Robot session changed','Older or duplicate request','Controller busy','Invalid mapping','Pico must be STOP-latched and ready'];
 export const FAULT_NAMES=['Encoder input fault','Motor timing fault','Left wheel stall','Right wheel stall','Left encoder direction','Right encoder direction','IMU sensor fault','Controller fault','Ultrasonic fault','Barcode input fault','Scan fault'];
 const ALPHABET='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-. $/+%';
 const bytesOf=p=>p instanceof Uint8Array?p:new Uint8Array(p);
@@ -148,6 +151,27 @@ export function decodeResumeReply(payload){
   return {request_id:id,session_token:session,result,result_name:RESUME_RESULTS[result],...control};
 }
 
+// Letters ordered by action, one five-bit A–Z index per action.
+export function encodeBarcodeMap(id,session,deadline,letters){
+  if(!Number.isInteger(id)||id<1||id>0xffff||!Number.isInteger(session)||session<1||session>0xffffffff||
+     !Number.isInteger(deadline)||deadline<0||deadline>0xffffffff)throw new Error('Invalid mapping request field');
+  if(!Array.isArray(letters)||letters.length!==4||letters.some(letter=>typeof letter!=='string'||!/^[A-Z]$/.test(letter))||
+     new Set(letters).size!==4)throw new Error('Select a different letter for each action');
+  const b=new Uint8Array(14),v=viewOf(b);
+  b[0]=0xa9;v.setUint16(1,id,true);v.setUint32(3,session,true);v.setUint32(7,deadline,true);
+  const packed=letters.reduce((word,letter,i)=>word|(BARCODE_LETTERS.indexOf(letter)<<(5*i)),0);
+  b[11]=packed;b[12]=packed>>>8;b[13]=packed>>>16;
+  return b;
+}
+
+export function decodeBarcodeMapReply(payload){
+  const b=bytesOf(payload),v=viewOf(b);
+  if(b.length!==8||b[0]!==0xaa)throw new Error('Invalid barcode mapping reply');
+  const id=v.getUint16(1,true),session=v.getUint32(3,true),result=b[7];
+  if(!id||!session||result>=BARCODE_MAP_RESULTS.length)throw new Error('Invalid barcode mapping result');
+  return {request_id:id,session_token:session,result,result_name:BARCODE_MAP_RESULTS[result]};
+}
+
 export function hex(bytes) { return [...bytes].map(x => x.toString(16).padStart(2,'0')).join(' '); }
 export function packetText(packet) {
   if (!packet) return 'Waiting for a messageâ€¦';
@@ -159,7 +183,7 @@ export function packetText(packet) {
 export class TelemetryStore {
   constructor() { this.reset(); }
   needsClockSync(at=Date.now()) {
-    return this.seenSession!==null&&!this.pendingStatus&&!this.pendingStop&&!this.pendingResume&&
+    return this.seenSession!==null&&!this.pendingStatus&&!this.pendingStop&&!this.pendingResume&&!this.pendingMap&&
       (!this.clockAnchor||this.clockAnchor.session!==this.seenSession||at<this.clockAnchor.at||at-this.clockAnchor.at>=10000);
   }
   packetAge(value,at,limit=2000) {
@@ -243,6 +267,7 @@ export class TelemetryStore {
     this.terrain=null;this.lastHumpEvent=null;
     this.pendingStatus=null;this.statusReply=null;this.lastStatusId=0;this.statusLastSentAt=null;
     this.pendingResume=null;this.resumeReply=null;this.lastResumeId=0;this.resumeNotice='Resume releases STOP only after fresh controller checks.';
+    this.pendingMap=null;this.confirmedMap=null;this.mapNotice='';
     this.statusNotice='Controller status is read-only. Resume may restart autonomous movement.';
     this.controller=null;this.pendingStop=null;this.stopReply=null;this.stopNotice='Waiting for current controller status.';
   }
@@ -259,9 +284,11 @@ export class TelemetryStore {
     if(this.pendingStatus){this.pendingStatus=null;this.statusNotice=reason;}
     if(this.pendingStop){this.pendingStop=null;this.stopNotice=reason;}
     if(this.pendingResume){this.pendingResume=null;this.resumeNotice=reason;}
+    if(this.pendingMap){this.pendingMap=null;this.mapNotice='Mapping confirmation was interrupted. Send the mapping again.';}
   }
   clearController(reason='Connection changed; pending commands cancelled.') {
-    this.cancelStatus(reason);this.controller=null;this.clockAnchor=null;this.seenSession=null;this.scanPending=null;this.lastSequence=null;this.lastHeartbeatCounter=null;this.lastHeartbeat=null;this.terrain=null;
+    if(!this.pendingMap)this.mapNotice='';
+    this.cancelStatus(reason);this.confirmedMap=null;this.controller=null;this.clockAnchor=null;this.seenSession=null;this.scanPending=null;this.lastSequence=null;this.lastHeartbeatCounter=null;this.lastHeartbeat=null;this.terrain=null;
   }
   currentController(now=Date.now(),connected=true) {
     return connected&&this.controller?.controller_valid&&now>=this.controller.at&&now-this.controller.at<=2000?this.controller:null;
@@ -269,6 +296,7 @@ export class TelemetryStore {
   observeController(value,at) {
     const old=this.controller;
     if(old&&old.session_token!==value.session_token) {
+      this.confirmedMap=null;this.mapNotice='';
       this.cancelStatus('Robot session changed; pending commands cancelled.');this.lastSequence=null;this.sample=null;this.lastTelemetry=null;this.scanPending=null;this.diagnostics=null;this.lastHeartbeatCounter=null;
       this.event('Controller session changed','Fresh requests are required','neutral',at);
     }
@@ -316,10 +344,19 @@ export class TelemetryStore {
     if(!a||a.session!==session||at<a.at||at-a.at>30000)throw new Error('Wait for fresh Pico clock synchronization');
     return (a.boot+at-a.at+2000)>>>0;
   }
+  beginBarcodeMap(id,letters,at=Date.now()){
+    const c=this.currentController(at);
+    if(!c||!c.stop_latched||c.controller_state_code!==6)throw new Error('Latch STOP before sending the mapping');
+    if(this.pendingMap||this.pendingStatus||this.pendingStop||this.pendingResume)throw new Error('A controller request is pending');
+    const session=c.session_token;
+    const b=encodeBarcodeMap(id,session,this.commandDeadline(at,session),letters);
+    this.pendingMap={id,session,at,letters:[...letters]};this.mapNotice='Waiting for Pico confirmation…';
+    return b;
+  }
   beginResume(id,at=Date.now()){
     const c=this.currentController(at);
     if(!c||c.test_build||!c.stop_latched||c.controller_state_code!==6)throw new Error('Resume requires a current normal-mode stop latch');
-    if(this.pendingStatus||this.pendingStop||this.pendingResume)throw new Error('A controller request is pending');
+    if(this.pendingStatus||this.pendingStop||this.pendingResume||this.pendingMap)throw new Error('A controller request is pending');
     const b=encodeResumeRequest(id,c.session_token,this.commandDeadline(at,c.session_token));
     if(id===this.lastResumeId)throw new Error('Use a fresh Resume request ID');
     this.pendingResume={phase:'arming',id,session:c.session_token,at,deadline:at+3000};this.lastResumeId=id;
@@ -334,6 +371,9 @@ export class TelemetryStore {
   }
   expireCommands(at=Date.now()) {
     this.expireStatus(at);
+    if(this.pendingMap&&at-this.pendingMap.at>=3000){
+      this.pendingMap=null;this.confirmedMap=null;this.mapNotice='No mapping reply. Send again before starting the run.';
+    }
     const resume=this.pendingResume;
     if(resume&&((resume.phase==='ready'&&at>=resume.valid_until)||at>=resume.deadline)){
       this.pendingResume=null;
@@ -364,6 +404,17 @@ export class TelemetryStore {
       if (retained) throw new Error('Retained message ignored; waiting for a fresh sample');
       if(kind==='telemetry'&&[0xb5,0xb6,0xb7,0xb8].includes(bytes[0]))return this.ingestAux(bytes,at,packet);
       if(kind==='status') {
+        if(bytes[0]===0xaa){
+          this.expireCommands(at);
+          const reply=decodeBarcodeMapReply(bytes),p=this.pendingMap;
+          if(!p||at<p.at||reply.request_id!==p.id||(reply.session_token!==p.session&&reply.result!==2))
+            throw new Error('Unmatched or expired barcode mapping reply');
+          this.pendingMap=null;
+          if(reply.result===0)this.confirmedMap=p.letters;
+          if(reply.result===2)this.confirmedMap=null;
+          this.mapNotice=reply.result===0?'Pico confirmed the mapping.':`Mapping rejected. ${reply.result_name}.`;
+          packet.accepted=true;packet.decoded=reply;packet.detail='Barcode mapping result';return true;
+        }
         if(bytes[0]===0xa6){
           const reply=decodeResumeArmReply(bytes),p=this.pendingResume;this.expireCommands(at);
           if(!p||p!==this.pendingResume||p.phase!=='arming'||reply.request_id!==p.id||at<p.at)throw new Error('Unmatched or expired Resume authorization');

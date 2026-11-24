@@ -18,6 +18,10 @@
 #include "subsystem1/subsystem1.h"
 #include "subsystem2/subsystem2.h"
 #include "subsystem3/subsystem3.h"
+#if APP_S3_BARCODE_DETECT
+#include "subsystem2/encoder_move.h"
+#include "telemetry_sources.h"
+#endif
 
 /* Standalone analog IR/steering test; other normal subsystem tasks stay off. */
 extern void ir_adc_test(void) __attribute__((noreturn));
@@ -76,9 +80,125 @@ static ER app_motor_request(INT left, INT right)
 #endif
 }
 
-#ifdef APP_OBSTACLE_BYPASS
+#if defined(APP_OBSTACLE_BYPASS) || (APP_S3_BARCODE_DETECT && S2_LINE_USE_RPM_CONTROL)
 static UW last_drive_ms;
+#endif
+#ifdef APP_OBSTACLE_BYPASS
 static OBSTACLE_BYPASS bypass;
+#endif
+
+#if APP_S3_BARCODE_DETECT && S2_LINE_USE_RPM_CONTROL
+/* Distance from the confirmed leading edge to the axle's pivot position.
+ * Tune on the demo cross tile for the actual forward IR mounting. */
+#define JUNCTION_CENTER_MM 60
+#define JUNCTION_TRACK_MM 120U
+#define JUNCTION_EXIT_MM_X10 600
+#define JUNCTION_SETTLE_MS 2000U
+enum { JUNCTION_IDLE, JUNCTION_CENTERING, JUNCTION_TURNING, JUNCTION_SETTLING, JUNCTION_FAILED };
+static struct {
+    S2_ENCODER_MOVE move;
+    int64_t crossing_mm_x10, exit_mm_x10;
+    UW map, last_line_ms, phase_ms;
+    uint16_t barcode_sequence;
+    uint8_t phase, pending_code, cross_samples, exit_samples;
+    int16_t turn_degrees;
+    BOOL crossed, needs_exit;
+} junction;
+
+static void junction_cancel(BOOL stop_latched)
+{
+    if (junction.phase != JUNCTION_FAILED) junction.phase = JUNCTION_IDLE;
+    junction.move.result = S2_MOVE_IDLE;
+    if (stop_latched) junction.pending_code = 0;
+    junction.cross_samples = 0;
+}
+
+static void junction_read_barcode(BOOL accept, UW now)
+{
+    UW map = app_controller_barcode_map();
+    if (map != junction.map) {
+        junction.map = map;
+        junction.pending_code = 0;
+    }
+    TELEMETRY_BARCODE barcode;
+    if (telemetry_get_barcode(&barcode) != E_OK || barcode.event_sequence == junction.barcode_sequence)
+        return;
+    junction.barcode_sequence = barcode.event_sequence;
+    if (accept && (UW)(now - barcode.timestamp_ms) <= APP_IR_MAX_AGE_MS)
+        junction.pending_code = barcode.code;
+}
+
+static void junction_observe(const S3_LINE_DATA *line, const S2_MOTION_DATA *motion, UW now)
+{
+    if (line->timestamp_ms == junction.last_line_ms) return;
+    junction.last_line_ms = line->timestamp_ms;
+    if (line->pattern != 3U) {
+        junction.cross_samples = 0;
+        if (junction.exit_samples < 3U) ++junction.exit_samples;
+        if (junction.exit_samples == 3U && (!junction.needs_exit ||
+            motion->distance_centre_mm_x10 - junction.exit_mm_x10 >= JUNCTION_EXIT_MM_X10)) {
+            junction.crossed = junction.needs_exit = FALSE;
+        }
+        return;
+    }
+    junction.exit_samples = 0;
+    if (junction.crossed || ++junction.cross_samples < 2U) return;
+    junction.crossed = TRUE;
+    unsigned action = app_barcode_map_action(junction.map, junction.pending_code);
+    junction.pending_code = 0;
+    if (action == APP_BARCODE_UNMAPPED || action == APP_BARCODE_FORWARD) return;
+    junction.turn_degrees = action == APP_BARCODE_LEFT ? 90 : action == APP_BARCODE_RIGHT ? -90 : 180;
+    junction.crossing_mm_x10 = motion->distance_centre_mm_x10;
+    junction.phase = JUNCTION_CENTERING;
+    junction.phase_ms = now;
+}
+
+static unsigned junction_step(const S2_MOTION_DATA *motion, UW now, BOOL settled, S2_MOVE_TARGETS *targets)
+{
+    *targets = (S2_MOVE_TARGETS){0};
+    if (junction.phase == JUNCTION_FAILED) return APP_CTRL_FAULT;
+    if (!motion || motion->faults || !motion->encoder_valid || !motion->speed_valid) {
+        junction.phase = JUNCTION_FAILED;
+        return APP_CTRL_FAULT;
+    }
+    if (junction.move.result != S2_MOVE_RUNNING) {
+        if (!settled) {
+            if ((UW)(now - junction.phase_ms) >= JUNCTION_SETTLE_MS) junction.phase = JUNCTION_FAILED;
+        } else if (junction.phase == JUNCTION_SETTLING) {
+            junction.exit_mm_x10 = motion->distance_centre_mm_x10;
+            junction.needs_exit = TRUE;
+            junction.exit_samples = 0;
+            junction.phase = JUNCTION_IDLE;
+        } else {
+            ER er;
+            if (junction.phase == JUNCTION_CENTERING) {
+                int64_t remaining = JUNCTION_CENTER_MM * 10LL -
+                    (motion->distance_centre_mm_x10 - junction.crossing_mm_x10);
+                if (remaining <= 0) {
+                    junction.phase = JUNCTION_TURNING;
+                    junction.phase_ms = now;
+                    return APP_CTRL_RECOVERING;
+                }
+                if (remaining > JUNCTION_CENTER_MM * 10LL) remaining = JUNCTION_CENTER_MM * 10LL;
+                er = s2_linear_begin(&junction.move, (INT)((remaining + 9) / 10), motion, now);
+            } else {
+                er = s2_turn_begin(&junction.move, junction.turn_degrees, JUNCTION_TRACK_MM, motion, now);
+            }
+            if (er != E_OK) junction.phase = JUNCTION_FAILED;
+        }
+    }
+    if (junction.move.result == S2_MOVE_RUNNING) {
+        S2_MOVE_RESULT result = s2_encoder_move_step(&junction.move, motion, now, TRUE, targets);
+        if (result == S2_MOVE_REACHED) {
+            junction.phase = junction.phase == JUNCTION_CENTERING ? JUNCTION_TURNING : JUNCTION_SETTLING;
+            junction.phase_ms = now;
+        } else if (result != S2_MOVE_RUNNING) junction.phase = JUNCTION_FAILED;
+    }
+    if (junction.phase == JUNCTION_FAILED) return APP_CTRL_FAULT;
+    if (junction.phase == JUNCTION_TURNING || junction.phase == JUNCTION_SETTLING)
+        return junction.turn_degrees < 0 ? APP_CTRL_TURNING_RIGHT : APP_CTRL_TURNING_LEFT;
+    return APP_CTRL_RECOVERING;
+}
 #endif
 
 /* Sole integrated steering owner; S2 retains PWM/encoder/PID ownership. */
@@ -117,12 +237,6 @@ static void app_controller_step(UW started_ms)
     const BOOL obstacle_hold = subsystem5_obstacle_stop_required();
     const BOOL scanning = navigation_fresh && navigation.phase == S5_NAV_SCANNING;
     resume_ready = resume_ready && !obstacle_hold && !scanning;
-    if (motion_fresh && (motion.command_active || motion.duty_left_x100 || motion.duty_right_x100))
-        last_drive_ms = now.lo;
-    /* Wait for a full stopped speed window so neither wheel is held back
-     * by S2's reversal guard when the encoder turn begins. */
-    BOOL turn_settled = stopped &&
-        (UW)(now.lo - motion.speed_timestamp_ms) + motion.speed_period_ms <= (UW)(now.lo - last_drive_ms);
     BOOL turn_requested = navigation_fresh && navigation.turn_id != 0U &&
         (navigation.phase == S5_NAV_LEFT || navigation.phase == S5_NAV_RIGHT);
 #else
@@ -130,6 +244,14 @@ static void app_controller_step(UW started_ms)
         app_controller_latch_obstacle_stop();
         resume_ready = FALSE;
     }
+#endif
+#if defined(APP_OBSTACLE_BYPASS) || (APP_S3_BARCODE_DETECT && S2_LINE_USE_RPM_CONTROL)
+    if (motion_fresh && (motion.command_active || motion.duty_left_x100 || motion.duty_right_x100))
+        last_drive_ms = now.lo;
+    /* Observe one full stationary speed window before commanding reversal. */
+    BOOL turn_settled = stopped &&
+        (UW)(now.lo - motion.speed_timestamp_ms) + motion.speed_period_ms <= (UW)(now.lo - last_drive_ms);
+    BOOL signed_targets = FALSE;
 #endif
     unsigned inhibit = app_controller_poll_ready(resume_ready);
     BOOL ready = fresh && motion_fresh && (!S2_LINE_USE_RPM_CONTROL || motion.speed_valid);
@@ -139,9 +261,28 @@ static void app_controller_step(UW started_ms)
 #ifdef APP_OBSTACLE_BYPASS
     follow_line = permitted && !obstacle_hold && !scanning;
     BOOL bypass_requested = turn_requested || bypass.phase != BYPASS_IDLE;
+#endif
+#if APP_S3_BARCODE_DETECT && S2_LINE_USE_RPM_CONTROL
+    BOOL junction_following = follow_line;
+#ifdef APP_OBSTACLE_BYPASS
+    junction_following = follow_line && !bypass_requested;
+    if (bypass_requested || obstacle_hold || scanning) junction_cancel(FALSE);
+#endif
+    if (inhibit & APP_CTRL_LATCH) junction_cancel(TRUE);
+    junction_following = junction_following && junction.phase == JUNCTION_IDLE;
+    junction_read_barcode(junction_following, now.lo);
+    if (junction_following && motion.encoder_valid) junction_observe(&line, &motion, now.lo);
+#endif
+#ifdef APP_OBSTACLE_BYPASS
     if ((inhibit & APP_CTRL_LATCH) && bypass.phase != BYPASS_FAILED)
         bypass.phase = BYPASS_IDLE;
+#endif
 
+#if APP_S3_BARCODE_DETECT && S2_LINE_USE_RPM_CONTROL
+    if (junction.phase == JUNCTION_FAILED) state = APP_CTRL_FAULT;
+    else
+#endif
+#ifdef APP_OBSTACLE_BYPASS
     if (bypass.phase == BYPASS_FAILED) state = APP_CTRL_FAULT;
     else if (startup_done && !(inhibit & APP_CTRL_LATCH) && bypass_requested) {
         const BYPASS_INPUT inputs = {
@@ -156,12 +297,22 @@ static void app_controller_step(UW started_ms)
         state = app_bypass_step(&bypass, &inputs, &targets);
         left = targets.left_rpm_x10;
         right = targets.right_rpm_x10;
+        signed_targets = TRUE;
     } else if (startup_done && !inhibit && (obstacle_hold || scanning)) {
         state = APP_CTRL_SCANNING;
     } else
 #endif
     if (inhibit & APP_CTRL_LATCH) state = APP_CTRL_STOP_LATCHED;
     else if (inhibit & APP_CTRL_POLL_BUSY) state = APP_CTRL_WAITING_LINE;
+#if APP_S3_BARCODE_DETECT && S2_LINE_USE_RPM_CONTROL
+    else if (junction.phase != JUNCTION_IDLE) {
+        S2_MOVE_TARGETS targets;
+        state = junction_step(motion_fresh ? &motion : NULL, now.lo, turn_settled, &targets);
+        left = targets.left_rpm_x10;
+        right = targets.right_rpm_x10;
+        signed_targets = TRUE;
+    }
+#endif
     else if (follow_line) {
         app_line_targets(&line, &left, &right);
 #if S2_LINE_USE_RPM_CONTROL
@@ -182,6 +333,9 @@ static void app_controller_step(UW started_ms)
     /* A STOP arriving during source reads or Resume admission wins. */
     inhibit = app_controller_poll();
     if (inhibit) {
+#if APP_S3_BARCODE_DETECT && S2_LINE_USE_RPM_CONTROL
+        if (inhibit & APP_CTRL_LATCH) junction_cancel(TRUE);
+#endif
 #ifdef APP_OBSTACLE_BYPASS
         if ((inhibit & APP_CTRL_LATCH) && bypass.phase != BYPASS_FAILED)
             bypass.phase = BYPASS_IDLE;
@@ -192,24 +346,29 @@ static void app_controller_step(UW started_ms)
             state = (inhibit & APP_CTRL_LATCH) ? APP_CTRL_STOP_LATCHED : APP_CTRL_WAITING_LINE;
     }
     ER er;
-#ifdef APP_OBSTACLE_BYPASS
-    if (bypass_requested && (left != 0 || right != 0))
+#if defined(APP_OBSTACLE_BYPASS) || (APP_S3_BARCODE_DETECT && S2_LINE_USE_RPM_CONTROL)
+    if (signed_targets && (left != 0 || right != 0))
         er = subsystem2_set_signed_rpm_x10(left, right);
     else
 #endif
         er = app_motor_request(left, right);
     if (er != E_OK) {
+#if APP_S3_BARCODE_DETECT && S2_LINE_USE_RPM_CONTROL
+        if (junction.phase != JUNCTION_IDLE) junction.phase = JUNCTION_FAILED;
+#endif
 #ifdef APP_OBSTACLE_BYPASS
         if (bypass_requested) bypass.phase = BYPASS_FAILED;
 #endif
         (void)app_motor_request(0, 0);
-#ifdef APP_OBSTACLE_BYPASS
+#if defined(APP_OBSTACLE_BYPASS) || (APP_S3_BARCODE_DETECT && S2_LINE_USE_RPM_CONTROL)
     } else {
         if (left != 0 || right != 0) last_drive_ms = now.lo;
+#ifdef APP_OBSTACLE_BYPASS
         /* A latched STOP ends the scan request once the wheels settle, so
          * the sensor can update the front clearance needed for Resume. */
         if ((inhibit & APP_CTRL_LATCH) && turn_requested && turn_settled)
             (void)subsystem5_end_turn(navigation.turn_id);
+#endif
 #endif
     }
     app_controller_publish(state, er);

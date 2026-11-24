@@ -1,5 +1,6 @@
 #include "app.h"
 #include "controller.h"
+#include "subsystem3/barcode_decoder.h"
 
 static ID controller_sem;
 /* Nonzero ID means occupied. Final byte: action:1/result:3/spare:4. */
@@ -15,6 +16,7 @@ static uint8_t scan_stop_ready;
 /* Protected authorization, not motor state: ticket:32/expiry:32. */
 static uint8_t resume_ticket[8];
 static uint32_t ticket_counter;
+static uint32_t barcode_map;
 #define RESULT_SHIFT 6U
 #define REQUEST_RESUME 1U
 #define REQUEST_UNPROCESSED (7U << 1)
@@ -57,6 +59,41 @@ static int publication_fresh(void) {
     return (published[4]&APP_CTRL_STATE_MASK)&&
            (uint32_t)(uptime()-read32(published))<=APP_CTRL_MAX_AGE_MS;
 }
+unsigned app_controller_set_barcode_map(uint32_t letters, uint32_t deadline_ms)
+{
+    if (letters >= APP_BARCODE_MAP_SET) return APP_BARCODE_MAP_INVALID;
+    uint32_t seen = 0;
+    for (unsigned i = 0; i < 4; ++i) {
+        unsigned letter = (letters >> (5 * i)) & 31U;
+        if (letter >= 26 || (seen & (1UL << letter))) return APP_BARCODE_MAP_INVALID;
+        seen |= 1UL << letter;
+    }
+    if (lock() != E_OK) return APP_BARCODE_MAP_BUSY;
+    unsigned result = APP_BARCODE_MAP_NOT_STOPPED;
+    if (!lease_valid(deadline_ms)) result = APP_BARCODE_MAP_EXPIRED;
+    else if (read32(request_slot) || (read32(resume_ticket) && lease_valid(read32(resume_ticket+4))))
+        result = APP_BARCODE_MAP_BUSY;
+    else if (!pickup_stop_active() && publication_fresh() &&
+             (published[4] & (APP_CTRL_STATE_MASK | APP_CTRL_LATCH)) == (APP_CTRL_STOP_LATCHED | APP_CTRL_LATCH)) {
+        __atomic_store_n(&barcode_map, APP_BARCODE_MAP_SET | letters, __ATOMIC_RELEASE);
+        result = APP_BARCODE_MAP_APPLIED;
+    }
+    (void)tk_sig_sem(controller_sem,1);
+    return result;
+}
+uint32_t app_controller_barcode_map(void)
+{
+    return __atomic_load_n(&barcode_map, __ATOMIC_ACQUIRE);
+}
+unsigned app_barcode_map_action(uint32_t map, uint8_t code)
+{
+    unsigned letter = (code & S3_BC_SYMBOL_MASK) - S3_BC_FIRST_LETTER_INDEX;
+    if (!(map & APP_BARCODE_MAP_SET) || !(code & S3_BC_VALID) || letter >= 26U)
+        return APP_BARCODE_UNMAPPED;
+    for (unsigned i = 0; i < 4; ++i)
+        if (((map >> (5 * i)) & 31U) == letter) return i + 1;
+    return APP_BARCODE_UNMAPPED;
+}
 int app_controller_init(void) {
     T_CSEM sem={0};
     if(controller_sem>0)return E_OBJ;
@@ -68,6 +105,7 @@ int app_controller_init(void) {
     __atomic_store_n(&pickup_stop,0U,__ATOMIC_RELEASE);
     __atomic_store_n(&scan_stop_ready,0U,__ATOMIC_RELEASE);
     ticket_counter=0;
+    __atomic_store_n(&barcode_map, 0, __ATOMIC_RELEASE);
     /* Normal runs require a fresh Resume after every boot. */
     owner_word=APP_TEST?APP_CTRL_TEST:APP_CTRL_LATCH;
     return E_OK;

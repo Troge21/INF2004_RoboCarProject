@@ -38,6 +38,16 @@
 #define APP_RESUME_FAULT 5U
 #define APP_RESUME_NOT_READY 6U
 #define APP_RESUME_AUTH_CHANGED 7U
+#define APP_BARCODE_MAP_APPLIED 0U
+#define APP_BARCODE_MAP_EXPIRED 1U
+#define APP_BARCODE_MAP_SESSION 2U
+#define APP_BARCODE_MAP_REPLAY 3U
+#define APP_BARCODE_MAP_BUSY 4U
+#define APP_BARCODE_MAP_INVALID 5U
+#define APP_BARCODE_MAP_NOT_STOPPED 6U
+#define APP_BARCODE_MAP_SET (1UL << 20)
+enum { APP_BARCODE_UNMAPPED, APP_BARCODE_LEFT, APP_BARCODE_RIGHT,
+       APP_BARCODE_FORWARD, APP_BARCODE_UTURN };
 /* Private owner reply bit; converted to a distinct MQTT marker, not sent here. */
 #define APP_REPLY_RESUME 0x200U
 /* Snapshot: operating-time:32 LE + state:4/latch:1/TEST:1/reserved:2.
@@ -55,6 +65,10 @@ int app_controller_scan_stop_ready(void);
 int app_controller_arm_resume(uint32_t deadline_ms,uint32_t *ticket);
 int app_controller_submit_resume(uint32_t ticket,uint32_t session,uint32_t deadline_ms);
 void app_controller_cancel_resume(void);
+/* Four zero-based alphabet indices, in left/right/forward/U-turn order. */
+unsigned app_controller_set_barcode_map(uint32_t letters, uint32_t deadline_ms);
+uint32_t app_controller_barcode_map(void);
+unsigned app_barcode_map_action(uint32_t map, uint8_t code);
 int app_controller_snapshot(uint8_t out[5]);
 int app_controller_take_reply(uint8_t out[10]);
 /* Controller task only, once before and once after its motor submission. */

@@ -96,6 +96,8 @@ int app_controller_submit_stop(uint32_t id,uint32_t session,uint32_t deadline){
 int app_controller_take_reply(uint8_t b[10]){(void)b;return E_TMOUT;}
 int app_controller_arm_resume(uint32_t deadline,uint32_t *ticket){(void)deadline;if(!arm_result)*ticket=12345;return arm_result;}
 int app_controller_submit_resume(uint32_t ticket,uint32_t session,uint32_t deadline){(void)ticket;(void)session;(void)deadline;return APP_RESUME_NOT_READY;}
+uint32_t app_controller_barcode_map(void){return 0;}
+unsigned app_barcode_map_action(uint32_t map,uint8_t code){(void)map;(void)code;return APP_BARCODE_UNMAPPED;}
 #include "../../../app_program/subsystem1/subsystem1.c"
 #include "../../../app_program/subsystem1/subsystem1_test.c"
 static void expect(int value,const char *message){

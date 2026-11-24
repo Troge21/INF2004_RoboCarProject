@@ -1,4 +1,4 @@
-import { TelemetryStore,hex,packetText } from './protocol.js';
+import { BARCODE_ACTIONS,BARCODE_LETTERS,TelemetryStore,hex,packetText } from './protocol.js';
 import { MqttConnection,validateTopics } from './mqtt.js';
 import { lineChart,sparkline,renderObstacleRadar,renderScanReadings } from './charts.js';
 
@@ -69,12 +69,74 @@ function obstacleScanCard(){
     </div>
   </div>`,'','scan-card');
 }
+const barcodeRows=[2,3,0,1].map(action=>({letter:'',action:String(action)}));
+function barcodeMappingCard(){
+  return card('Barcode movement mapping','The car uses the scanned letter at the next cross-junction.',`
+    <form id="barcode-mapping" class="barcode-mapping">
+      ${barcodeRows.map((row,i)=>`<div class="barcode-map-row">
+        <label>Letter<select data-map-letter="${i}" aria-label="Letter ${i+1}"></select></label>
+        <label>Action<select data-map-action="${i}" aria-label="Action ${i+1}">${BARCODE_ACTIONS.map((action,index)=>
+          `<option value="${index}"${row.action===String(index)?' selected':''}>${action}</option>`).join('')}</select></label>
+      </div>`).join('')}
+      <button class="button button-white" type="submit" disabled>Send mapping</button>
+      <p class="field-note" data-value="barcode-map-note" role="status"></p>
+    </form>`);
+}
+function renderBarcodeLetterOptions(){
+  document.querySelectorAll('[data-map-letter]').forEach(select=>{
+    const index=Number(select.dataset.mapLetter),current=barcodeRows[index].letter;
+    const others=new Set(barcodeRows.filter((_,i)=>i!==index).map(row=>row.letter));
+    select.replaceChildren(new Option('Select letter',''),...[...BARCODE_LETTERS].filter(letter=>!others.has(letter)).map(letter=>new Option(letter,letter)));
+    select.value=current;
+  });
+}
+function barcodeLettersByAction(){
+  if(barcodeRows.some(row=>!row.letter)||new Set(barcodeRows.map(row=>row.action)).size!==4)return null;
+  const letters=[];
+  for(const row of barcodeRows)letters[Number(row.action)]=row.letter;
+  return letters;
+}
+function updateBarcodeMap(control){
+  const form=$('barcode-mapping');if(!form)return;
+  const letters=barcodeLettersByAction();
+  const confirmed=letters&&store.confirmedMap?.every((letter,i)=>letter===letters[i]);
+  const canSend=status==='connected'&&control?.stop_latched&&control.controller_state_code===6&&
+    store.clockAnchor?.session===control.session_token&&!store.pendingMap&&!store.pendingStatus&&!store.pendingStop&&!store.pendingResume;
+  form.querySelector('button').disabled=!canSend||!letters;
+  form.querySelectorAll('select').forEach(select=>select.disabled=Boolean(store.pendingMap));
+  let note=store.mapNotice;
+  if(!note) {
+    if(confirmed)note='Pico confirmed the mapping.';
+    else if(store.confirmedMap)note='The Pico still has your previous mapping. Send these edits to apply them.';
+    else if(new Set(barcodeRows.map(row=>row.action)).size!==4)note='Use each movement once.';
+    else if(status!=='connected')note='Connect to the RoboCar to send the mapping.';
+    else if(!letters)note='Choose four different letters.';
+    else if(!control?.stop_latched)note='Latch STOP before sending the mapping.';
+    else note='Send the mapping before pressing Resume. Send it again after a Pico restart.';
+  }
+  const output=form.querySelector('[data-value="barcode-map-note"]');
+  if(output.textContent!==note)output.textContent=note;
+}
+function sendBarcodeMap(event){
+  event.preventDefault();
+  const letters=barcodeLettersByAction();
+  if(status!=='connected'||!connection?.ready||!letters)return;
+  const requestId=(freshRequestId()%65535)+1;
+  try{
+    const bytes=store.beginBarcodeMap(requestId,letters);
+    try{connection.publish(lastOptions.commandTopic,bytes);}
+    catch(error){store.pendingMap=null;throw error;}
+  }catch(error){store.mapNotice=error.message;}
+  updateCommands(Date.now());
+}
 function sensors(){
   return `<div class="metrics">${metric('speed','Average wheel speed','m/s','From encoder feedback','speed')}${metric('distance','Distance travelled','m','Current run','distance')}${metric('obstacle','Obstacle distance','mm','Latest valid range','radar')}${metric('hump','Highest hump estimate','mm','Maximum for this run','mountain')}</div>
   <div class="two-columns">${chartCard('Wheel velocity','Compare the two encoder speed estimates','speed-chart',speedLegend,speedFoot)}${chartCard('Obstacle proximity','Live ultrasonic range measurements','obstacle-chart',obstacleLegend,obstacleFoot)}</div>
   <div class="two-columns">${chartCard('Vehicle pitch','Live IMU angle; front-up is positive','pitch-chart','<div class="legend"><span><i class="teal"></i>Pitch</span></div>','<span>Sensor angle <strong>· degrees</strong></span><span>Calibrating or stale samples appear as gaps</span>')}${card('IMU & height status','Real sensor status and estimator assumptions','<div class="vehicle-details"><div class="vehicle-detail"><span>Pitch</span><strong data-value="pitch">Unavailable</strong></div><div class="vehicle-detail"><span>Roll from level</span><strong data-value="roll">Unavailable</strong></div><div class="vehicle-detail"><span>Motion</span><strong data-value="motion-class">Unavailable</strong></div><div class="vehicle-detail"><span>Turn rate estimate</span><strong data-value="turn-rate">Unavailable</strong></div><div class="vehicle-detail"><span>Last hump type</span><strong data-value="hump-kind">Unavailable</strong></div><div class="vehicle-detail"><span>IMU state</span><strong data-value="imu-state">Unavailable</strong></div><div class="vehicle-detail"><span>Last accepted hump</span><strong data-value="last-hump">Unavailable</strong></div><div class="vehicle-detail"><span>Run maximum estimate</span><strong data-value="run-hump">Unavailable</strong></div></div><div class="card-bottom-note" data-value="imu-note">Waiting for IMU telemetry</div>')}</div>
   <div class="two-columns">${chartCard('Terrain & hump height','Current estimate and highest hump of the run','hump-chart','<div class="legend"><span><i class="teal"></i>Current</span><span><i class="purple"></i>Run maximum</span></div>','<span>Estimated height <strong>· mm</strong></span><span data-value="height-source">Waiting for IMU telemetry</span>')}${chartCard('Distance travelled','Cumulative encoder estimate for the current run','distance-chart','<div class="legend"><span><i class="teal"></i>Distance</span></div>','<span>Measured distance <strong>· m</strong></span><span>Since Pico restart; wheel slip affects accuracy</span>')}</div>
-  ${motionCard()}<div class="two-columns">${card('Line & navigation','Analog line pair GP27/GP26 and barcode sensor GP28','<div class="sensor-status" id="sensor-status"></div><div class="barcode-row">'+icon('barcode')+'Latest barcode<strong data-value="barcode">Unavailable</strong></div><div class="barcode-row">'+icon('barcode')+'GP28 barcode sensor<strong data-value="barcode-signal">Unavailable</strong></div><div class="card-bottom-note" data-value="barcode-signal-detail">Waiting for barcode sensor diagnostics</div><div class="card-bottom-note">Filled = black · empty = white · ? = unavailable. White/white and black/black drive forward.</div>')}${obstacleScanCard()}</div>`;
+  ${motionCard()}
+  <div class="two-columns">${card('Line & navigation','Analog line pair GP27/GP26 and barcode sensor GP28','<div class="sensor-status" id="sensor-status"></div><div class="barcode-row">'+icon('barcode')+'Latest barcode<strong data-value="barcode">Unavailable</strong></div><div class="barcode-row">'+icon('barcode')+'GP28 barcode sensor<strong data-value="barcode-signal">Unavailable</strong></div><div class="card-bottom-note" data-value="barcode-signal-detail">Waiting for barcode sensor diagnostics</div><div class="card-bottom-note">Filled = black · empty = white · ? = unavailable.</div>')}${obstacleScanCard()}</div>
+  ${barcodeMappingCard()}`;
 }
 function communications(){
   return `<div class="metrics">${metric('broker','Broker connection','','MQTT WebSocket session','radio')}${metric('messages','Received messages','','Includes rejected messages','packet')}${metric('interval-metric','Telemetry interval','ms','Target ≤ 2000 ms','clock')}${metric('payload','Latest payload','bytes','Application payload only','chip')}</div>
@@ -90,6 +152,17 @@ function switchTab(){
   $('page-title').innerHTML=escape(titles[tab][0])+'<span class="heading-dot">.</span>';$('page-description').textContent=titles[tab][1];$('breadcrumb').textContent=titles[tab][2];
   document.querySelectorAll('[data-tab]').forEach(a=>{a.classList.toggle('active',a.dataset.tab===tab);if(a.dataset.tab===tab)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');});
   $('dashboard-view').innerHTML=tab==='sensors'?sensors():tab==='communications'?communications():overview();
+  const mapping=$('barcode-mapping');
+  if(mapping){
+    renderBarcodeLetterOptions();
+    mapping.addEventListener('submit',sendBarcodeMap);
+    mapping.addEventListener('change',event=>{
+      const {mapLetter,mapAction}=event.target.dataset;
+      if(mapLetter!==undefined){barcodeRows[Number(mapLetter)].letter=event.target.value;renderBarcodeLetterOptions();}
+      if(mapAction!==undefined)barcodeRows[Number(mapAction)].action=event.target.value;
+      store.mapNotice='';updateCommands(Date.now());
+    });
+  }
   document.querySelectorAll('[data-packet-view]').forEach(b=>b.addEventListener('click',()=>{packetView=b.dataset.packetView;updateInspector();}));
   update(true);
 }
@@ -213,7 +286,7 @@ function updateCommands(now) {
   const control=store.currentController(now,status==='connected');
   const cooling=store.statusLastSentAt!==null&&now-store.statusLastSentAt<250;
   document.querySelectorAll('[data-command="STATUS"]').forEach(button=>{
-    button.disabled=status!=='connected'||Boolean(store.pendingStatus)||Boolean(store.pendingStop)||Boolean(store.pendingResume)||cooling;
+    button.disabled=status!=='connected'||Boolean(store.pendingStatus)||Boolean(store.pendingStop)||Boolean(store.pendingResume)||Boolean(store.pendingMap)||cooling;
     button.title='Read-only status request; does not move the car';
   });
   document.querySelectorAll('[data-command="STOP"]').forEach(button=>{
@@ -221,13 +294,14 @@ function updateCommands(now) {
     button.title=control?.test_build?'Latch the real controller inhibit; motors are disabled in this test build':'Latch STOP; this also cancels a pending Resume';
   });
   document.querySelectorAll('[data-command="RESUME"]').forEach(button=>{
-    button.disabled=status!=='connected'||!control||control.test_build||!control.stop_latched||control.controller_state_code!==6||Boolean(store.pendingStatus)||Boolean(store.pendingStop)||Boolean(store.pendingResume)||cooling;
+    button.disabled=status!=='connected'||!control||control.test_build||!control.stop_latched||control.controller_state_code!==6||Boolean(store.pendingStatus)||Boolean(store.pendingStop)||Boolean(store.pendingResume)||Boolean(store.pendingMap)||cooling;
     button.title='Release STOP after fresh controller checks; autonomous movement may start immediately';
   });
   const mode=control?.test_build?'Stationary test: motor control is disabled.':'Resume releases STOP; autonomous movement may start immediately.';
   value('command-note',status==='connected'?(store.pendingResume?store.resumeNotice:store.pendingStop?store.stopNotice:`${store.statusNotice} ${control?mode:'Waiting for fresh controller status.'}`):'Connect to the broker for controller status and requests.');
   value('stop-result',store.stopNotice);
   value('resume-result',store.resumeNotice);
+  updateBarcodeMap(control);
   const reply=store.statusReply;
   value('status-result',reply?`Last STATUS: ${new Date(reply.received_at).toLocaleTimeString()} | Pico uptime ${(reply.uptime_ms/1000).toFixed(1)} s | ${reply.test_build?'Stationary test build':'Normal build'} | ${reply.controller_state} | ${reply.sample_age_ms===null?'No fresh telemetry sample':`Sample age ${reply.sample_age_ms} ms`}`:'No STATUS reply received yet.');
 }

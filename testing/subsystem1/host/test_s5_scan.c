@@ -51,7 +51,7 @@ enum { NEAR_THRESHOLD=6, RETRY_SUCCEEDS, DRIVING_NOISY, RESUME_DURING_SCAN,
        AUTO_SCAN, AUTO_RIGHT, AUTO_BLOCKED, AUTO_UNCLEAR };
 static UINT created,counts[4],busy,measured,scenario,seen[6],servo_calls,checks;
 static UW servo_compare;
-static UW first_hold_motion_ms,last_driving_ping_ms;
+static UW first_hold_motion_ms,last_driving_ping_ms,last_post_scan_ping_ms;
 static unsigned sweep_echoes,post_scan_echoes,driving_echoes;
 static BOOL automatic_case(void){return scenario>=AUTO_SCAN;}
 #ifdef APP_OBSTACLE_BYPASS
@@ -157,6 +157,11 @@ static ER tk_wai_sem(ID id,INT n,INT timeout){
            (scenario==AUTO_UNCLEAR && index>=SCAN_MIDDLE))mm=face;
     }else if(sweep_echoes>=SCAN_POINTS*((scenario==2||scenario==RETRY_SUCCEEDS||scenario==AUTO_UNCLEAR)?2U:1U)){
         assert(servo_compare==2930U);
+        if(post_scan_echoes&&automatic_case()){
+            UW interval=source_ms-last_post_scan_ping_ms;
+            assert(interval>=SAMPLE_PAUSE_MS&&interval<=SAMPLE_PAUSE_MS+ECHO_TIMEOUT_MS);
+        }
+        last_post_scan_ping_ms=source_ms;
         mm=post_scan_echoes++ && !automatic_case()?600U:0U;
     }else{
         assert(servo_compare==2930U);
@@ -219,6 +224,7 @@ static void reset(unsigned which){
     turn_started_ms=0;turn_acked=FALSE;
 #endif
     first_hold_motion_ms=last_driving_ping_ms=sweep_echoes=post_scan_echoes=driving_echoes=0;
+    last_post_scan_ping_ms=0;
     __atomic_store_n(&obstacle_stop,0U,__ATOMIC_RELEASE);
     echo_done=range_sem=0;memset(counts,0,sizeof(counts));memset(seen,0,sizeof(seen));
     memset(range_publication,0,sizeof(range_publication));memset(navigation_publication,0,sizeof(navigation_publication));
