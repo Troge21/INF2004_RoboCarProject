@@ -301,6 +301,16 @@ static void test_slow_right_hump(void) {
     terrain_samples(&wheel,&now,0,-55,10,20);
     terrain_samples(&wheel,&now,0,0,24,20);
     expect(s_hump_event==1,"a brief right tilt without sustained roll over distance is rejected");
+
+    s_turn_code=256+45; /* 45 deg/s yaw from line-steering while climbing */
+    terrain_samples(&wheel,&now,0,0,5,20);
+    terrain_samples(&wheel,&now,0,55,30,20);
+    wheel.distance_left_mm_x10-=10;wheel.distance_right_mm_x10+=30;now+=20;
+    terrain_update(&wheel,0,now,20); /* 1 mm single-wheel ramp bounce with net forward travel */
+    terrain_samples(&wheel,&now,0,0,40,20);
+    s_turn_code=256;
+    expect(s_hump_event==2 && s_hump_kind==S4_HUMP_LEFT,
+        "moderate line-steering yaw and a 1 mm single-wheel ramp bounce do not abort a valid hump");
 }
 static void test_motion_classes(void) {
     s_state=S4_STATE_MONITORING;

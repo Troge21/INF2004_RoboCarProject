@@ -124,7 +124,7 @@ static void junction_read_barcode(BOOL accept, UW now)
     if (telemetry_get_barcode(&barcode) != E_OK || barcode.event_sequence == junction.barcode_sequence)
         return;
     junction.barcode_sequence = barcode.event_sequence;
-    if (accept && (UW)(now - barcode.timestamp_ms) <= APP_IR_MAX_AGE_MS)
+    if (accept && (UW)(now - barcode.timestamp_ms) <= S2_FEEDBACK_MAX_AGE_MS)
         junction.pending_code = barcode.code;
 }
 
@@ -184,7 +184,11 @@ static unsigned junction_step(const S2_MOTION_DATA *motion, UW now, BOOL settled
             } else {
                 er = s2_turn_begin(&junction.move, junction.turn_degrees, JUNCTION_TRACK_MM, motion, now);
             }
-            if (er != E_OK) junction.phase = JUNCTION_FAILED;
+            if (er == E_BUSY || er == E_TMOUT) {
+                if ((UW)(now - junction.phase_ms) >= JUNCTION_SETTLE_MS) junction.phase = JUNCTION_FAILED;
+            } else if (er != E_OK) {
+                junction.phase = JUNCTION_FAILED;
+            }
         }
     }
     if (junction.move.result == S2_MOVE_RUNNING) {
@@ -193,6 +197,8 @@ static unsigned junction_step(const S2_MOTION_DATA *motion, UW now, BOOL settled
             junction.phase = junction.phase == JUNCTION_CENTERING ? JUNCTION_TURNING : JUNCTION_SETTLING;
             junction.phase_ms = now;
         } else if (result != S2_MOVE_RUNNING) junction.phase = JUNCTION_FAILED;
+        else if (junction.phase == JUNCTION_CENTERING)
+            targets->left_rpm_x10 = targets->left_rpm_x10 * STRAIGHT_LEFT_RPM_X10 / STRAIGHT_RIGHT_RPM_X10;
     }
     if (junction.phase == JUNCTION_FAILED) return APP_CTRL_FAULT;
     if (junction.phase == JUNCTION_TURNING || junction.phase == JUNCTION_SETTLING)
@@ -264,13 +270,17 @@ static void app_controller_step(UW started_ms)
 #endif
 #if APP_S3_BARCODE_DETECT && S2_LINE_USE_RPM_CONTROL
     BOOL junction_following = follow_line;
+    BOOL barcode_accept = startup_done && !(inhibit & APP_CTRL_LATCH) &&
+        (!motion_fresh || !motion.faults);
 #ifdef APP_OBSTACLE_BYPASS
     junction_following = follow_line && !bypass_requested;
+    barcode_accept = barcode_accept && !bypass_requested && !obstacle_hold && !scanning;
     if (bypass_requested || obstacle_hold || scanning) junction_cancel(FALSE);
 #endif
     if (inhibit & APP_CTRL_LATCH) junction_cancel(TRUE);
     junction_following = junction_following && junction.phase == JUNCTION_IDLE;
-    junction_read_barcode(junction_following, now.lo);
+    barcode_accept = barcode_accept && junction.phase == JUNCTION_IDLE;
+    junction_read_barcode(barcode_accept, now.lo);
     if (junction_following && motion.encoder_valid) junction_observe(&line, &motion, now.lo);
 #endif
 #ifdef APP_OBSTACLE_BYPASS
@@ -318,9 +328,13 @@ static void app_controller_step(UW started_ms)
 #if S2_LINE_USE_RPM_CONTROL
         left = left * LINE_SPEED_PERCENT / 100;
         right = right * LINE_SPEED_PERCENT / 100;
-        /* Compensate for the observed rightward drift on plain white. */
-        if (line.pattern == 0U && left == right)
-            left = STRAIGHT_LEFT_RPM_X10;
+        /* Compensate for the observed rightward drift on plain white, and keep
+         * weak left-edge corrections monotonically below straight-line trim. */
+        if ((line.pattern == 0U && left == right) || left < right) {
+            const INT inside = (LINE_FORWARD_RPM_X10 - 140) * LINE_SPEED_PERCENT / 100;
+            left = inside + (left - inside) * (STRAIGHT_LEFT_RPM_X10 - inside) /
+                (STRAIGHT_RIGHT_RPM_X10 - inside);
+        }
 #endif
         state = APP_CTRL_FOLLOWING;
     } else if (startup_done) {

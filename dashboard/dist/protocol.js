@@ -174,7 +174,7 @@ export function decodeBarcodeMapReply(payload){
 
 export function hex(bytes) { return [...bytes].map(x => x.toString(16).padStart(2,'0')).join(' '); }
 export function packetText(packet) {
-  if (!packet) return 'Waiting for a messageâ€¦';
+  if (!packet) return 'Waiting for a message…';
   if (packet.accepted && packet.decoded !== null)
     return JSON.stringify(packet.decoded,null,2);
   return `${packet.accepted?'Accepted':'Rejected'}: ${packet.detail}\n\n${hex(packet.bytes)}`;
@@ -252,7 +252,7 @@ export class TelemetryStore {
       this.scanProfile={sequence:value.scan_sequence,session_token:value.session_token,uptime_ms:value.uptime_ms,width_mm:p.width_mm,points:p.points,at};this.scanPending=null;
       this.event('Scan profile received',p.total+' measured angles','neutral',at);
     }
-    packet.detail='Scan chunk '+(value.start+1)+'?'+(value.start+value.points.length)+' / '+value.total;return true;
+    packet.detail='Scan chunk '+(value.start+1)+'–'+(value.start+value.points.length)+' / '+value.total;return true;
   }
   currentSample(now = Date.now(), connected = true) {
     const age = this.lastTelemetry === null ? Infinity : now - this.lastTelemetry;
@@ -262,7 +262,7 @@ export class TelemetryStore {
     this.history=[]; this.events=[]; this.packets=[]; this.sample=null;
     this.lastTelemetry=null; this.lastHeartbeat=null; this.lastSequence=null; this.lastHeartbeatCounter=null;
     this.messageCount=0; this.telemetryCount=0; this.rejected=0; this.sequenceGaps=0;
-    this.totalBytes=0; this.lastPayloadBytes=0; this.lastInterval=null; this.format='â€”';
+    this.totalBytes=0; this.lastPayloadBytes=0; this.lastInterval=null; this.format='—';
     this.clockAnchor=null;this.seenSession=null;this.scanProfile=null;this.scanPending=null;this.diagnostics=null;this.diagnosticHistory=[];this.heartbeatIntervals=[];this.lastBarcodeEvent=null;this.lastBarcode=null;this.barcodeSignal=null;
     this.terrain=null;this.lastHumpEvent=null;
     this.pendingStatus=null;this.statusReply=null;this.lastStatusId=0;this.statusLastSentAt=null;
@@ -500,7 +500,7 @@ export class TelemetryStore {
         else this.event('Barcode detected',`Scan #${sample.barcode_event_sequence}`,'success',at);
       }
       if(sample.imu_state && sample.imu_state!==this.sample?.imu_state)
-        this.event(`IMU Â· ${sample.imu_state}`,'S4 sensor state changed',sample.imu_state==='Sensor fault'?'warning':'neutral',at);
+        this.event(`IMU · ${sample.imu_state}`,'S4 sensor state changed',sample.imu_state==='Sensor fault'?'warning':'neutral',at);
       if (!sample.obstacle_valid && this.sample?.obstacle_valid!==false) this.event('Range unavailable','No valid ultrasonic measurement','warning',at);
       this.sample=sample; this.lastTelemetry=at; this.telemetryCount++; this.lastPayloadBytes=bytes.length; this.format=decoded.format;
       this.history.push({...sample,at,interval:this.lastInterval,bytes:bytes.length});

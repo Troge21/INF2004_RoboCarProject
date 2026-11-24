@@ -62,7 +62,7 @@ int telemetry_get_barcode(TELEMETRY_BARCODE *out){*out=barcode_sample;return bar
 #include "subsystem5/subsystem5.h"
 static UW operating_ms;
 static unsigned scenario,phase,ticks,checks,pattern,stale,invalid,compare[4];
-static unsigned right_edge_adc;
+static unsigned right_edge_adc,centre_edge_adc;
 static unsigned motor_busy,motor_brief_busy,controller_busy,encoder_fail;
 static unsigned feedback_brief_busy,feedback_wait_times_out;
 static unsigned nav_phase=S5_NAV_CLEAR,nav_stale,nav_busy,nav_reads;
@@ -101,7 +101,7 @@ static ER tk_get_otm(SYSTIM *t){t->lo=operating_ms;t->hi=0;return E_OK;}
 static ER tk_get_tim(SYSTIM *t){t->lo=operating_ms+1000000U;t->hi=0;return E_OK;}
 static ER subsystem3_get_line(S3_LINE_DATA *s){
     s->pattern=pattern;s->valid=!invalid;
-    s->centre_adc=(pattern&2U)?750U:150U;
+    s->centre_adc=(pattern&2U)?750U:(centre_edge_adc?centre_edge_adc:150U);
     s->right_adc=(pattern&1U)?2650U:(right_edge_adc?right_edge_adc:160U);
     s->timestamp_ms=operating_ms+1000000U-(stale?101U:0U);return E_OK;
 }
@@ -465,11 +465,17 @@ static ER tk_dly_tsk(INT ms){
         }else if(ticks<=32U){
             const S2_COMMAND command=read_command();
             assert(command.mode==S2_MODE_RPM);
-            const BOOL neutral_white=pattern==0U&&right_edge_adc==0U;
-            assert(command.left==(neutral_white?line_straight_left_rpm_x10:line_forward_rpm_x10));
+            if(ticks==28U){
+                assert(command.left<line_straight_left_rpm_x10&&command.left>line_inside_rpm_x10);
+                assert(command.right==line_forward_rpm_x10);
+                centre_edge_adc=0;
+            }else{
+                const BOOL neutral_white=pattern==0U&&right_edge_adc==0U&&centre_edge_adc==0U;
+                assert(command.left==(neutral_white?line_straight_left_rpm_x10:line_forward_rpm_x10));
+            }
             if(ticks==25U){assert(command.right==line_inside_rpm_x10);pattern=0;right_edge_adc=1000;}
             if(ticks==26U){assert(command.right==218);right_edge_adc=0;}
-            if(ticks==27U)assert(command.right==line_forward_rpm_x10);
+            if(ticks==27U){assert(command.right==line_forward_rpm_x10);centre_edge_adc=350;}
             if(ticks==31U)pattern=1;
             if(ticks==32U){
                 assert(command.right==line_inside_rpm_x10);
@@ -605,7 +611,7 @@ static ER tk_dly_tsk(INT ms){
     return E_OK;
 }
 static void run(unsigned which){
-    scenario=which;phase=ticks=operating_ms=created=stale=invalid=encoder_fail=0;pattern=right_edge_adc=0;
+    scenario=which;phase=ticks=operating_ms=created=stale=invalid=encoder_fail=0;pattern=right_edge_adc=centre_edge_adc=0;
     motor_busy=motor_brief_busy=controller_busy=nav_stale=nav_busy=nav_reads=0;
     feedback_brief_busy=feedback_wait_times_out=0;
     nav_phase=S5_NAV_CLEAR;counts=(S2_ENCODER_COUNTS){0,0};
@@ -765,9 +771,13 @@ static void test_junction(void){
         assert(junction.crossed&&!junction.pending_code);
         if(angles[choice]==0){assert(junction.phase==JUNCTION_IDLE);continue;}
         assert(junction.phase==JUNCTION_CENTERING&&junction.turn_degrees==angles[choice]);
+        /* A sample older than 60 ms returns E_TMOUT from s2_linear_begin; wait instead of faulting. */
+        motion.timestamp_ms=990;motion.speed_timestamp_ms=1060;
+        assert(junction_step(&motion,1060,TRUE,&targets)==APP_CTRL_RECOVERING);
+        assert(junction.phase==JUNCTION_CENTERING&&junction.move.result==S2_MOVE_IDLE);
         motion.timestamp_ms=motion.speed_timestamp_ms=1060;
         (void)junction_step(&motion,1060,TRUE,&targets);
-        assert(targets.left_rpm_x10>0&&targets.right_rpm_x10>0);
+        assert(targets.left_rpm_x10>0&&targets.right_rpm_x10>0&&targets.left_rpm_x10<targets.right_rpm_x10);
         motion.distance_centre_mm_x10=JUNCTION_CENTER_MM*10;
         motion.timestamp_ms=motion.speed_timestamp_ms=1100;
         (void)junction_step(&motion,1100,FALSE,&targets);
@@ -802,6 +812,11 @@ static void test_junction(void){
     junction.phase=JUNCTION_TURNING;
     assert(junction_step(NULL,1200,FALSE,&targets)==APP_CTRL_FAULT&&
         !targets.left_rpm_x10&&!targets.right_rpm_x10);
+    memset(&junction,0,sizeof(junction));
+    barcode_sample=(TELEMETRY_BARCODE){.timestamp_ms=1000,.event_sequence=2,
+        .code=S3_BC_VALID|S3_BC_FIRST_LETTER_INDEX};
+    junction_read_barcode(TRUE,1400);
+    assert(junction.pending_code==barcode_sample.code);
     memset(&junction,0,sizeof(junction));barcode_sample=(TELEMETRY_BARCODE){0};
     __atomic_store_n(&barcode_map,0,__ATOMIC_RELEASE);
     pass("barcode route uses distinct IR samples, executes each action once, rearms after leaving and cancels on STOP");

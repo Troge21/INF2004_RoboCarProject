@@ -82,8 +82,8 @@ unsigned app_bypass_step(OBSTACLE_BYPASS *bypass, const BYPASS_INPUT *input,
     const BOOL have_range = range_available(input);
     if (input->motion->faults || elapsed >= BYPASS_LEG_LIMIT_MS ||
         (initial && input->nav && !matching_turn) ||
-        (!initial && !awaiting_start && !reached && have_range && input->range->valid &&
-         input->range->distance_mm <= S5_OBSTACLE_MM))
+        (!route[phase].turn_deg && !awaiting_start && !reached && have_range &&
+         input->range->valid && input->range->distance_mm <= S5_OBSTACLE_MM))
         return fail_bypass(bypass);
 
     const BOOL clearance = have_range && (input->range->no_return || input->range->distance_mm > S5_OBSTACLE_MM) &&

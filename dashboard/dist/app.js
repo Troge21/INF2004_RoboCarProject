@@ -210,9 +210,9 @@ function update(force=false){
   value('pitch',current?.pitch_deg==null?'Unavailable':`${format(current.pitch_deg,1)}°`);value('imu-state',current?.imu_state??'Unavailable');
   value('last-hump',!current?.imu_state?'Unavailable':current.hump_mm==null?'No accepted hump received':`${current.hump_mm} mm`);value('run-hump',!current?.imu_state?'Unavailable':current.max_hump_mm==null?'No accepted hump received':`${current.max_hump_mm} mm`);
   const terrain=store.currentTerrain(now,status==='connected');
-  value('roll',terrain?.roll_deg==null?'Unavailable':format(terrain.roll_deg,1)+'?');
+  value('roll',terrain?.roll_deg==null?'Unavailable':format(terrain.roll_deg,1)+'°');
   value('motion-class',terrain?.motion_class??'Unavailable');
-  value('turn-rate',terrain?.turn_deg_s==null?'Unavailable':format(terrain.turn_deg_s,0)+' ?/s');
+  value('turn-rate',terrain?.turn_deg_s==null?'Unavailable':format(terrain.turn_deg_s,0)+' °/s');
   value('hump-kind',current?.hump_mm!=null?terrain?.hump_kind??'Unavailable':'Unavailable');
   const imuNote=!current?.imu_state?'Waiting for fresh IMU telemetry':
     terrain?'Height uses IMU tilt and encoder travel. Positive turn rate means left.':
@@ -262,7 +262,7 @@ function update(force=false){
   const lineLabels=['Left','Right'];
   const lineState=i=>current?.ir?.[i]===1?'Black line':current?.ir?.[i]===0?'Background':'Unavailable';
   const ir=$('overview-ir');if(ir){ir.innerHTML=[1,2].map((i,j)=>`<i class="${current?.ir?.[i]===1?'on':current?.ir?.[i]===0?'':'unknown'}" title="${lineLabels[j]}: ${lineState(i)}" aria-label="${lineLabels[j]}: ${lineState(i)}">${lineState(i)==='Unavailable'?'?':''}</i>`).join('');ir.setAttribute('aria-label',`Line sensors: left ${lineState(1)}, right ${lineState(2)}. Barcode IR is a separate input.`);}
-  if($('sensor-status'))$('sensor-status').innerHTML='<div class="sensor-tile"><span class="sensor-indicator reserved" aria-hidden="true">B</span><strong>Barcode IR</strong><small>GP28 AO · decoding pending</small></div>'+[1,2].map((i,j)=>`<div class="sensor-tile"><span class="sensor-indicator ${current?.ir?.[i]===1?'on':current?.ir?.[i]===0?'':'unknown'}" aria-hidden="true">${lineState(i)==='Unavailable'?'?':''}</span><strong>${lineLabels[j]} IR · GP${j===0?27:26}</strong><small>${lineState(i)}</small></div>`).join('');
+  if($('sensor-status'))$('sensor-status').innerHTML='<div class="sensor-tile"><span class="sensor-indicator reserved" aria-hidden="true">B</span><strong>Barcode IR</strong><small>GP28 AO · Code 39 active</small></div>'+[1,2].map((i,j)=>`<div class="sensor-tile"><span class="sensor-indicator ${current?.ir?.[i]===1?'on':current?.ir?.[i]===0?'':'unknown'}" aria-hidden="true">${lineState(i)==='Unavailable'?'?':''}</span><strong>${lineLabels[j]} IR · GP${j===0?27:26}</strong><small>${lineState(i)}</small></div>`).join('');
 
   for(const [name,key,color]of [['speed','average_wheel_mps','#208f85'],['distance','distance_m','#8b78df'],['obstacle','obstacle_mm','#208f85'],['hump','max_hump_mm','#acbc89']])sparkline($(`spark-${name}`),store.history.map(d=>d[key]),color);
   const opts={seconds,now};

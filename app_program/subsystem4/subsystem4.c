@@ -58,7 +58,8 @@ IMPORT UW tm_usb_pending(void);
 #define S4_RIGHT_HUMP_EXIT_PITCH_X10  30
 #define S4_ENCODER_MAX_AGE_MS      100U
 #define S4_HUMP_MAX_STEP_X10       120
-#define S4_HUMP_MAX_TURN_DEG_S     35
+#define S4_HUMP_MAX_REVERSE_X10    (-15)
+#define S4_HUMP_MAX_TURN_DEG_S     65
 #define S4_TURN_EVENT_DEG_S        18
 #define S4_STATIONARY_MM_S_X10     50
 #define S4_ACCEL_EVENT_MM_S2       75
@@ -330,7 +331,8 @@ static void terrain_update(const S2_MOTION_DATA *motion, int16_t pitch_x10,
     s_terrain.left_mm_x10 = motion->distance_left_mm_x10;
     s_terrain.right_mm_x10 = motion->distance_right_mm_x10;
     s_terrain.position_valid = TRUE;
-    if (left < 0 || right < 0 || left > S4_HUMP_MAX_STEP_X10 || right > S4_HUMP_MAX_STEP_X10) {
+    if (left < S4_HUMP_MAX_REVERSE_X10 || right < S4_HUMP_MAX_REVERSE_X10 ||
+        left + right < 0 || left > S4_HUMP_MAX_STEP_X10 || right > S4_HUMP_MAX_STEP_X10) {
         cancel_hump();
         return;
     }
