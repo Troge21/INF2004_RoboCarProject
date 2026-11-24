@@ -16,6 +16,7 @@
 #define ECHO_RISE (8U << (4 * S5_ECHO_PIN))
 #define ECHO_EDGES (ECHO_FALL | ECHO_RISE)
 #define ECHO_TIMEOUT_MS 40
+#define ECHO_MAX_RANGE_US 23200U
 #define SAMPLE_PAUSE_MS 80 /* trigger spacing remains greater than 60 ms */
 #define S5_NAV_REFRESH_MS 50U
 #ifdef APP_OBSTACLE_BYPASS
@@ -219,7 +220,7 @@ EXPORT ER s5_echo_to_mm(UW pulse_us, UW *mm)
     if (mm == NULL) return E_PAR;
     *mm = 0;
     /* Datasheet formula: centimetres = microseconds / 58 (x10 for mm). */
-    if (pulse_us < 116 || pulse_us > 23200) return E_PAR;
+    if (pulse_us < 116 || pulse_us > ECHO_MAX_RANGE_US) return E_PAR;
     *mm = (pulse_us * 10U + 29U) / 58U;
     return E_OK;
 }
@@ -263,10 +264,17 @@ static RANGE_RESULT measure(UW *mm)
     er = tk_wai_sem(echo_done, 1, ECHO_TIMEOUT_MS);
     (void)app_gpio_irq_enable(S5_ECHO_PIN, FALSE);
     if (er == E_TMOUT) {
-        return echo_state == WAIT_RISE ? RANGE_NO_RETURN : RANGE_ERROR;
+        if(echo_state==WAIT_RISE) return RANGE_NO_RETURN;
+        /* A captured rise held beyond the measurable echo window cannot
+         * represent a near return. A high pin before triggering is still a
+         * hardware error on the next sample. */
+        if(echo_state==WAIT_FALL && gpio_get_val(S5_ECHO_PIN) &&
+           (UW)(in_w(TIMER_TIMERAWL)-rise_us)>ECHO_MAX_RANGE_US)
+            return RANGE_NO_RETURN;
+        return RANGE_ERROR;
     }
     if (er != E_OK || echo_state != COMPLETE) return RANGE_ERROR;
-    if (width_us > 23200U) return RANGE_NO_RETURN;
+    if (width_us > ECHO_MAX_RANGE_US) return RANGE_NO_RETURN;
     return s5_echo_to_mm(width_us, mm) == E_OK ? RANGE_OK : RANGE_ERROR;
 }
 

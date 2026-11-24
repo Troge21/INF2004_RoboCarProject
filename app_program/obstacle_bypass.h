@@ -13,8 +13,10 @@ typedef enum {
 /* One sequence, owned by the vehicle controller task. */
 typedef struct {
     S2_ENCODER_MOVE move;
-    UW scan_id, phase_started_ms, line_timestamp_ms, last_ready_ms;
-    uint8_t phase, line_state;
+    int64_t clearance_position_mm_x10;
+    UW scan_id, phase_started_ms, line_timestamp_ms, last_ready_ms, clearance_ms;
+    UW checked_return_echo_ms;
+    uint8_t phase, line_state, has_clearance, return_clear_samples;
     int8_t side;
 } OBSTACLE_BYPASS;
 

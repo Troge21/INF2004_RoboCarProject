@@ -15,8 +15,8 @@ Current normal operating image (motor control enabled):
 **build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt.uf2** (NO _test suffix)
 
 Profile **NET=lwip MQTT=1 TEST=0 APP_MODE=integrated CONSOLE=usb_cdc CRASH_REPORT=0**.
-Size **761344 bytes**. SHA-256
-`d72c18a7f9c9e8378b1f8515611958cd546585880506eefbe77e22af079f9b4c`.
+Size **762880 bytes**. SHA-256
+`78da5b4a368455fb3a1112ba7e7c9ff3dd347d872815bc40a7c44c9df8cfca2a`.
 The original pre-trim UF2 is kept locally as
 `build_make/mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt_backup.uf2` (`3273ea8f`).
 The integrated build includes MQTT, encoder motor control, the S3 line
@@ -235,11 +235,18 @@ The full scan selects a bypass side using its outer readings. The route uses
 a 280 mm lateral shift and a 600 mm pass along
 the obstacle. A width estimate is published when both edges can be measured.
 The turn can start with a clear side even if the width stays **Edges unclear**.
-The controller checks front clearance between legs and while moving. The
-normal UF2 and `_s2_bypass_floor_test.uf2` make the final turn at the fixed
-encoder distance and resume forward driving on white. The `_s2_bypass.uf2`
-variant requires tape confirmation before its final turn. Physical tape
-reacquisition still needs a track test. STOP and pickup cancel the maneuver.
+The controller requires fresh front clearance before each forward leg. A
+started pivot can finish through missing echoes. A straight leg already
+underway can crawl through a range dropout for at most 1.4 seconds or 90 mm
+of encoder travel since the last clear sample. A close echo stops the wheels
+immediately. During the return, two distinct clear readings allow the move
+to resume, and a confirmed obstruction faults the maneuver.
+
+The normal UF2 searches up to 400 mm for two fresh black-line samples on the
+return leg. It then advances another 60 mm to bring the axle over the tape
+before the final turn. It stops if no tape is found. The separate
+`_s2_bypass_floor_test.uf2` aligns at a fixed encoder distance. STOP and pickup
+cancel the maneuver.
 
 See [the integration and evidence](../testing/subsystem1/SENSOR_INTEGRATION.md)
 and [the physical checklist](../testing/subsystem1/FINAL_ACCEPTANCE.md).

@@ -33,6 +33,7 @@
 #define RESETS_RESET 1U
 #define RESETS_RESET_DONE 2U
 #define RESETS_RESET_PWM 4U
+#define TIMER_TIMERAWL 3U
 #define PWM_BASE 1000U
 #define PWM_CHx_CSR 0U
 #define PWM_CHx_DIV 4U
@@ -47,6 +48,8 @@ typedef void (*FP)(INT,void *);
 typedef struct {UW lo,hi;} SYSTIM;
 typedef struct {UW sematr;INT isemcnt,maxsem;} T_CSEM;
 static UW source_ms=1000,raw_us=1000000;
+static UW simulated_high_us;
+static BOOL echo_pin_high;
 enum { NEAR_THRESHOLD=6, RETRY_SUCCEEDS, DRIVING_NOISY, RESUME_DURING_SCAN,
        AUTO_SCAN, AUTO_RIGHT, AUTO_BLOCKED, AUTO_UNCLEAR };
 static UINT created,counts[4],busy,measured,scenario,seen[6],servo_calls,checks;
@@ -71,13 +74,13 @@ static ER tk_dly_tsk(INT);
 static ID tk_cre_sem(const T_CSEM *s){assert(++created<4);counts[created]=s->isemcnt;return (ID)created;}
 static ER tk_del_sem(ID id){counts[id]=0;return E_OK;}
 static void tk_exd_tsk(void){assert(0);}
-static UW in_w(UINT reg){assert(reg==RESETS_RESET_DONE);return RESETS_RESET_PWM;}
+static UW in_w(UINT reg){if(reg==TIMER_TIMERAWL)return raw_us;assert(reg==RESETS_RESET_DONE);return RESETS_RESET_PWM;}
 static void out_w(UINT reg,UW v){(void)v;assert(reg>=PWM_BASE+6U*20U&&reg<=PWM_BASE+6U*20U+16U);}
 static void clr_w(UINT reg,UW v){assert((reg==RESETS_RESET&&v==RESETS_RESET_PWM)||reg==GPIO(5));}
 static void set_w(UINT reg,UW v){assert(reg==GPIO(5)&&v==GPIO_PDE);}
 static ER gpio_set_pin(UINT pin,UINT mode){(void)mode;assert(pin==4||pin==5);return E_OK;}
 static ER gpio_set_val(UINT pin,UINT v){assert(pin==4&&v<=1);return E_OK;}
-static UINT gpio_get_val(UINT pin){assert(pin==5);return 0;}
+static UINT gpio_get_val(UINT pin){assert(pin==5);return echo_pin_high;}
 static void WaitUsec(UINT us){raw_us+=us;}
 static ER pwm_set_pin(UINT pin){assert(pin==12);return E_OK;}
 static ER pwm_set_enabled(UINT pin,BOOL enabled){assert(pin==12&&enabled);return E_OK;}
@@ -120,6 +123,12 @@ static ER tk_wai_sem(ID id,INT n,INT timeout){
         --counts[id];return E_OK;
     }
     assert(timeout==40);
+    if(simulated_high_us){
+        echo_isr(5,8,0,raw_us);
+        raw_us+=simulated_high_us;
+        echo_pin_high=TRUE;
+        return E_TMOUT;
+    }
     UW mm;
     if(scenario==1){
         assert(servo_compare==2930U);
@@ -220,6 +229,7 @@ static ER tk_dly_tsk(INT ms){
 static void pass(const char *name){++checks;printf("PASS: %s\n",name);}
 static void reset(unsigned which){
     created=busy=measured=servo_calls=0;scenario=which;source_ms=1000;raw_us=1000000;
+    simulated_high_us=0;echo_pin_high=FALSE;
 #ifdef APP_OBSTACLE_BYPASS
     turn_started_ms=0;turn_acked=FALSE;
 #endif
@@ -245,6 +255,14 @@ int main(void){
     assert(s5_choose_motion(1,100,1,500,1,300)==S5_MOTION_LEFT);
     assert(s5_choose_motion(1,100,0,0,1,500)==S5_MOTION_RIGHT);
     pass("thresholds, missing echoes and clearance margin preserve a clear escape");
+    reset(0);
+    UW mm;
+    simulated_high_us=40000;
+    assert(measure(&mm)==RANGE_NO_RETURN&&!mm);
+    assert(measure(&mm)==RANGE_ERROR&&!mm); /* pin still high before trigger */
+    echo_pin_high=FALSE;simulated_high_us=10000;
+    assert(measure(&mm)==RANGE_ERROR&&!mm);
+    pass("a long captured pulse indicates no in-range return; a stuck or indeterminate input stays invalid");
     reset(0);assert(telemetry_get_scan(&scan)==E_TMOUT);
     if(setjmp(done)==0)started(0,NULL);
     assert(seen[S5_NAV_SCANNING]&&seen[S5_NAV_CLEAR]&&!seen[S5_NAV_LEFT]);

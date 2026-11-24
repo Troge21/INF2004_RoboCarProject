@@ -193,18 +193,33 @@ static void run_bypass_cycle(void){
         }
     }else if(phase==4){
         if(bypass.phase==BYPASS_SHIFT_IN){
+#ifdef APP_BYPASS_LINE_RETURN
+            if(bypass.move.result==S2_MOVE_RUNNING){
+                S2_MOTION_DATA feedback;
+                assert(subsystem2_get_motion(&feedback)==E_OK);
+                int64_t centre=(feedback.distance_left_mm_x10*234/206+feedback.distance_right_mm_x10)/2;
+                int64_t progress=centre-bypass.move.origin_mm_x10;
+                INT tape=scenario==14?3250:2200;
+                pattern=scenario!=9&&progress>=tape&&progress<tape+350;
+                if(bypass.line_state==LINE_CONFIRMED){
+                    assert(bypass.move.target_mm_x10>=tape+BYPASS_RETURN_AXLE_MM_X10);
+                    assert(bypass.move.target_mm_x10<tape+350+BYPASS_RETURN_AXLE_MM_X10);
+                }
+            }
+#else
             if(scenario==14&&bypass.move.result==S2_MOVE_REACHED){
                 stopped();pattern=1;
             }else if(moving()&&scenario!=9&&scenario!=14){
                 pattern=(seen&(1U<<BYPASS_SHIFT_IN))?1U:0U;
             }
+#endif
         }
         if(scenario==14)assert(bypass.phase!=BYPASS_FAILED);
         if(!checked_range_gap&&
            ((scenario==8&&bypass.phase==BYPASS_TURN_ALONG&&compare[1]&&compare[2])||
             (scenario==12&&bypass.phase==BYPASS_PASS&&moving()))){
             checked_range_gap=TRUE;front_missing=TRUE;
-            release_at=ticks+(scenario==12?BYPASS_SENSOR_WAIT_MS/20U+5U:40U);phase=10;
+            release_at=ticks+(scenario==12?(BYPASS_CLEAR_HOLD_MS+BYPASS_SENSOR_WAIT_MS)/20U+5U:40U);phase=10;
         }else if(scenario==10&&bypass.phase==BYPASS_SHIFT_OUT&&moving()){
             front_blocked=TRUE;phase=5;
         }else if(scenario==11&&bypass.phase==BYPASS_PASS&&moving()){
@@ -241,14 +256,18 @@ static void run_bypass_cycle(void){
     }else if(phase==7){
         stopped();assert(bypass.phase==BYPASS_FAILED);
         if(ticks==release_at){
-            pass(scenario==9?"missing tape at the fixed return distance leaves the car stopped":
+            pass(scenario==9?"missing tape at the return limit leaves the car stopped":
                 "returning clearance cannot restart an aborted bypass");
             longjmp(done,1);
         }
     }else if(phase==8&&moving()){
         assert(app_controller_snapshot(snapshot)==E_OK&&(snapshot[4]&15)==APP_CTRL_FOLLOWING);
         if(scenario==14)
+#ifdef APP_BYPASS_LINE_RETURN
+            pass("late tape extends the return beyond the old offset and aligns with the axle centred");
+#else
             pass("fresh tape at the return cutoff is confirmed while the wheels settle");
+#endif
         else if(scenario==9){
             const S2_COMMAND command=read_command();
             assert(!pattern&&command.left==206&&command.right==234);
@@ -265,15 +284,24 @@ static void run_bypass_cycle(void){
             invalid=0;phase=2;
         }
     }else if(phase==10){
-        stopped();
-        if(bypass.phase==BYPASS_FAILED){
-            assert(scenario==12&&ticks+6U>=release_at);
+        if(scenario==8){
+            assert(bypass.phase==BYPASS_TURN_ALONG||bypass.phase==BYPASS_PASS);
+            if(bypass.phase==BYPASS_TURN_ALONG&&bypass.move.result==S2_MOVE_RUNNING)
+                assert(read_command().mode==S2_MODE_RPM);
+            if(bypass.phase==BYPASS_PASS)stopped();
+            if(ticks==release_at){
+                pass("the encoder pivot continues through a range dropout without starting an unverified forward leg");
+                front_missing=FALSE;phase=4;
+            }
+        }else if(bypass.phase==BYPASS_FAILED){
+            stopped();
+            assert(scenario==12&&ticks+BYPASS_CLEAR_HOLD_MS/20U+6U>=release_at);
             pass("a sustained loss of the front echo faults the route with both wheels off");
             front_missing=FALSE;release_at=ticks+20U;phase=7;
-        }else if(ticks==release_at){
-            assert(scenario==8&&bypass.phase==BYPASS_TURN_ALONG);
-            pass("an 800 ms range dropout pauses the second turn and resumes on fresh clearance");
-            front_missing=FALSE;phase=4;
+        }else {
+            const S2_COMMAND command=read_command();
+            if(command.mode==S2_MODE_RPM)assert(command.right<=BYPASS_CRAWL_RPM_X10);
+            else stopped();
         }
     }else if(phase==11){
         uint32_t ticket=0;
@@ -807,6 +835,32 @@ static void test_junction(void){
     pass("barcode route uses distinct IR samples, executes each action once, rearms after leaving and cancels on STOP");
 }
 #endif
+#ifdef APP_OBSTACLE_BYPASS
+static void test_return_echo(void){
+    OBSTACLE_BYPASS route={.phase=BYPASS_ALIGN,.side=1,.phase_started_ms=1000,.last_ready_ms=1000};
+    S2_MOTION_DATA feedback={.encoder_valid=TRUE,.speed_valid=TRUE,.mode=S2_MODE_STOP,
+        .timestamp_ms=1000,.speed_timestamp_ms=1000};
+    const S3_LINE_DATA line={0};
+    S5_NAV_DATA nav={.phase=S5_NAV_BLOCKED};
+    S5_RANGE_DATA range={.distance_mm=180,.timestamp_ms=1000,.valid=TRUE};
+    BYPASS_INPUT input={.motion=&feedback,.line=&line,.nav=&nav,.range=&range,.now_ms=1000,.ready=TRUE};
+    S2_MOVE_TARGETS targets;
+    assert(s2_turn_begin(&route.move,90,120,&feedback,1000)==E_OK);
+    assert(app_bypass_step(&route,&input,&targets)==APP_CTRL_STOPPED&&!targets.left_rpm_x10&&!targets.right_rpm_x10);
+    assert(app_bypass_step(&route,&input,&targets)==APP_CTRL_STOPPED);
+    range.distance_mm=550;nav.phase=S5_NAV_CLEAR;
+    input.now_ms=range.timestamp_ms=1080;
+    assert(app_bypass_step(&route,&input,&targets)==APP_CTRL_STOPPED);
+    assert(app_bypass_step(&route,&input,&targets)==APP_CTRL_STOPPED);
+    input.now_ms=range.timestamp_ms=feedback.timestamp_ms=feedback.speed_timestamp_ms=1160;
+    assert(app_bypass_step(&route,&input,&targets)==APP_CTRL_RECOVERING&&targets.left_rpm_x10<0&&targets.right_rpm_x10>0);
+    range.distance_mm=190;range.timestamp_ms=input.now_ms=1240;
+    assert(app_bypass_step(&route,&input,&targets)==APP_CTRL_STOPPED);
+    range.timestamp_ms=input.now_ms=1320;
+    assert(app_bypass_step(&route,&input,&targets)==APP_CTRL_FAULT&&!targets.left_rpm_x10&&!targets.right_rpm_x10);
+    pass("return pivot pauses on one close echo, needs two clear samples to resume and faults on confirmed obstruction");
+}
+#endif
 int main(void){
 #if APP_S3_BARCODE_DETECT
     test_junction();
@@ -821,6 +875,7 @@ int main(void){
     pass("both turn directions reduce only inside duty faster and recover at the normal rate");
     run(0);run(1);run(2);run(3);run(5);run(6);run(15);
 #ifdef APP_OBSTACLE_BYPASS
+    test_return_echo();
     run(7);run(8);run(9);run(10);run(11);run(12);run(13);run(14);run(16);
 #else
     run(4);run(17);run(18);run(19);
@@ -832,7 +887,8 @@ with tempfile.TemporaryDirectory(prefix='robocar-ao-stop-') as directory:
     c=Path(directory)/'stop_path.c';exe=Path(directory)/'stop_path.exe'
     c.write_text(prefix+'\n#include "motion_control.c"\n#include "odometry.c"\n'+api+loop+controller+tests,encoding='utf-8')
     for flags in ([],['-DAPP_OBSTACLE_BYPASS=1'],
-                  ['-DAPP_OBSTACLE_BYPASS=1','-DAPP_BYPASS_ENCODER_ALIGN=1','-DAPP_S3_BARCODE_DETECT=1']):
+                  ['-DAPP_OBSTACLE_BYPASS=1','-DAPP_BYPASS_ENCODER_ALIGN=1'],
+                  ['-DAPP_OBSTACLE_BYPASS=1','-DAPP_BYPASS_LINE_RETURN=1','-DAPP_S3_BARCODE_DETECT=1']):
         subprocess.run(['gcc','-std=c11','-Wall','-Wextra','-Werror',*flags,
                         '-I',str(root/'app_program'),'-I',str(root/'app_program/subsystem2'),
                         str(c),'-o',str(exe)],check=True)
