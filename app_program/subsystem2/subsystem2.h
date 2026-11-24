@@ -55,10 +55,10 @@ EXPORT void subsystem2_test_status(void);
 #define S2_PID_KD_X1000          0
 #define S2_PID_INTEGRAL_LIMIT_X100 1500
 #define S2_PID_MAX_DUTY_X100     4000
-#define S2_PID_SLEW_X100_PER_S   2000
+#define S2_PID_SLEW_X100_PER_S   3000
 /* Faster PWM reduction for the inside wheel of a strong forward turn. */
-#define S2_TURN_FALL_X100_PER_S  8000
-#define S2_TURN_MIN_SPLIT_RPM_X10 70
+#define S2_TURN_FALL_X100_PER_S  10000
+#define S2_TURN_MIN_SPLIT_RPM_X10 60
 #define S2_PID_FF_RPM_X10       350
 #define S2_PID_LEFT_FF_X100     1800
 #define S2_PID_RIGHT_FF_X100    2000

@@ -133,8 +133,10 @@ static UB barcode_sample(UW raw,UW now_us)
             return code;
         }
         if(!barcode_pending_code && barcode_history_count>=2U && elapsed>S3_BC_MAX_RUN_US){
+            const BOOL barcode_burst=barcode_history_count>=S3_BC_RUNS;
             ++barcode_signal.rejected;
             barcode_history_count=0;
+            if(barcode_burst)return 1U;
         }
         if(elapsed>BARCODE_HISTORY_IDLE_US)
             barcode_history_edge_us=now_us-BARCODE_HISTORY_IDLE_US;
@@ -195,7 +197,7 @@ static void sample_line_and_barcode(void)
         }else{
             channel_changed=FALSE;
             const UB code=barcode_sample(raw,in_w(TIMER_TIMERAWL));
-            if(code){
+            if(code && (code>=S3_BC_VALID || !detection_pending)){
                 SYSTIM now={0};
                 (void)tk_get_tim(&now);
                 detection_ms=now.lo;
@@ -211,7 +213,8 @@ static void sample_line_and_barcode(void)
             s3_publish_barcode_signal(&barcode_signal);
             last_signal_us=now_us;
         }
-        if(detection_pending && s3_publish_barcode_detection(detection_ms,detection_pending)!=E_TMOUT)
+        if(detection_pending &&
+           s3_publish_barcode_detection(detection_ms,detection_pending==1U?0U:detection_pending)!=E_TMOUT)
             detection_pending=0;
     }
 }

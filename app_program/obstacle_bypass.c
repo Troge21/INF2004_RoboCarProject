@@ -5,6 +5,7 @@
 #define BYPASS_EFFECTIVE_TRACK_MM 120U
 #define BYPASS_SHIFT_MM 280
 #define BYPASS_PASS_MM 600
+#define BYPASS_MIN_RETURN_MM_X10 800U
 #define BYPASS_RANGE_MAX_AGE_MS 500U
 /* Centred pings are roughly 400 ms apart. A single unusable ping can
  * leave clearance unavailable for two intervals while turning. */
@@ -50,11 +51,15 @@ static BOOL range_available(const BYPASS_INPUT *input)
         (UW)(input->now_ms - range->timestamp_ms) <= BYPASS_RANGE_MAX_AGE_MS;
 }
 
-static void observe_return_line(OBSTACLE_BYPASS *bypass, const S3_LINE_DATA *line)
+static void observe_return_line(OBSTACLE_BYPASS *bypass, const S3_LINE_DATA *line, BOOL allow_latch)
 {
-    if (bypass->line_state == LINE_CONFIRMED || line->timestamp_ms == bypass->line_timestamp_ms)
+    if (line->timestamp_ms == bypass->line_timestamp_ms)
         return;
     bypass->line_timestamp_ms = line->timestamp_ms;
+    if (bypass->line_state == LINE_CONFIRMED) {
+        if (!allow_latch && !line->pattern) bypass->line_state = WAIT_LINE;
+        return;
+    }
     if (!line->pattern) bypass->line_state = WAIT_LINE;
     else if (bypass->line_state >= WAIT_LINE) ++bypass->line_state;
 }
@@ -75,6 +80,7 @@ unsigned app_bypass_step(OBSTACLE_BYPASS *bypass, const BYPASS_INPUT *input,
     }
     const BYPASS_PHASE phase = (BYPASS_PHASE)bypass->phase;
     const UW elapsed = input->now_ms - bypass->phase_started_ms;
+    const BOOL turning = route[phase].turn_deg != 0;
     const BOOL initial = phase == BYPASS_TURN_OUT;
     const BOOL matching_turn = opening_turn(input->nav) && input->nav->turn_id == bypass->scan_id;
     const BOOL awaiting_start = bypass->move.result == S2_MOVE_IDLE;
@@ -82,13 +88,15 @@ unsigned app_bypass_step(OBSTACLE_BYPASS *bypass, const BYPASS_INPUT *input,
     const BOOL have_range = range_available(input);
     if (input->motion->faults || elapsed >= BYPASS_LEG_LIMIT_MS ||
         (initial && input->nav && !matching_turn) ||
-        (!route[phase].turn_deg && !awaiting_start && !reached && have_range &&
+        (!turning && !awaiting_start && !reached && have_range &&
          input->range->valid && input->range->distance_mm <= S5_OBSTACLE_MM))
         return fail_bypass(bypass);
 
     const BOOL clearance = have_range && (input->range->no_return || input->range->distance_mm > S5_OBSTACLE_MM) &&
         input->nav && input->nav->phase == S5_NAV_CLEAR;
-    const BOOL ready = input->ready && (initial ? matching_turn : (reached || clearance));
+    /* Ignore transient corner echoes while actively executing an in-place turn. */
+    const BOOL turn_active_ready = turning && !awaiting_start && have_range;
+    const BOOL ready = input->ready && (initial ? matching_turn : (reached || clearance || turn_active_ready));
     if (awaiting_start && elapsed >= BYPASS_START_LIMIT_MS) return fail_bypass(bypass);
     if (!ready) {
         if (!awaiting_start && (UW)(input->now_ms - bypass->last_ready_ms) >= BYPASS_SENSOR_WAIT_MS)
@@ -98,23 +106,6 @@ unsigned app_bypass_step(OBSTACLE_BYPASS *bypass, const BYPASS_INPUT *input,
         return APP_CTRL_STOPPED;
     }
     bypass->last_ready_ms = input->now_ms;
-
-    /* Tape can enter the beam just as the encoder target cuts the drive.
-     * Count fresh samples through the existing stopped-speed confirmation. */
-    if (phase == BYPASS_SHIFT_IN && !awaiting_start)
-        observe_return_line(bypass, input->line);
-
-    if (reached) {
-        if (!input->settled) return APP_CTRL_STOPPED;
-        if (initial && subsystem5_end_turn(bypass->scan_id) != E_OK) return APP_CTRL_STOPPED;
-#ifndef APP_BYPASS_ENCODER_ALIGN
-        if (phase == BYPASS_SHIFT_IN && bypass->line_state != LINE_CONFIRMED)
-            return fail_bypass(bypass);
-#endif
-        set_phase(bypass, phase == BYPASS_ALIGN ? BYPASS_IDLE : (BYPASS_PHASE)(phase + 1),
-                  input->now_ms);
-        return APP_CTRL_STOPPED;
-    }
 
     const INT turn = route[phase].turn_deg;
     const S2_MOTION_DATA *motion = input->motion;
@@ -128,6 +119,30 @@ unsigned app_bypass_step(OBSTACLE_BYPASS *bypass, const BYPASS_INPUT *input,
         calibrated.distance_centre_mm_x10 =
             (calibrated.distance_left_mm_x10 + calibrated.distance_right_mm_x10) / 2;
         motion = &calibrated;
+    }
+
+    /* Tape can enter the beam just as the encoder target cuts the drive, or
+     * before the full fixed offset completes once minimum clearance is met. */
+    if (phase == BYPASS_SHIFT_IN && !awaiting_start) {
+        const uint64_t progress = (!reached && motion->distance_centre_mm_x10 >= bypass->move.origin_mm_x10) ?
+            (uint64_t)(motion->distance_centre_mm_x10 - bypass->move.origin_mm_x10) : 0U;
+        observe_return_line(bypass, input->line, reached || progress >= BYPASS_MIN_RETURN_MM_X10);
+        if (!reached && bypass->line_state == LINE_CONFIRMED && progress >= BYPASS_MIN_RETURN_MM_X10) {
+            bypass->move.result = S2_MOVE_REACHED;
+            return APP_CTRL_STOPPED;
+        }
+    }
+
+    if (reached) {
+        if (!input->settled) return APP_CTRL_STOPPED;
+        if (initial && subsystem5_end_turn(bypass->scan_id) != E_OK) return APP_CTRL_STOPPED;
+#ifndef APP_BYPASS_ENCODER_ALIGN
+        if (phase == BYPASS_SHIFT_IN && bypass->line_state != LINE_CONFIRMED)
+            return fail_bypass(bypass);
+#endif
+        set_phase(bypass, phase == BYPASS_ALIGN ? BYPASS_IDLE : (BYPASS_PHASE)(phase + 1),
+                  input->now_ms);
+        return APP_CTRL_STOPPED;
     }
 
     if (awaiting_start) {

@@ -37,6 +37,9 @@ static INT app_tape_level(UINT adc, UINT edge, UINT dark)
 
 enum {
     LINE_FORWARD_RPM_X10 = 260,
+    LINE_EDGE_TRIM_RPM_X10 = 100,
+    LINE_BEND_TRIM_RPM_X10 = 160,
+    LINE_BEND_START_LEVEL = 40,
     LINE_SPEED_PERCENT = 90,
     STRAIGHT_RIGHT_RPM_X10 = LINE_FORWARD_RPM_X10 * LINE_SPEED_PERCENT / 100,
     STRAIGHT_LEFT_RPM_X10 = STRAIGHT_RIGHT_RPM_X10 - 28
@@ -45,10 +48,11 @@ enum {
 static void app_line_targets(const S3_LINE_DATA *line, INT *left, INT *right)
 {
 #if S2_LINE_USE_RPM_CONTROL
-    const INT forward = LINE_FORWARD_RPM_X10, edge_trim = 70, bend_trim = 70;
+    const INT forward = LINE_FORWARD_RPM_X10, edge_trim = LINE_EDGE_TRIM_RPM_X10,
+              bend_trim = LINE_BEND_TRIM_RPM_X10, bend_start = LINE_BEND_START_LEVEL;
 #else
     const INT forward = APP_FORWARD_DUTY, edge_trim = APP_FORWARD_DUTY - APP_INNER_DUTY;
-    const INT bend_trim = 0;
+    const INT bend_trim = 0, bend_start = 60;
 #endif
     if (!line->valid || line->pattern > 3U) {
         *left = *right = 0;
@@ -62,14 +66,13 @@ static void app_line_targets(const S3_LINE_DATA *line, INT *left, INT *right)
     const INT error = app_tape_level(line->centre_adc, 250U, 750U) -
                       app_tape_level(line->right_adc, 450U, 2650U);
     const INT strength = error < 0 ? -error : error;
-    const INT bend_start = 60;
     INT trim = strength * edge_trim / 100;
-    /* Leave the weak-edge response alone. Tighten only with strong contrast
-     * on one side, using this sample so the correction fades off the tape. */
+    /* Tighten smoothly as one sensor saturates toward a bend, clamped at zero. */
     if (strength > bend_start)
         trim += (strength - bend_start) * bend_trim / (100 - bend_start);
+    if (trim > forward) trim = forward;
     if (error > 0) *left -= trim;
-    else *right -= trim;
+    else if (error < 0) *right -= trim;
 }
 static ER app_motor_request(INT left, INT right)
 {
@@ -79,6 +82,18 @@ static ER app_motor_request(INT left, INT right)
     return subsystem2_set_duty(left, right);
 #endif
 }
+
+#if S2_LINE_USE_RPM_CONTROL
+enum {
+    LINE_SHARP_STRENGTH = 90,
+    LINE_SHARP_HOLD_MS = 260,
+    LINE_SHARP_REVERSE_RPM_X10 = 120
+};
+static struct {
+    UW since_ms;
+    int8_t side; /* +1 = left bend (GP27), -1 = right bend (GP26), 0 = none */
+} sharp_bend;
+#endif
 
 #if defined(APP_OBSTACLE_BYPASS) || (APP_S3_BARCODE_DETECT && S2_LINE_USE_RPM_CONTROL)
 static UW last_drive_ms;
@@ -94,6 +109,7 @@ static OBSTACLE_BYPASS bypass;
 #define JUNCTION_TRACK_MM 120U
 #define JUNCTION_EXIT_MM_X10 600
 #define JUNCTION_SETTLE_MS 2000U
+#define JUNCTION_BARCODE_MAX_AGE_MS 2000U
 enum { JUNCTION_IDLE, JUNCTION_CENTERING, JUNCTION_TURNING, JUNCTION_SETTLING, JUNCTION_FAILED };
 static struct {
     S2_ENCODER_MOVE move;
@@ -104,6 +120,15 @@ static struct {
     int16_t turn_degrees;
     BOOL crossed, needs_exit;
 } junction;
+
+static void calibrate_straight_motion(const S2_MOTION_DATA *raw, S2_MOTION_DATA *calibrated)
+{
+    *calibrated = *raw;
+    calibrated->distance_left_mm_x10 = calibrated->distance_left_mm_x10 *
+        STRAIGHT_RIGHT_RPM_X10 / STRAIGHT_LEFT_RPM_X10;
+    calibrated->distance_centre_mm_x10 =
+        (calibrated->distance_left_mm_x10 + calibrated->distance_right_mm_x10) / 2;
+}
 
 static void junction_cancel(BOOL stop_latched)
 {
@@ -124,7 +149,8 @@ static void junction_read_barcode(BOOL accept, UW now)
     if (telemetry_get_barcode(&barcode) != E_OK || barcode.event_sequence == junction.barcode_sequence)
         return;
     junction.barcode_sequence = barcode.event_sequence;
-    if (accept && (UW)(now - barcode.timestamp_ms) <= S2_FEEDBACK_MAX_AGE_MS)
+    if (accept && barcode.code != 0U &&
+        (UW)(now - barcode.timestamp_ms) <= JUNCTION_BARCODE_MAX_AGE_MS)
         junction.pending_code = barcode.code;
 }
 
@@ -132,11 +158,13 @@ static void junction_observe(const S3_LINE_DATA *line, const S2_MOTION_DATA *mot
 {
     if (line->timestamp_ms == junction.last_line_ms) return;
     junction.last_line_ms = line->timestamp_ms;
+    S2_MOTION_DATA calibrated;
+    calibrate_straight_motion(motion, &calibrated);
     if (line->pattern != 3U) {
         junction.cross_samples = 0;
         if (junction.exit_samples < 3U) ++junction.exit_samples;
         if (junction.exit_samples == 3U && (!junction.needs_exit ||
-            motion->distance_centre_mm_x10 - junction.exit_mm_x10 >= JUNCTION_EXIT_MM_X10)) {
+            calibrated.distance_centre_mm_x10 - junction.exit_mm_x10 >= JUNCTION_EXIT_MM_X10)) {
             junction.crossed = junction.needs_exit = FALSE;
         }
         return;
@@ -148,7 +176,7 @@ static void junction_observe(const S3_LINE_DATA *line, const S2_MOTION_DATA *mot
     junction.pending_code = 0;
     if (action == APP_BARCODE_UNMAPPED || action == APP_BARCODE_FORWARD) return;
     junction.turn_degrees = action == APP_BARCODE_LEFT ? 90 : action == APP_BARCODE_RIGHT ? -90 : 180;
-    junction.crossing_mm_x10 = motion->distance_centre_mm_x10;
+    junction.crossing_mm_x10 = calibrated.distance_centre_mm_x10;
     junction.phase = JUNCTION_CENTERING;
     junction.phase_ms = now;
 }
@@ -161,11 +189,13 @@ static unsigned junction_step(const S2_MOTION_DATA *motion, UW now, BOOL settled
         junction.phase = JUNCTION_FAILED;
         return APP_CTRL_FAULT;
     }
+    S2_MOTION_DATA calibrated;
+    calibrate_straight_motion(motion, &calibrated);
     if (junction.move.result != S2_MOVE_RUNNING) {
         if (!settled) {
             if ((UW)(now - junction.phase_ms) >= JUNCTION_SETTLE_MS) junction.phase = JUNCTION_FAILED;
         } else if (junction.phase == JUNCTION_SETTLING) {
-            junction.exit_mm_x10 = motion->distance_centre_mm_x10;
+            junction.exit_mm_x10 = calibrated.distance_centre_mm_x10;
             junction.needs_exit = TRUE;
             junction.exit_samples = 0;
             junction.phase = JUNCTION_IDLE;
@@ -173,14 +203,14 @@ static unsigned junction_step(const S2_MOTION_DATA *motion, UW now, BOOL settled
             ER er;
             if (junction.phase == JUNCTION_CENTERING) {
                 int64_t remaining = JUNCTION_CENTER_MM * 10LL -
-                    (motion->distance_centre_mm_x10 - junction.crossing_mm_x10);
+                    (calibrated.distance_centre_mm_x10 - junction.crossing_mm_x10);
                 if (remaining <= 0) {
                     junction.phase = JUNCTION_TURNING;
                     junction.phase_ms = now;
                     return APP_CTRL_RECOVERING;
                 }
                 if (remaining > JUNCTION_CENTER_MM * 10LL) remaining = JUNCTION_CENTER_MM * 10LL;
-                er = s2_linear_begin(&junction.move, (INT)((remaining + 9) / 10), motion, now);
+                er = s2_linear_begin(&junction.move, (INT)((remaining + 9) / 10), &calibrated, now);
             } else {
                 er = s2_turn_begin(&junction.move, junction.turn_degrees, JUNCTION_TRACK_MM, motion, now);
             }
@@ -192,7 +222,8 @@ static unsigned junction_step(const S2_MOTION_DATA *motion, UW now, BOOL settled
         }
     }
     if (junction.move.result == S2_MOVE_RUNNING) {
-        S2_MOVE_RESULT result = s2_encoder_move_step(&junction.move, motion, now, TRUE, targets);
+        const S2_MOTION_DATA *move_motion = junction.phase == JUNCTION_CENTERING ? &calibrated : motion;
+        S2_MOVE_RESULT result = s2_encoder_move_step(&junction.move, move_motion, now, TRUE, targets);
         if (result == S2_MOVE_REACHED) {
             junction.phase = junction.phase == JUNCTION_CENTERING ? JUNCTION_TURNING : JUNCTION_SETTLING;
             junction.phase_ms = now;
@@ -257,6 +288,8 @@ static void app_controller_step(UW started_ms)
     /* Observe one full stationary speed window before commanding reversal. */
     BOOL turn_settled = stopped &&
         (UW)(now.lo - motion.speed_timestamp_ms) + motion.speed_period_ms <= (UW)(now.lo - last_drive_ms);
+#endif
+#if S2_LINE_USE_RPM_CONTROL || defined(APP_OBSTACLE_BYPASS)
     BOOL signed_targets = FALSE;
 #endif
     unsigned inhibit = app_controller_poll_ready(resume_ready);
@@ -328,12 +361,27 @@ static void app_controller_step(UW started_ms)
 #if S2_LINE_USE_RPM_CONTROL
         left = left * LINE_SPEED_PERCENT / 100;
         right = right * LINE_SPEED_PERCENT / 100;
-        /* Compensate for the observed rightward drift on plain white, and keep
-         * weak left-edge corrections monotonically below straight-line trim. */
-        if ((line.pattern == 0U && left == right) || left < right) {
-            const INT inside = (LINE_FORWARD_RPM_X10 - 140) * LINE_SPEED_PERCENT / 100;
-            left = inside + (left - inside) * (STRAIGHT_LEFT_RPM_X10 - inside) /
-                (STRAIGHT_RIGHT_RPM_X10 - inside);
+        /* Apply the physical left-wheel trim uniformly so weak right-edge
+         * turns stay monotonic and both turn directions respond symmetrically. */
+        left = left * STRAIGHT_LEFT_RPM_X10 / STRAIGHT_RIGHT_RPM_X10;
+        const INT error = app_tape_level(line.centre_adc, 250U, 750U) -
+                          app_tape_level(line.right_adc, 450U, 2650U);
+        const int8_t bend_side = (line.pattern == 2U && error >= LINE_SHARP_STRENGTH) ? 1 :
+            (line.pattern == 1U && error <= -LINE_SHARP_STRENGTH) ? -1 : 0;
+        if (!bend_side) {
+            sharp_bend.side = 0;
+        } else if (bend_side != sharp_bend.side) {
+            sharp_bend.side = bend_side;
+            sharp_bend.since_ms = operating.lo;
+        } else if ((UW)(operating.lo - sharp_bend.since_ms) >= LINE_SHARP_HOLD_MS) {
+            if (bend_side > 0) {
+                left = -(LINE_SHARP_REVERSE_RPM_X10 * STRAIGHT_LEFT_RPM_X10 / STRAIGHT_RIGHT_RPM_X10);
+                right = STRAIGHT_RIGHT_RPM_X10;
+            } else {
+                left = STRAIGHT_LEFT_RPM_X10;
+                right = -LINE_SHARP_REVERSE_RPM_X10;
+            }
+            signed_targets = TRUE;
         }
 #endif
         state = APP_CTRL_FOLLOWING;
@@ -360,7 +408,7 @@ static void app_controller_step(UW started_ms)
             state = (inhibit & APP_CTRL_LATCH) ? APP_CTRL_STOP_LATCHED : APP_CTRL_WAITING_LINE;
     }
     ER er;
-#if defined(APP_OBSTACLE_BYPASS) || (APP_S3_BARCODE_DETECT && S2_LINE_USE_RPM_CONTROL)
+#if S2_LINE_USE_RPM_CONTROL || defined(APP_OBSTACLE_BYPASS)
     if (signed_targets && (left != 0 || right != 0))
         er = subsystem2_set_signed_rpm_x10(left, right);
     else
@@ -385,6 +433,12 @@ static void app_controller_step(UW started_ms)
 #endif
 #endif
     }
+#if S2_LINE_USE_RPM_CONTROL
+    if (state != APP_CTRL_FOLLOWING || inhibit != 0U || er != E_OK) {
+        sharp_bend.side = 0;
+        sharp_bend.since_ms = 0;
+    }
+#endif
     app_controller_publish(state, er);
 }
 static void vehicle_controller_task(INT stacd, void *exinf)

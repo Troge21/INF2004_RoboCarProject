@@ -46,6 +46,8 @@ IMPORT UW tm_usb_pending(void);
 #define S4_LIFT_RISE_DIVISOR        (10U)
 #define S4_LIFT_WINDOW_MS           (900U)
 #define S4_LIFT_COS_SQ_Q8           (220U) /* cos(22 degrees)^2 */
+#define S4_LIFT_MAX_GRAVITY_MG      (1800U)
+#define S4_LIFT_DROP_MS             (60U)
 #define S4_ROLL_ENTER_X10          30
 #define S4_ROLL_SMOOTH_MM_X10      150U
 #define S4_LEVEL_FILTER_MS         160U
@@ -72,8 +74,10 @@ enum {
 typedef struct {
     uint32_t lift_since_ms;
     uint32_t tilt_since_ms;
+    uint32_t drop_since_ms;
     uint8_t lift_phase;
     uint8_t tilt_active;
+    uint8_t drop_active;
 } S4_PICKUP_PROGRESS;
 
 typedef struct {
@@ -468,19 +472,42 @@ static BOOL pickup_update(S4_PICKUP_PROGRESS *progress,
     const int32_t dot = (int32_t)reference->x_mg * accel->x_mg +
         (int32_t)reference->y_mg * accel->y_mg + (int32_t)reference->z_mg * accel->z_mg;
     const BOOL gravity_ok = gravity_sample(accel_sq);
+    const BOOL lift_norm_ok = accel_sq >= S4_CAL_MIN_GRAVITY_MG * S4_CAL_MIN_GRAVITY_MG &&
+        accel_sq <= S4_LIFT_MAX_GRAVITY_MG * S4_LIFT_MAX_GRAVITY_MG;
     if (!gravity_sample(reference_sq)) return FALSE;
 
     if (progress->lift_phase == S4_LIFT_ARMED) {
-        if (now_ms - progress->lift_since_ms > S4_LIFT_WINDOW_MS)
+        if (now_ms - progress->lift_since_ms > S4_LIFT_WINDOW_MS) {
             progress->lift_phase = S4_LIFT_IDLE;
-    } else if (!gravity_ok || dot < (int32_t)(reference_sq + reference_sq / S4_LIFT_RISE_DIVISOR)) {
+            progress->drop_active = FALSE;
+        }
+    } else if (!lift_norm_ok || dot < (int32_t)(reference_sq + reference_sq / S4_LIFT_RISE_DIVISOR)) {
         progress->lift_phase = S4_LIFT_IDLE;
+        progress->drop_active = FALSE;
     } else if (progress->lift_phase == S4_LIFT_IDLE) {
         progress->lift_phase = S4_LIFT_RISING;
         progress->lift_since_ms = now_ms;
+        progress->drop_active = FALSE;
     } else if (now_ms - progress->lift_since_ms >= S4_LIFT_RISE_MS) {
         progress->lift_phase = S4_LIFT_ARMED;
         progress->lift_since_ms = now_ms;
+        progress->drop_active = FALSE;
+    }
+
+    /* Confirm a level vertical lift when the initial >=1.1g rise is followed by
+     * sustained deceleration below 0.85g along the resting vertical. */
+    if (progress->lift_phase == S4_LIFT_ARMED) {
+        const BOOL lift_drop = dot > 0 &&
+            (uint64_t)(uint32_t)dot * 20U <= (uint64_t)reference_sq * 17U &&
+            (uint64_t)accel_sq * 100U <= (uint64_t)reference_sq * 75U;
+        if (!lift_drop) {
+            progress->drop_active = FALSE;
+        } else if (!progress->drop_active) {
+            progress->drop_active = TRUE;
+            progress->drop_since_ms = now_ms;
+        } else if (now_ms - progress->drop_since_ms >= S4_LIFT_DROP_MS) {
+            return TRUE;
+        }
     }
 
     const unsigned cos_sq = progress->lift_phase == S4_LIFT_ARMED ?

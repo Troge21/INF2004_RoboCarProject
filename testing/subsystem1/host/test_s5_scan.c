@@ -369,6 +369,18 @@ int main(void){
     assert(scan_width(live_box,232)==164);
     assert(scan_width(intermittent_edge,224)==148);
     pass("a 155 mm box capture with an intermittent edge resolves to 148 mm in replay");
+    /* Angled box face slightly closer than centre - tolerance, plus boundary far echo. */
+    for(unsigned i=0;i<SCAN_POINTS;++i)
+        packed_ranges[i]=(i<=SCAN_MIDDLE-8U||i>=SCAN_MIDDLE+8U)?600U:200U;
+    packed_ranges[SCAN_MIDDLE-4]=145U;
+    packed_ranges[SCAN_MIDDLE+4]=145U;
+    assert(scan_width(packed_ranges,200)>0);
+    packed_ranges[SCAN_MIDDLE+4]=110U; /* < centre - 2*tolerance still rejected */
+    assert(scan_width(packed_ranges,200)==0);
+    for(unsigned i=0;i<SCAN_POINTS;++i)packed_ranges[i]=200U;
+    packed_ranges[0]=600U;packed_ranges[SCAN_POINTS-1]=600U;
+    assert(scan_width(packed_ranges,200)>0);
+    pass("angled face within 2x tolerance and boundary-step far echoes resolve obstacle width");
     printf("SUMMARY: %u actual S5 scan/publication checks passed, APP_TEST=%d; no motor API linked.\n",checks,APP_TEST);
     return 0;
 }

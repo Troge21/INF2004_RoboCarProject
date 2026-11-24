@@ -88,7 +88,7 @@ ER s3_barcode_read_ao(UW *value, BOOL channel_changed)
 
 ER s3_publish_barcode_detection(UW timestamp_ms, UB code)
 {
-    if(!s3_barcode_character(code))return E_PAR;
+    if(code && !s3_barcode_character(code))return E_PAR;
     if(s_barcode_sem<=0)return E_OBJ;
     ER er=tk_wai_sem(s_barcode_sem,1,TMO_POL);
     if(er!=E_OK)return er;

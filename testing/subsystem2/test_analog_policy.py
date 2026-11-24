@@ -11,7 +11,7 @@ for rpm in (0, 1):
               'typedef struct { UINT pattern; int valid; uint16_t centre_adc, right_adc; } S3_LINE_DATA;\n'
               f'#define S2_LINE_USE_RPM_CONTROL {rpm}\n'
               '#define APP_FORWARD_DUTY 20\n#define APP_INNER_DUTY 15\n')
-    forward, partial, transition, bend, inner = (260, 225, 218, 169, 120) if rpm else (20, 18, 17, 16, 15)
+    forward, partial, transition, bend, inner = (260, 184, 147, 74, 0) if rpm else (20, 18, 17, 16, 15)
     checks = f'''
 int main(void) {{
     INT l, r;

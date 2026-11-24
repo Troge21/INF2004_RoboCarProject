@@ -150,11 +150,18 @@ tests = r'''
 static void pass(const char *name){++checks;printf("PASS: %s\n",name);}
 static void stopped(void){for(unsigned i=0;i<4;++i)assert(compare[i]==0);}
 static BOOL moving(void){return compare[0]>0&&compare[2]>0;}
-enum { line_forward_rpm_x10 = 234, line_straight_left_rpm_x10 = 206, line_inside_rpm_x10 = 108 };
+enum {
+    line_forward_rpm_x10 = 234,
+    line_straight_left_rpm_x10 = 206,
+    line_inside_rpm_x10 = 0,
+    line_sharp_right_rev_rpm_x10 = -120,
+    line_sharp_left_rev_rpm_x10 = -(120 * 206 / 234)
+};
 #ifdef APP_OBSTACLE_BYPASS
 static void run_bypass_cycle(void){
     static unsigned seen, release_at;
-    static BOOL checked_opening_gap,checked_range_gap;
+    static BOOL checked_opening_gap,checked_range_gap,checked_shift_early;
+    static int64_t shift_in_origin_x10;
     uint8_t snapshot[5],reply[10];
     const int side=scenario==8?-1:1;
     if(scenario==13){
@@ -171,7 +178,8 @@ static void run_bypass_cycle(void){
         return;
     }
     if(phase==0&&moving()){
-        seen=0;checked_opening_gap=checked_range_gap=FALSE;obstacle_stop_required=TRUE;nav_phase=S5_NAV_SCANNING;phase=1;
+        seen=0;checked_opening_gap=checked_range_gap=checked_shift_early=FALSE;shift_in_origin_x10=0;
+        obstacle_stop_required=TRUE;nav_phase=S5_NAV_SCANNING;phase=1;
     }else if(phase==1){
         stopped();pattern=0;nav_turn_id=1;
         assert(app_controller_scan_stop_ready()&&!(app_controller_poll()&APP_CTRL_LATCH));
@@ -193,18 +201,31 @@ static void run_bypass_cycle(void){
         }
     }else if(phase==4){
         if(bypass.phase==BYPASS_SHIFT_IN){
+            if(scenario==21&&!shift_in_origin_x10&&bypass.move.result==S2_MOVE_RUNNING)
+                shift_in_origin_x10=bypass.move.origin_mm_x10;
             if(scenario==14&&bypass.move.result==S2_MOVE_REACHED){
                 stopped();pattern=1;
             }else if(moving()&&scenario!=9&&scenario!=14){
                 pattern=(seen&(1U<<BYPASS_SHIFT_IN))?1U:0U;
             }
+            if(scenario==21&&bypass.move.result==S2_MOVE_REACHED&&!checked_shift_early){
+                S2_MOTION_DATA motion_now;
+                assert(subsystem2_get_motion(&motion_now)==E_OK);
+                int64_t calib_l=motion_now.distance_left_mm_x10*line_forward_rpm_x10/line_straight_left_rpm_x10;
+                int64_t progress=(calib_l+motion_now.distance_right_mm_x10)/2-shift_in_origin_x10;
+                assert(bypass.line_state==LINE_CONFIRMED&&progress>=800&&progress<BYPASS_SHIFT_MM*10);
+                checked_shift_early=TRUE;
+            }
         }
-        if(scenario==14)assert(bypass.phase!=BYPASS_FAILED);
+        if(scenario==14||scenario==20||scenario==21)assert(bypass.phase!=BYPASS_FAILED);
         if(!checked_range_gap&&
            ((scenario==8&&bypass.phase==BYPASS_TURN_ALONG&&compare[1]&&compare[2])||
             (scenario==12&&bypass.phase==BYPASS_PASS&&moving()))){
             checked_range_gap=TRUE;front_missing=TRUE;
             release_at=ticks+(scenario==12?BYPASS_SENSOR_WAIT_MS/20U+5U:40U);phase=10;
+        }else if(scenario==20&&!checked_range_gap&&bypass.phase==BYPASS_TURN_ALONG&&compare[0]&&compare[3]){
+            checked_range_gap=TRUE;front_blocked=TRUE;
+            release_at=ticks+15U;phase=10;
         }else if(scenario==10&&bypass.phase==BYPASS_SHIFT_OUT&&moving()){
             front_blocked=TRUE;phase=5;
         }else if(scenario==11&&bypass.phase==BYPASS_PASS&&moving()){
@@ -221,6 +242,7 @@ static void run_bypass_cycle(void){
         }else if(bypass.phase==BYPASS_IDLE){
             const unsigned all=(1U<<(BYPASS_ALIGN+1))-2U;
             assert((seen&all)==all);
+            if(scenario==21)assert(checked_shift_early);
 #ifdef APP_BYPASS_ENCODER_ALIGN
             assert((bypass.line_state==LINE_CONFIRMED)==(scenario!=9));
 #else
@@ -245,10 +267,14 @@ static void run_bypass_cycle(void){
                 "returning clearance cannot restart an aborted bypass");
             longjmp(done,1);
         }
-    }else if(phase==8&&moving()){
+    }else if(phase==8&&(scenario==9?moving():(compare[0]>0&&!compare[1]&&!compare[2]&&!compare[3]))){
         assert(app_controller_snapshot(snapshot)==E_OK&&(snapshot[4]&15)==APP_CTRL_FOLLOWING);
         if(scenario==14)
             pass("fresh tape at the return cutoff is confirmed while the wheels settle");
+        else if(scenario==20)
+            pass("transient corner echo during an active bypass turn neither pauses nor faults the route");
+        else if(scenario==21)
+            pass("confirmed return tape stops the shift-in leg before overshooting to the fixed limit");
         else if(scenario==9){
             const S2_COMMAND command=read_command();
             assert(!pattern&&command.left==206&&command.right==234);
@@ -265,6 +291,13 @@ static void run_bypass_cycle(void){
             invalid=0;phase=2;
         }
     }else if(phase==10){
+        if(scenario==20){
+            assert(bypass.phase==BYPASS_TURN_ALONG&&(compare[0]||compare[3]));
+            if(ticks==release_at){
+                front_blocked=FALSE;phase=4;
+            }
+            return;
+        }
         stopped();
         if(bypass.phase==BYPASS_FAILED){
             assert(scenario==12&&ticks+6U>=release_at);
@@ -450,9 +483,8 @@ static ER tk_dly_tsk(INT ms){
         assert(nav_reads==0&&ended_turn_id==0);
         if(ticks<=24U){
             const S2_COMMAND command=read_command();
-            assert(moving()&&!compare[1]&&!compare[3]);
-            const INT expected_left=pattern==0U?line_straight_left_rpm_x10:
-                (pattern==2U?line_inside_rpm_x10:line_forward_rpm_x10);
+            assert((compare[0]>0||compare[2]>0)&&!compare[1]&&!compare[3]);
+            const INT expected_left=pattern==2U?line_inside_rpm_x10:line_straight_left_rpm_x10;
             assert(command.left==expected_left);
             assert(command.right==(pattern==1U?line_inside_rpm_x10:line_forward_rpm_x10));
             assert(app_controller_snapshot(snapshot)==E_OK&&(snapshot[4]&15)==APP_CTRL_FOLLOWING);
@@ -466,20 +498,20 @@ static ER tk_dly_tsk(INT ms){
             const S2_COMMAND command=read_command();
             assert(command.mode==S2_MODE_RPM);
             if(ticks==28U){
-                assert(command.left<line_straight_left_rpm_x10&&command.left>line_inside_rpm_x10);
-                assert(command.right==line_forward_rpm_x10);
+                assert(command.left==190&&command.right==line_forward_rpm_x10);
                 centre_edge_adc=0;
+            }else if(ticks==26U){
+                assert(command.left==line_straight_left_rpm_x10&&command.right==211);
+                right_edge_adc=0;
             }else{
-                const BOOL neutral_white=pattern==0U&&right_edge_adc==0U&&centre_edge_adc==0U;
-                assert(command.left==(neutral_white?line_straight_left_rpm_x10:line_forward_rpm_x10));
+                assert(command.left==line_straight_left_rpm_x10);
             }
             if(ticks==25U){assert(command.right==line_inside_rpm_x10);pattern=0;right_edge_adc=1000;}
-            if(ticks==26U){assert(command.right==218);right_edge_adc=0;}
             if(ticks==27U){assert(command.right==line_forward_rpm_x10);centre_edge_adc=350;}
             if(ticks==31U)pattern=1;
             if(ticks==32U){
                 assert(command.right==line_inside_rpm_x10);
-                pass("the live controller applies left-wheel trim on neutral white and preserves the tape-edge corrections");
+                pass("the live controller applies left-wheel trim uniformly on neutral white and preserves symmetric tape-edge corrections");
                 assert(app_controller_submit_stop(105,99,operating_ms+1000U)==E_OK);
             }
         }else{
@@ -525,21 +557,26 @@ static ER tk_dly_tsk(INT ms){
         const UINT inside_pattern=turning_left?2U:1U;
         const INT inside_target=turning_left?command.left:command.right;
         const INT outside_target=turning_left?command.right:command.left;
+        const INT expected_outside=turning_left?line_forward_rpm_x10:line_straight_left_rpm_x10;
+        const INT expected_rev=turning_left?line_sharp_left_rev_rpm_x10:line_sharp_right_rev_rpm_x10;
         if(ticks==1U){
             pattern=inside_pattern;
+        }else if(ticks<=14U){
+            assert(command.mode==S2_MODE_RPM&&inside_target==line_inside_rpm_x10&&outside_target==expected_outside);
         }else if(ticks<=21U){
-            assert(command.mode==S2_MODE_RPM&&inside_target==line_inside_rpm_x10&&outside_target==line_forward_rpm_x10);
+            assert(command.mode==S2_MODE_RPM&&inside_target==expected_rev&&outside_target==expected_outside);
             if(ticks==21U)pattern=0;
         }else if(ticks<=81U){
             assert(command.mode==S2_MODE_RPM&&command.left==line_straight_left_rpm_x10&&command.right==line_forward_rpm_x10);
             assert(app_controller_snapshot(snapshot)==E_OK&&(snapshot[4]&15)==APP_CTRL_FOLLOWING);
             if(ticks==81U){
-                pass(turning_left?"after a sustained left bend both white sensors command straight immediately":
-                                  "after a sustained right bend both white sensors command straight immediately");
+                pass(turning_left?"sustained sharp left bend stops inside wheel then engages calibrated reverse assist before recovering":
+                                  "sustained sharp right bend stops inside wheel then engages reverse assist before recovering");
                 pattern=inside_pattern^3U;
             }
         }else if(ticks==82U){
-            assert(command.mode==S2_MODE_RPM&&inside_target==line_forward_rpm_x10&&outside_target==line_inside_rpm_x10);
+            const INT opp_outside=turning_left?line_straight_left_rpm_x10:line_forward_rpm_x10;
+            assert(command.mode==S2_MODE_RPM&&outside_target==line_inside_rpm_x10&&inside_target==opp_outside);
             assert(app_controller_submit_stop(106,99,operating_ms+1000U)==E_OK);
         }else{
             stopped();
@@ -616,6 +653,7 @@ static void run(unsigned which){
     feedback_brief_busy=feedback_wait_times_out=0;
     nav_phase=S5_NAV_CLEAR;counts=(S2_ENCODER_COUNTS){0,0};
     nav_turn_id=ended_turn_id=0;obstacle_stop_required=FALSE;
+    sharp_bend.side=0;sharp_bend.since_ms=0;
 #ifdef APP_OBSTACLE_BYPASS
     last_drive_ms=0;
     bypass=(OBSTACLE_BYPASS){0};range_hold_ms=0;front_blocked=front_missing=front_no_return=FALSE;
@@ -763,9 +801,12 @@ static void test_junction(void){
         barcode_sample=(TELEMETRY_BARCODE){.timestamp_ms=1000,.event_sequence=1,
             .code=S3_BC_VALID|S3_BC_REVERSED|(S3_BC_FIRST_LETTER_INDEX+choice)};
         junction_read_barcode(TRUE,1000);
+        barcode_sample=(TELEMETRY_BARCODE){.timestamp_ms=1010,.event_sequence=99,.code=0};
+        junction_read_barcode(TRUE,1010);
+        assert(junction.pending_code==(S3_BC_VALID|S3_BC_REVERSED|(S3_BC_FIRST_LETTER_INDEX+choice)));
         junction_observe(&line,&motion,1000);
         junction_observe(&line,&motion,1020);
-        assert(junction.phase==JUNCTION_IDLE&&junction.pending_code==barcode_sample.code);
+        assert(junction.phase==JUNCTION_IDLE&&junction.pending_code);
         line.timestamp_ms=1040;
         junction_observe(&line,&motion,1040);
         assert(junction.crossed&&!junction.pending_code);
@@ -778,7 +819,13 @@ static void test_junction(void){
         motion.timestamp_ms=motion.speed_timestamp_ms=1060;
         (void)junction_step(&motion,1060,TRUE,&targets);
         assert(targets.left_rpm_x10>0&&targets.right_rpm_x10>0&&targets.left_rpm_x10<targets.right_rpm_x10);
-        motion.distance_centre_mm_x10=JUNCTION_CENTER_MM*10;
+        motion.distance_left_mm_x10=200*STRAIGHT_LEFT_RPM_X10/STRAIGHT_RIGHT_RPM_X10;
+        motion.distance_right_mm_x10=200;
+        motion.speed_timestamp_ms=1080;motion.timestamp_ms=1080;
+        (void)junction_step(&motion,1080,TRUE,&targets);
+        assert(junction.phase==JUNCTION_CENTERING&&junction.move.trim_rpm_x10==0);
+        motion.distance_left_mm_x10=(JUNCTION_CENTER_MM*10*STRAIGHT_LEFT_RPM_X10+STRAIGHT_RIGHT_RPM_X10-1)/STRAIGHT_RIGHT_RPM_X10;
+        motion.distance_right_mm_x10=JUNCTION_CENTER_MM*10;
         motion.timestamp_ms=motion.speed_timestamp_ms=1100;
         (void)junction_step(&motion,1100,FALSE,&targets);
         assert(junction.phase==JUNCTION_TURNING&&!targets.left_rpm_x10&&!targets.right_rpm_x10);
@@ -788,8 +835,8 @@ static void test_junction(void){
         assert((angles[choice]>0?targets.left_rpm_x10<0:targets.left_rpm_x10>0)&&
                (angles[choice]>0?targets.right_rpm_x10>0:targets.right_rpm_x10<0));
         const INT arc=junction.move.target_mm_x10;
-        motion.distance_left_mm_x10=angles[choice]>0?-arc:arc;
-        motion.distance_right_mm_x10=-motion.distance_left_mm_x10;
+        motion.distance_left_mm_x10+=angles[choice]>0?-arc:arc;
+        motion.distance_right_mm_x10+=angles[choice]>0?arc:-arc;
         (void)junction_step(&motion,1100,FALSE,&targets);
         assert(junction.phase==JUNCTION_SETTLING&&!targets.left_rpm_x10&&!targets.right_rpm_x10);
         (void)junction_step(&motion,1100,TRUE,&targets);
@@ -799,7 +846,8 @@ static void test_junction(void){
         junction_observe(&line,&motion,1120);
         assert(junction.phase==JUNCTION_IDLE&&!junction.pending_code);
         line.pattern=0;
-        motion.distance_centre_mm_x10+=JUNCTION_EXIT_MM_X10;
+        motion.distance_left_mm_x10+=JUNCTION_EXIT_MM_X10;
+        motion.distance_right_mm_x10+=JUNCTION_EXIT_MM_X10;
         for(unsigned i=0;i<3;++i){line.timestamp_ms+=20;junction_observe(&line,&motion,line.timestamp_ms);}
         assert(!junction.crossed&&!junction.needs_exit);
     }
@@ -836,7 +884,7 @@ int main(void){
     pass("both turn directions reduce only inside duty faster and recover at the normal rate");
     run(0);run(1);run(2);run(3);run(5);run(6);run(15);
 #ifdef APP_OBSTACLE_BYPASS
-    run(7);run(8);run(9);run(10);run(11);run(12);run(13);run(14);run(16);
+    run(7);run(8);run(9);run(10);run(11);run(12);run(13);run(14);run(16);run(20);run(21);
 #else
     run(4);run(17);run(18);run(19);
 #endif

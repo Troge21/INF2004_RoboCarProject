@@ -70,14 +70,15 @@ static S3_LINE_DATA line;
 static S5_RANGE_DATA range;
 static HUMP_TELEMETRY_T imu;
 static TELEMETRY_SCAN scan_source;
+static TELEMETRY_BARCODE barcode_source;
 static TELEMETRY_TRAVEL travel_source;
-static int motion_ready,range_ready,line_ready,imu_ready,scan_ready,travel_ready;
+static int motion_ready,range_ready,line_ready,imu_ready,scan_ready,barcode_ready,travel_ready;
 ER subsystem2_get_motion(S2_MOTION_DATA *s){++source_calls;*s=motion;return motion_ready?0:E_OBJ;}
 ER subsystem3_get_line(S3_LINE_DATA *s){++source_calls;*s=line;return line_ready?0:E_OBJ;}
 ER subsystem4_get_telemetry(HUMP_TELEMETRY_T *s){++source_calls;*s=imu;return imu_ready?0:E_OBJ;}
 ER subsystem5_get_range(S5_RANGE_DATA *s){++source_calls;*s=range;return range_ready?0:E_OBJ;}
 int telemetry_get_scan(TELEMETRY_SCAN *s){*s=scan_source;return scan_ready?0:E_NOSPT;}
-int telemetry_get_barcode(TELEMETRY_BARCODE *s){(void)s;return E_NOSPT;}
+int telemetry_get_barcode(TELEMETRY_BARCODE *s){if(!barcode_ready)return E_NOSPT;*s=barcode_source;return E_OK;}
 int telemetry_get_travel(TELEMETRY_TRAVEL *s){if(!travel_ready)return E_OBJ;*s=travel_source;return E_OK;}
 int telemetry_get_faults(TELEMETRY_FAULTS *s){(void)s;return E_NOSPT;}
 int telemetry_get_resources(TELEMETRY_RESOURCES *s){
@@ -158,6 +159,19 @@ int main(void){
     expect(n==46&&s1_get_bits(b+13,S1_B_TRAVEL,32)==1234,"owner path snapshot reaches the existing 46-byte wire field");
     advance(2001);n=s1_network_poll(b,sizeof(b),17);
     expect(n==46&&s1_get_bits(b+13,S1_B_TRAVEL,32)==UINT32_MAX,"stale path expires instead of appearing current");
+    barcode_ready=1;
+    barcode_source=(TELEMETRY_BARCODE){.timestamp_ms=calendar_ms,.event_sequence=7,.code=S3_BC_VALID|10U};
+    collect();advance(5000);n=s1_network_poll(b,sizeof(b),17);
+    expect(n==46&&s1_get_bits(b+13,S1_B_BARCODE,7)==11&&s1_get_bits(b+13,S1_B_EVENT,16)==7,
+        "decoded barcode remains in telemetry past brief WiFi stalls");
+    advance(10001);n=s1_network_poll(b,sizeof(b),17);
+    expect(n==46&&s1_get_bits(b+13,S1_B_BARCODE,7)==0&&s1_get_bits(b+13,S1_B_EVENT,16)==0,
+        "barcode telemetry expires cleanly after 15 seconds");
+    barcode_source=(TELEMETRY_BARCODE){.timestamp_ms=calendar_ms,.event_sequence=8,.code=0};
+    collect();advance(400);n=s1_network_poll(b,sizeof(b),17);
+    expect(n==46&&s1_get_bits(b+13,S1_B_BARCODE,7)==0&&s1_get_bits(b+13,S1_B_EVENT,16)==8&&
+        s1_get_bits(b+13,S1_B_NAV,3)==0,"detection-only barcode publishes sequence without decoded symbol");
+    barcode_ready=0;
     imu_ready=1;imu.state=S4_STATE_MONITORING;
     imu.timestamp_ms=imu.pitch_timestamp_ms=calendar_ms;
     imu.flags=S4_FLAG_SENSOR_OK|S4_FLAG_PITCH_VALID|S4_FLAG_ENCODER_HEIGHT;

@@ -262,7 +262,9 @@ function update(force=false){
   const lineLabels=['Left','Right'];
   const lineState=i=>current?.ir?.[i]===1?'Black line':current?.ir?.[i]===0?'Background':'Unavailable';
   const ir=$('overview-ir');if(ir){ir.innerHTML=[1,2].map((i,j)=>`<i class="${current?.ir?.[i]===1?'on':current?.ir?.[i]===0?'':'unknown'}" title="${lineLabels[j]}: ${lineState(i)}" aria-label="${lineLabels[j]}: ${lineState(i)}">${lineState(i)==='Unavailable'?'?':''}</i>`).join('');ir.setAttribute('aria-label',`Line sensors: left ${lineState(1)}, right ${lineState(2)}. Barcode IR is a separate input.`);}
-  if($('sensor-status'))$('sensor-status').innerHTML='<div class="sensor-tile"><span class="sensor-indicator reserved" aria-hidden="true">B</span><strong>Barcode IR</strong><small>GP28 AO · Code 39 active</small></div>'+[1,2].map((i,j)=>`<div class="sensor-tile"><span class="sensor-indicator ${current?.ir?.[i]===1?'on':current?.ir?.[i]===0?'':'unknown'}" aria-hidden="true">${lineState(i)==='Unavailable'?'?':''}</span><strong>${lineLabels[j]} IR · GP${j===0?27:26}</strong><small>${lineState(i)}</small></div>`).join('');
+  const barcodeSignalClass=barcodeSignal?.black?'on':barcodeSignal?.adc!=null?'':'reserved';
+  const barcodeSignalNote=barcodeSignal?.adc!=null?`GP28 AO · ${barcodeSignal.black?'Black':'White'} (${barcodeSignal.adc})`:'GP28 AO · Waiting';
+  if($('sensor-status'))$('sensor-status').innerHTML=`<div class="sensor-tile"><span class="sensor-indicator ${barcodeSignalClass}" aria-hidden="true">B</span><strong>Barcode IR</strong><small>${escape(barcodeSignalNote)}</small></div>`+[1,2].map((i,j)=>`<div class="sensor-tile"><span class="sensor-indicator ${current?.ir?.[i]===1?'on':current?.ir?.[i]===0?'':'unknown'}" aria-hidden="true">${lineState(i)==='Unavailable'?'?':''}</span><strong>${lineLabels[j]} IR · GP${j===0?27:26}</strong><small>${lineState(i)}</small></div>`).join('');
 
   for(const [name,key,color]of [['speed','average_wheel_mps','#208f85'],['distance','distance_m','#8b78df'],['obstacle','obstacle_mm','#208f85'],['hump','max_hump_mm','#acbc89']])sparkline($(`spark-${name}`),store.history.map(d=>d[key]),color);
   const opts={seconds,now};

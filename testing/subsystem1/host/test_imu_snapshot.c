@@ -188,6 +188,43 @@ static void test_gentle_pickup(void) {
     for(unsigned ms=1000;ms<=1240;ms+=20)
         confirmed|=pickup_update(&progress,&level,&tilted,ms);
     expect(!confirmed,"a rise alone and a tilt outside the confirmation window leave STOP clear");
+
+    /* Level vertical lift: >=1.1g rise for 60 ms, then <=0.85g vertical deceleration for 60 ms. */
+    const GY511_ACCEL_DATA_T brisk_rising={0,0,1450};
+    const GY511_ACCEL_DATA_T decel={0,0,750};
+    progress=(S4_PICKUP_PROGRESS){0};
+    confirmed=FALSE;
+    for(unsigned ms=0;ms<=60;ms+=20)
+        confirmed|=pickup_update(&progress,&level,&rising,ms);
+    expect(!confirmed&&progress.lift_phase==S4_LIFT_ARMED,"level rise arms pickup check");
+    for(unsigned ms=80;ms<140;ms+=20)
+        confirmed|=pickup_update(&progress,&level,&decel,ms);
+    expect(!confirmed&&pickup_update(&progress,&level,&decel,140),
+        "level vertical pickup confirms after sustained post-rise deceleration with zero tilt");
+
+    progress=(S4_PICKUP_PROGRESS){0};
+    confirmed=FALSE;
+    for(unsigned ms=0;ms<=60;ms+=20)
+        confirmed|=pickup_update(&progress,&level,&brisk_rising,ms);
+    expect(!confirmed&&progress.lift_phase==S4_LIFT_ARMED,"brisk 1.45g vertical lift still arms");
+    for(unsigned ms=80;ms<=140;ms+=20)
+        confirmed|=pickup_update(&progress,&level,&decel,ms);
+    expect(confirmed,"brisk level vertical pickup triggers STOP");
+
+    progress=(S4_PICKUP_PROGRESS){0};
+    confirmed=FALSE;
+    for(unsigned ms=0;ms<=60;ms+=20)
+        confirmed|=pickup_update(&progress,&level,&rising,ms);
+    for(unsigned ms=80;ms<=100;ms+=20)
+        confirmed|=pickup_update(&progress,&level,&decel,ms);
+    confirmed|=pickup_update(&progress,&level,&level,120);
+    expect(!confirmed,"a brief 40 ms deceleration dip after a rise leaves STOP clear");
+
+    progress=(S4_PICKUP_PROGRESS){0};
+    confirmed=FALSE;
+    for(unsigned ms=0;ms<=120;ms+=20)
+        confirmed|=pickup_update(&progress,&level,&decel,ms);
+    expect(!confirmed,"low-g dip without a prior upward rise leaves STOP clear");
 }
 static void terrain_samples(S2_MOTION_DATA *motion, uint32_t *now, int pitch, int roll,
                             unsigned count, unsigned step_x10) {

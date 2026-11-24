@@ -249,6 +249,15 @@ static void test_barcode_acquisition(void){
         assert(telemetry_get_barcode(&detection)==E_OK && detection.event_sequence==input-1U);
         assert(s3_barcode_character(detection.code)=='A' && !detection.navigation);
     }
+    /* Undecodable multi-bar burst (>=S3_BC_RUNS) should publish detection-only code=0. */
+    for(unsigned i=0;i<S3_BC_RUNS;++i)scan_widths[i]=(i&1U)?10000U:20000U;
+    scan_mode=2;
+    scan_start_us=hardware_us;
+    remaining_samples=1000U; /* 2000 ms: covers 200 ms lead + 440 ms burst + >600 ms quiet */
+    if(setjmp(task_done)==0)sample_line_and_barcode();
+    scan_mode=0;
+    assert(telemetry_get_barcode(&detection)==E_OK && detection.code==0 &&
+        detection.event_sequence==7+sizeof(driving_guard_ms)/sizeof(driving_guard_ms[0]));
     puts("PASS: AO task detects normal and faint labels in both directions and rejects brief spikes and a plain stripe");
 }
 #endif

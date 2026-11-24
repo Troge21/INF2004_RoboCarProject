@@ -7,6 +7,7 @@
 #define FAULT_MOTOR 63U
 #define FAULT_IMU 64U
 #define FAULT_CONTROL 128U
+#define S1_BARCODE_MAX_AGE_MS 15000U
 uint32_t s1_read_u32(const uint8_t *b) {
     return (uint32_t)b[0]|((uint32_t)b[1]<<8)|((uint32_t)b[2]<<16)|((uint32_t)b[3]<<24);
 }
@@ -147,7 +148,7 @@ int s1_pack_frame(const S1_SNAPSHOT *s,uint32_t now,uint32_t boot,uint32_t sessi
         s1_set_bits(b,S1_B_LEFT,14,SPEED_NULL);s1_set_bits(b,S1_B_RIGHT,14,SPEED_NULL);
     }
     if(expired(s,S1_AGE_TRAVEL,now,2000))s1_set_bits(b,S1_B_TRAVEL,32,UINT32_MAX);
-    if(expired(s,S1_AGE_BARCODE,now,2000)){
+    if(expired(s,S1_AGE_BARCODE,now,S1_BARCODE_MAX_AGE_MS)){
         s1_set_bits(b,S1_B_BARCODE,7,0);s1_set_bits(b,S1_B_EVENT,16,0);s1_set_bits(b,S1_B_NAV,3,0);
     }
     if(expired(s,S1_AGE_FAULTS,now,2000))faults(b,S1_EXTERNAL_FAULT_MASK,0,0);

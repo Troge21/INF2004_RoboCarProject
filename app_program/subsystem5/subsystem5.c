@@ -316,7 +316,7 @@ static int scan_edge(const uint16_t distances[SCAN_POINTS],int direction,UW cent
         const UINT mm=distances[index];
         const UINT cosine=cos_from_centre(index);
         const UW depth=(mm*cosine+2048U)/4096U;
-        if(!cosine || mm==SCAN_BAD_ECHO || (mm && mm+tolerance<centre))return 0;
+        if(!cosine || mm==SCAN_BAD_ECHO || (mm && mm+2U*tolerance<centre))return 0;
         const BOOL same_face=mm && (mm<=centre+tolerance ||
             (depth+depth_tolerance>=centre && depth<=centre+depth_tolerance));
         if(same_face)continue;
@@ -324,6 +324,7 @@ static int scan_edge(const uint16_t distances[SCAN_POINTS],int direction,UW cent
          * of the clear rays has a farther echo. Two missed pings with a
          * face hit between them do not establish an edge. */
         if(gap && (step-gap==1U || (step-gap==2U && (gap_has_echo || mm))))return (int)gap;
+        if(step==SCAN_MIDDLE && mm>centre+tolerance)return (int)(gap?gap:step);
         gap=step;
         gap_has_echo=mm!=0U;
     }
